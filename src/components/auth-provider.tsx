@@ -6,10 +6,10 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../services/supabase';
+import { supabase, supabaseConfig } from '../services/supabase';
 
 function client() {
-  if (!supabase) throw Error('Supabase não configurado.');
+  if (!supabase) throw Error(supabaseConfig.message);
   return supabase;
 }
 const actions = {

@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { supabase } from '../services/supabase';
-import { authMessage } from '../services/auth-errors';
+import { supabase, supabaseConfig } from '../services/supabase';
+import {
+  authMessage,
+  authErrorDetails,
+  SIGNUP_CONFIRMATION,
+} from '../services/auth-errors';
 import { useAuth } from './auth-provider';
 import {
   Dialog,
@@ -16,6 +20,9 @@ export function AuthForm({ close }: { close: () => void }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState('');
+  const [details, setDetails] = useState<ReturnType<
+    typeof authErrorDetails
+  > | null>(null);
   const [busy, setBusy] = useState(false);
   const recovery = auth.recovery;
   return (
@@ -38,8 +45,8 @@ export function AuthForm({ close }: { close: () => void }) {
         </DialogDescription>
         {!supabase ? (
           <p>
-            Sincronização ainda não configurada. Você pode continuar usando os
-            dados neste navegador.
+            {supabaseConfig.message} Você pode continuar usando os dados neste
+            navegador.
           </p>
         ) : (
           <form
@@ -49,6 +56,7 @@ export function AuthForm({ close }: { close: () => void }) {
                 if (!supabase) return;
                 setBusy(true);
                 setMessage('');
+                setDetails(null);
                 try {
                   if ((mode === 'signup' || recovery) && password !== confirm) {
                     setMessage('As senhas precisam ser iguais.');
@@ -67,10 +75,7 @@ export function AuthForm({ close }: { close: () => void }) {
                     const { data, error } = await auth.signUp(email, password);
                     if (error) throw error;
                     if (data.session) close();
-                    else
-                      setMessage(
-                        'Confira seu email para confirmar o cadastro. Se já possui conta, entre ou recupere a senha.',
-                      );
+                    else setMessage(SIGNUP_CONFIRMATION);
                   } else {
                     const { error } = await auth.resetPassword(email);
                     if (error) throw error;
@@ -79,7 +84,12 @@ export function AuthForm({ close }: { close: () => void }) {
                     );
                   }
                 } catch (error) {
-                  setMessage(authMessage(error));
+                  const diagnostic = authErrorDetails(error, [
+                    password,
+                    confirm,
+                  ]);
+                  setDetails(diagnostic);
+                  setMessage(authMessage(diagnostic));
                 } finally {
                   setBusy(false);
                 }
@@ -87,9 +97,11 @@ export function AuthForm({ close }: { close: () => void }) {
             }}
           >
             {!recovery && (
-              <label>
+              <label htmlFor={`${mode}-email`}>
                 Email
                 <input
+                  id={`${mode}-email`}
+                  name="email"
                   type="email"
                   autoComplete="email"
                   required
@@ -99,9 +111,11 @@ export function AuthForm({ close }: { close: () => void }) {
               </label>
             )}
             {(recovery || mode !== 'reset') && (
-              <label>
+              <label htmlFor={`${recovery ? 'recovery' : mode}-password`}>
                 Senha
                 <input
+                  id={`${recovery ? 'recovery' : mode}-password`}
+                  name="password"
                   type="password"
                   autoComplete={
                     mode === 'signup' || recovery
@@ -116,9 +130,11 @@ export function AuthForm({ close }: { close: () => void }) {
               </label>
             )}
             {(recovery || mode === 'signup') && (
-              <label>
+              <label htmlFor={`${recovery ? 'recovery' : mode}-confirm`}>
                 Confirmar senha
                 <input
+                  id={`${recovery ? 'recovery' : mode}-confirm`}
+                  name="password_confirmation"
                   type="password"
                   autoComplete="new-password"
                   required
@@ -141,7 +157,46 @@ export function AuthForm({ close }: { close: () => void }) {
             </button>
           </form>
         )}
+        {!supabase && (
+          <details>
+            <summary>Diagnóstico seguro da configuração</summary>
+            <p>
+              URL presente:{' '}
+              {supabaseConfig.diagnostics.urlPresent ? 'sim' : 'não'}
+              <br />
+              URL parseável:{' '}
+              {supabaseConfig.diagnostics.urlParseable ? 'sim' : 'não'}
+              <br />
+              HTTPS: {supabaseConfig.diagnostics.https ? 'sim' : 'não'}
+              <br />
+              Host .supabase.co:{' '}
+              {supabaseConfig.diagnostics.supabaseHost ? 'sim' : 'não'}
+              <br />
+              Placeholder detectado:{' '}
+              {supabaseConfig.diagnostics.placeholderUrl ? 'sim' : 'não'}
+              <br />
+              Chave presente:{' '}
+              {supabaseConfig.diagnostics.keyPresent ? 'sim' : 'não'}
+              <br />
+              Tipo: {supabaseConfig.diagnostics.keyType}
+              <br />
+              Prefixo válido:{' '}
+              {supabaseConfig.diagnostics.validPrefix ? 'sim' : 'não'}
+              <br />
+              Placeholder detectado:{' '}
+              {supabaseConfig.diagnostics.placeholderKey ? 'sim' : 'não'}
+            </p>
+          </details>
+        )}
         {message && <output>{message}</output>}
+        {details && (
+          <details>
+            <summary>Detalhes do erro de autenticação</summary>
+            <p>Status: {details.status ?? 'Sem resposta HTTP'}</p>
+            <p>Code: {details.code ?? 'Não informado'}</p>
+            <p>Message: {details.message || 'Não informada'}</p>
+          </details>
+        )}
         {!recovery && (
           <div className="form-actions">
             {supabase && (
@@ -150,6 +205,7 @@ export function AuthForm({ close }: { close: () => void }) {
                   onClick={() => {
                     setMode(mode === 'signup' ? 'login' : 'signup');
                     setMessage('');
+                    setDetails(null);
                   }}
                 >
                   {mode === 'signup' ? 'Entrar' : 'Criar conta'}
@@ -158,6 +214,7 @@ export function AuthForm({ close }: { close: () => void }) {
                   onClick={() => {
                     setMode('reset');
                     setMessage('');
+                    setDetails(null);
                   }}
                 >
                   Esqueci minha senha

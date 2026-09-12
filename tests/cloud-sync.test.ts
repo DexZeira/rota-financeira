@@ -136,5 +136,8 @@ void test('erros comuns de autenticação são traduzidos sem expor conteúdo se
     'Email ou senha incorretos.',
   );
   assert.match(authMessage({ message: 'Email not confirmed' }), /Confirme/);
-  assert.match(authMessage({ message: 'secret internal response' }), /conexão/);
+  assert.equal(
+    authMessage({ message: 'secret internal response' }),
+    'secret internal response',
+  );
 });
