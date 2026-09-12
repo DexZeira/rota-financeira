@@ -1,5 +1,7 @@
 # Login e sincronização do Rota Financeira
 
+Para um projeto já configurado e funcionando, preserve tabela, função, policies e dados existentes. As correções da auditoria em `AUDIT.md` são de frontend e não exigem reexecutar o SQL. O procedimento abaixo também serve para configurar novos ambientes. Use `npm run verify` como comando de build no Cloudflare para validar antes de publicar.
+
 O código está preparado; nenhum projeto Supabase, banco remoto ou deploy foi criado por esta alteração. Não há credenciais incluídas. As fórmulas financeiras e a chave original `rota-financeira-v1` continuam iguais.
 
 ## 1. Criar e configurar o Supabase

@@ -1,73 +1,73 @@
-# Rota financeira
+# Rota Financeira
 
-Aplicação local-first em React 19, TypeScript e Vite. Sem backend, login ou serviços financeiros externos. Interface em português, BRL, temas claro/escuro e navegação adaptada a celular.
+Finanças pessoais e gestão de trabalho/veículo em React, TypeScript e Vite. Aplicação local-first com login e sincronização opcionais pelo Supabase. Português, BRL e temas claro, escuro e sistema.
 
-## Executar
+## Desenvolvimento local
 
-Requer Node.js 22.13 ou superior.
-
-```sh
-npm install
-npm run dev
-```
-
-Abra o endereço exibido no terminal (normalmente http://127.0.0.1:5173). Use sempre a mesma origem — protocolo, endereço e porta — para acessar os mesmos dados do navegador.
+Node.js 22.13 ou superior; CI em Node 22. Instale as versões do lockfile:
 
 ```sh
-npm test
-npm run build
-npm start
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-`npm start` serve a versão compilada, normalmente na porta 4173. Por usar outra origem, é necessário importar o backup do ambiente de desenvolvimento. Para uso contínuo, escolha uma origem e mantenha-a. A pasta `dist` pode ser servida por qualquer servidor de arquivos estáticos. Não abra `index.html` diretamente via `file://`.
+Use sempre a mesma origem para acessar o mesmo armazenamento. `localhost`, portas diferentes e outros navegadores têm cópias distintas. `npm start` serve `dist` depois do build, normalmente em 4173.
 
-## Primeiros passos
+```sh
+npm run verify
+npm audit --omit=dev
+```
 
-1. Em Configurações, informe saldo inicial, dias, horas e km planejados, despesas essenciais e metas.
-2. Em Moto, informe odômetro, valores de compra e atual, preço do combustível e consumo. Cadastre previsões por km com seus custos e vidas úteis.
-3. Em Manutenção, configure intervalos e datas dos itens estruturais. Nenhum intervalo ou preço foi presumido.
-4. Registre trabalho, gastos, dívidas e investimentos. Todo registro permite edição e exclusão com confirmação.
-5. Faça backups JSON regularmente em Configurações → Dados e backup.
+`verify` interrompe na primeira falha: testes → lint → TypeScript/build. Não requer credenciais reais.
 
-## Regras de cálculo
+## Supabase e variáveis
 
-- Saldo = saldo inicial + trabalho − gastos − serviços − pagamentos − aportes + retiradas.
-- Reserva da moto separa uma parte do saldo disponível, sem criar despesa. O uso libera a alocação; o gasto real deve ser registrado uma vez.
-- Custo operacional/km = combustível/km + previsões configuradas por km. Seguro e documentação usam custo e km previstos para o mesmo período.
-- Custo econômico/km inclui a diferença entre compra e valor atual dividida pela distância desde a compra. Depreciação não movimenta dinheiro.
-- Lucros estimados usam o custo econômico configurado atualmente. Valores financeiros sem configuração permanecem zerados.
-- Meta diária considera o maior entre despesas essenciais e gastos recorrentes, parcelas, aportes, planos, lucro líquido desejado e custo econômico da distância planejada. As reservas por km já estão nesse custo.
-- Serviços entram nos gastos reais automaticamente. Não replique o mesmo serviço na aba Gastos. A aplicação não presume que dois registros independentes do mesmo valor sejam duplicados.
-- Dívidas usam saldo e parcelas informados na inclusão, menos os pagamentos cadastrados. Juros servem à ordenação; não há capitalização, renegociação ou pagamentos automáticos.
-- Saldo inicial de investimentos representa patrimônio já existente. Novos aportes e retiradas alteram caixa; rendimentos e perdas alteram o investimento. Taxa de rentabilidade é informativa.
-- Dinheiro marcado em planos não é somado novamente ao patrimônio. Saldo guardado = saldo inicial + aportes do histórico − retiradas. Editar ou excluir movimentos recalcula o saldo; retiradas acima do saldo são rejeitadas. Um plano de troca desconta valor estimado da XRE e entrada. Planos marcados como concluídos deixam de compor a meta diária.
-- Manutenção considera o primeiro prazo entre data e km. Registrar um serviço redefine a base do próximo ciclo. Projeções somam o próximo evento de cada item, não repetições ilimitadas; previsão por km usa média dos últimos 30 dias.
-- Gastos recorrentes entram no orçamento, mas cada pagamento efetivo precisa ser registrado. O odômetro é atualizado explicitamente em Moto.
+Copie `.env.example` para `.env.local` e preencha somente para usar conta/nuvem:
 
-## Dados e recuperação
+```dotenv
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
 
-Armazenamento principal: `rota-financeira-v1` no localStorage. Gravação síncrona antes de confirmar sucesso; falhas de armazenamento não são escondidas. Outra aba atualiza a aplicação e fecha formulários em edição para evitar sobrescritas silenciosas.
+Use Project URL e publishable key ou anon legada. Nunca use service role, `sb_secret_` ou senha do banco. `.env.local` é ignorado; reinicie Vite após alterá-lo. Sem configuração válida, o uso local continua disponível.
 
-Backups incluem `version`, `exportDate` e `data` com `dataVersion`. A versão atual é 2, com histórico de aportes e retiradas dos planos. A importação valida estrutura, tipos, datas, valores, IDs únicos e referências, apresenta resumo e pede confirmação. Backups maiores que 20 MB são rejeitados. Os formatos conhecidos v0 e v1 são migrados, preservando o saldo dos planos; formatos externos desconhecidos são rejeitados sem substituir dados. O identificador de armazenamento continua `rota-financeira-v1` por compatibilidade.
+[SUPABASE_SETUP.md](SUPABASE_SETUP.md) explica SQL, Auth, redirects, Cloudflare e testes reais. [supabase/schema.sql](supabase/schema.sql) define uma linha por usuário, quatro policies de propriedade e RPC com compare-and-swap. Não resete o banco para atualizar o frontend.
 
-Reset total exige digitar `RESET`, salva recuperação em `rota-recovery` e solicita download do backup antes de limpar. A opção “Recuperar último backup automático” permite restaurar a última cópia. Outros resets preservam os domínios indicados na tela. Reset de configurações mantém saldo inicial para preservar o histórico financeiro. Dados corrompidos são preservados, e a tela permite importar um backup válido.
+## Dados, backup e recuperação
 
-Dados pertencem ao navegador/origem; não há sincronização entre dispositivos. Limpar dados do navegador também remove backups automáticos locais. Guarde os arquivos JSON fora do navegador. O download depende de o navegador permitir downloads. Em ambientes que não iniciam o download, “Copiar backup” copia o JSON completo para guardar em um arquivo `.json`.
+- Chave principal: `rota-financeira-v1`, preservada por compatibilidade. Schema/backup atuais: **v4**. Migrações v0–v3 são validadas antes de usar os dados.
+- Gravações locais precedem a confirmação. JSON corrompido ou versão desconhecida bloqueiam edição; o conteúdo original não é apagado automaticamente.
+- Configurações → Dados e backup permite baixar ou copiar JSON completo. Importação valida estrutura, IDs, datas e relações, mostra contagens e pede confirmação. Limite: 20 MB.
+- Antes de importação/reset e substituição por download remoto, uma cópia de recuperação local é preservada. Há uma última cópia por conta, não um histórico ilimitado. Contas antigas e cópias convidadas também consomem quota; não há expurgo automático.
+- Reset total exige `RESET` e solicita download. Falha ao preservar a cópia impede a substituição. A recuperação permite revisar/importar a cópia anterior.
+- Limpar dados do navegador apaga também recuperações locais. Guarde JSON fora do navegador. Solicitar download não garante que o arquivo foi guardado.
 
-## Arquivos principais
+## Sincronização e privacidade
 
-- `app/page.tsx`: navegação, persistência, diálogos de edição, importação e reset.
-- `src/model.ts`: tipos, campos, padrões estruturais e validações.
-- `src/calculations.ts`: custos, lucros, metas, dívidas, investimentos, manutenção e projeções.
-- `src/services/storage.ts`: CRUD, integridade, persistência, migração, backup e reset.
-- `src/components/common.tsx`: formulários acessíveis, listas, pesquisa e filtros.
-- `src/pages/views.tsx`: dez telas e gráficos.
-- `src/pages/settings.tsx`: configurações, exportação, cópia de backup e resets.
-- `app/globals.css`: tema e responsividade.
-- `tests/core.test.ts`: testes das regras e do ciclo de dados.
+Com sessão pronta, o app isola a conta local, lê a nuvem e compara com a última base sincronizada. Divergências pedem escolha. O timestamp remoto é usado literalmente no CAS; resposta vazia provoca releitura/conflito.
 
-## Limites desta versão
+Alterações offline permanecem no dispositivo. Reconexão/foco provocam nova tentativa. Logout mantém cópia local; em dispositivos compartilhados, use perfis separados. Uma aba carregada funciona offline, mas não há service worker/PWA que garanta abertura offline.
 
-As análises filtram faturamento, lucro estimado, gastos e atividades por período. Custo/km, dívidas, investimentos e patrimônio mostram a posição atual; não se inventa histórico de cotações ou avaliações da moto. Não há integração FIPE, inflação, banco, recomendação de investimento ou plano oficial de manutenção. Os intervalos e preços são definidos pelo usuário.
+Não há analytics financeiro ou monitoramento externo instalado pela auditoria. Diagnósticos ficam locais e omitem credenciais. Publishable keys são públicas; registros são protegidos por Auth/RLS.
 
-A aplicação funciona com servidor estático local, sem acesso à internet após instalar dependências. Não instala service worker nem promete abertura por URL remota sem conexão. Os dados ficam disponíveis após reiniciar o navegador na mesma origem.
+## Regras e arquitetura
+
+Fórmulas: `src/calculations.ts`, `src/target-sources.ts`, `src/work-results.ts` e utilitários relacionados. Campos/validações: `src/model.ts`. Migração/persistência: `src/services/storage.ts`. UI deve reutilizar as regras existentes.
+
+Dinheiro interno é numérico, separado da apresentação BRL. Datas financeiras são `YYYY-MM-DD` local; sincronização usa timestamps ISO. Não altere arredondamentos, fórmulas ou formato persistido sem identificar a mudança e testar compatibilidade.
+
+## Deploy Cloudflare Pages
+
+Destino existente: `rota-financeira.pages.dev`; branch de produção `main`; saída `dist`.
+
+Configure no painel o build **`npm run verify`** para impedir publicação se teste, lint ou build falhar. Configure as variáveis Vite em Production e faça novo build ao alterá-las. Não envie `.env.local` ao Git.
+
+O workflow [Validacao](.github/workflows/validate.yml) executa `npm ci`, `verify` e audit em push/PR, sem secrets Supabase. Após o primeiro push, proteja `main` exigindo o check **Testes, lint e build**. CI sozinho não bloqueia deploy automático independente da Cloudflare; o comando `verify` no painel também é necessário. A auditoria não alterou os painéis nem publicou o site.
+
+Referências: [GitHub Actions para Node](https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs), [build Cloudflare Pages](https://developers.cloudflare.com/pages/configuration/build-configuration/).
+
+## Auditoria
+
+Veja [AUDIT.md](AUDIT.md). PWA, telemetria, migração para centavos, remoção de ferramentas e grandes divisões de páginas ficam para fases próprias.
+
+`.agents/` e `skills-lock.json` são instruções de desenvolvimento versionadas, não código da aplicação. Mantê-los reproduz o contexto do agente. Se a equipe preferir configuração pessoal, pode removê-los do índice e ignorá-los em uma mudança específica; não foram removidos automaticamente.

@@ -11,7 +11,8 @@
     "start": "vite preview --host 127.0.0.1",
     "lint": "oxlint",
     "format": "oxfmt",
-    "test": "node tests/run.mjs"
+    "test": "node tests/run.mjs",
+    "verify": "npm test && npm run lint && npm run build"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
