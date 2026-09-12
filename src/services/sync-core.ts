@@ -40,6 +40,22 @@ export type SyncMeta = {
   lastSync?: string;
   localUpdated?: string;
 };
+export type SyncErrorDetails = {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  status?: number;
+};
+export function syncStatus(error: SyncErrorDetails, online: boolean): string {
+  if (!online) return 'Offline — alterações serão sincronizadas quando possível.';
+  if (error.status === 401) return 'Sessão expirada. Entre novamente para sincronizar.';
+  if (error.code === 'PGRST202') return 'RPC de sincronização ausente no Supabase.';
+  if (error.code === 'PGRST205' || error.code === '42P01')
+    return 'Tabela de sincronização ausente no Supabase.';
+  if (error.code === '42501') return 'Acesso negado pelas policies do Supabase.';
+  return 'Erro ao sincronizar. Seus dados continuam neste dispositivo.';
+}
 export const OWNER_KEY = 'rota-cloud-owner';
 export const accountKey = (user: string) => `rota-cloud-account:${user}`;
 export const metaKey = (user: string) => `rota-cloud-meta:${user}`;

@@ -14,6 +14,7 @@ import {
   resolveInitialSync,
   serializeSnapshot,
   switchAccount,
+  syncStatus,
 } from '../src/services/sync-core';
 import { authMessage } from '../src/services/auth-errors';
 
@@ -140,4 +141,11 @@ void test('erros comuns de autenticação são traduzidos sem expor conteúdo se
     authMessage({ message: 'secret internal response' }),
     'secret internal response',
   );
+});
+void test('diagnóstico de sincronização diferencia infraestrutura, sessão, offline e permissão', () => {
+  assert.match(syncStatus({ message: 'missing function', code: 'PGRST202' }, true), /RPC/);
+  assert.match(syncStatus({ message: 'missing table', code: '42P01' }, true), /Tabela/);
+  assert.match(syncStatus({ message: 'denied', code: '42501' }, true), /policies/);
+  assert.match(syncStatus({ message: 'expired', status: 401 }, true), /Sessão/);
+  assert.match(syncStatus({ message: 'offline', code: 'PGRST202' }, false), /Offline/);
 });

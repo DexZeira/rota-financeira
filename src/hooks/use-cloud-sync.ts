@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Data } from '../model';
 import { defaults } from '../model';
 import { backup, load, save } from '../services/storage';
-import { loadCloudState, saveCloudState } from '../services/cloud-sync';
+import {
+  loadCloudState,
+  saveCloudState,
+  type SyncErrorDetails,
+} from '../services/cloud-sync';
 import {
   accountKey,
   fingerprint,
@@ -10,6 +14,7 @@ import {
   OWNER_KEY,
   resolveInitialSync,
   switchAccount,
+  syncStatus,
   type CloudState,
   type SyncMeta,
 } from '../services/sync-core';
@@ -23,6 +28,7 @@ export function useCloudSync(
   const [settled, setSettled] = useState<string>();
   const [status, setStatus] = useState('Somente neste dispositivo');
   const [lastSync, setLastSync] = useState<string>();
+  const [error, setError] = useState<SyncErrorDetails | undefined>();
   const [wake, setWake] = useState(0);
   const [conflict, setConflict] = useState<{
     remote: CloudState | null;
@@ -51,6 +57,7 @@ export function useCloudSync(
       };
       busy.current = true;
       try {
+        setError(undefined);
         if (!valid()) throw Error('Conta mudou em outra aba.');
         if (!navigator.onLine) {
           setSettled(owner);
@@ -159,15 +166,24 @@ export function useCloudSync(
         const pending = fingerprint(load(localStorage)) !== meta.current.base;
         setStatus(pending ? 'Salvando…' : 'Salvo');
         if (pending) setWake((value) => value + 1);
-      } catch {
+      } catch (caught) {
         if (valid()) {
+          const source = caught && typeof caught === 'object'
+            ? caught as Partial<SyncErrorDetails>
+            : {};
+          const details: SyncErrorDetails = {
+            message: typeof source.message === 'string'
+              ? source.message
+              : 'Erro desconhecido de sincronização.',
+            code: typeof source.code === 'string' ? source.code : undefined,
+            details: typeof source.details === 'string' ? source.details : undefined,
+            hint: typeof source.hint === 'string' ? source.hint : undefined,
+            status: typeof source.status === 'number' ? source.status : undefined,
+          };
+          setError(details);
           // The selected account has already been isolated locally, so it can work offline.
           setSettled(owner);
-          setStatus(
-            navigator.onLine
-              ? 'Erro ao sincronizar. Seus dados continuam neste dispositivo.'
-              : 'Offline — alterações serão sincronizadas quando possível.',
-          );
+          setStatus(syncStatus(details, navigator.onLine));
         }
       } finally {
         if (ticket === generation.current) busy.current = false;
@@ -186,6 +202,7 @@ export function useCloudSync(
     queueMicrotask(() => {
       if (ticket !== generation.current) return;
       setConflict(null);
+      setError(undefined);
       setSettled(undefined);
       if (!user) {
         setLastSync(undefined);
@@ -272,5 +289,6 @@ export function useCloudSync(
     synchronize,
     changed,
     pending: !!user && settled !== user,
+    error,
   };
 }

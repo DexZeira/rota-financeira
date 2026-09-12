@@ -228,3 +228,6 @@ on function public.save_app_state(
   timestamptz
 )
 to authenticated;
+
+-- Atualiza o cache do PostgREST quando este script é executado no painel.
+notify pgrst, 'reload schema';

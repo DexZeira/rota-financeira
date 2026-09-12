@@ -614,6 +614,7 @@ export default function Home() {
                   choose={(choice) => {
                     void cloud.synchronize(choice);
                   }}
+                  syncError={cloud.error}
                 />
               )}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}

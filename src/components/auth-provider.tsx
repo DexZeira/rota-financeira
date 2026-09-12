@@ -45,15 +45,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [recovery, setRecovery] = useState(false);
   useEffect(() => {
     if (!supabase) return;
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setLoading(false);
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, next) => {
+      if (!active) return;
       setSession(next);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       if (event === 'SIGNED_OUT') setRecovery(false);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
   return (
     <AuthContext.Provider

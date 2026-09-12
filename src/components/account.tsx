@@ -6,6 +6,7 @@ import {
   SIGNUP_CONFIRMATION,
 } from '../services/auth-errors';
 import { useAuth } from './auth-provider';
+import type { SyncErrorDetails } from '../services/cloud-sync';
 import {
   Dialog,
   DialogContent,
@@ -235,12 +236,14 @@ export function AccountPanel({
   login,
   sync,
   choose,
+  syncError,
 }: {
   status: string;
   lastSync?: string;
   login: () => void;
   sync: () => void;
   choose: (choice: 'local' | 'cloud') => void;
+  syncError?: SyncErrorDetails;
 }) {
   const { session, signOut } = useAuth();
   const [error, setError] = useState('');
@@ -250,6 +253,16 @@ export function AccountPanel({
       <h2>Conta e sincronização</h2>
       <p>{session?.user.email || 'Somente neste dispositivo'}</p>
       <output>{status}</output>
+      {syncError && (
+        <details>
+          <summary>Detalhes do erro de sincronização</summary>
+          <p>Status: {syncError.status ?? 'Sem resposta HTTP'}</p>
+          <p>Código: {syncError.code ?? 'Não informado'}</p>
+          <p>Mensagem: {syncError.message}</p>
+          {syncError.details && <p>Detalhes: {syncError.details}</p>}
+          {syncError.hint && <p>Sugestão: {syncError.hint}</p>}
+        </details>
+      )}
       <p>
         Última sincronização:{' '}
         {lastSync
