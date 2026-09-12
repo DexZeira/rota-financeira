@@ -665,9 +665,35 @@ textarea:focus {
 }
 .form-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
+}
+
+/* Keep long confirmations and diagnostics reachable on short screens. */
+[data-slot='sidebar-inset'] {
+  min-width: 0;
+}
+
+[data-slot='dialog-content'],
+[data-slot='alert-dialog-content'] {
+  max-height: 90dvh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 430px) {
+  .goal-options {
+    grid-template-columns: 1fr !important;
+  }
+  .goal-options button {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 .row-actions {
   display: flex;

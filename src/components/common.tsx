@@ -5,7 +5,7 @@ import {
   updateCardWork,
   maintenanceCosts,
 } from '../calculations';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -48,11 +48,15 @@ export function Choice({
   onChange,
   options,
   label,
+  inputId,
+  name,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: (string | { value: string; label: string })[];
   label: string;
+  inputId?: string;
+  name?: string;
 }) {
   const items = options.map((o) =>
     typeof o === 'string'
@@ -65,11 +69,12 @@ export function Choice({
   );
   return (
     <Select
+      name={name}
       value={value}
       onValueChange={(v) => v !== null && onChange(String(v))}
       items={items}
     >
-      <SelectTrigger aria-label={label} className="choice">
+      <SelectTrigger id={inputId} aria-label={label} className="choice">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -152,6 +157,7 @@ export function Fields({
   setValue: (r: Row) => void;
   data: Data;
 }) {
+  const prefix = useId();
   return (
     <div className="form-grid">
       {fields.map((f) => {
@@ -184,13 +190,15 @@ export function Fields({
         if (['costId', 'workSessionId', 'componentId'].includes(f.key))
           options = [{ value: '', label: 'Nenhuma' }, ...options];
         return (
-          <label className={f.type === 'textarea' ? 'wide' : ''} key={f.key}>
+          <label htmlFor={`${prefix}-${f.key}`} className={f.type === 'textarea' ? 'wide' : ''} key={f.key}>
             <span>
               {f.label}
               {f.required ? ' *' : ''}
             </span>
             {f.type === 'select' ? (
               <Choice
+                inputId={`${prefix}-${f.key}`}
+                name={f.key}
                 label={f.label}
                 options={options}
                 value={String(value[f.key] ?? '')}
@@ -198,6 +206,9 @@ export function Fields({
               />
             ) : f.type === 'textarea' ? (
               <textarea
+                id={`${prefix}-${f.key}`}
+                name={f.key}
+                autoComplete="off"
                 value={String(value[f.key] ?? '')}
                 onChange={(e) =>
                   setValue({ ...value, [f.key]: e.target.value })
@@ -206,6 +217,9 @@ export function Fields({
             ) : (
               <>
                 <input
+                  id={`${prefix}-${f.key}`}
+                  name={f.key}
+                  autoComplete="off"
                   required={f.required}
                   type={f.type || 'text'}
                   min={f.type === 'number' && !f.signed ? 0 : undefined}
