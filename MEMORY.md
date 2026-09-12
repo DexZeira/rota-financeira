@@ -3,6 +3,8 @@
 
 
 Última revisão: 2026-09-11
+ 
+Decisão de 2026-09-12: login e sincronização opcionais via Supabase Auth + snapshot completo do backup (schema atual) em `user_app_state`, com RLS e gravação condicional atômica por `updated_at`. Persistência permanece local-first; nenhuma fórmula financeira foi alterada. Divergências exigem escolha, contas têm cópias locais isoladas e logout conserva dados. Configuração externa pendente conforme `SUPABASE_SETUP.md`; nunca colocar chaves administrativas no frontend.
 
 
 

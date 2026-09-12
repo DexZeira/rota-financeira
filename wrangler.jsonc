@@ -1,9 +1,18 @@
+<<<<<<< HEAD
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rota-financeira",
   "compatibility_date": "2026-09-12",
+  "observability": {
+    "enabled": true
+  },
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
+>>>>>>> f077e2a (Atualiza login e sincronizacao Supabase)
 }

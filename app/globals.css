@@ -1443,3 +1443,13 @@ strong,
     max-width: 100%;
   }
 }
+/* Account controls share the financial application's surfaces and focus styles. */
+.account-dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.account-dialog form, .account-dialog label { display: grid; gap: 8px; }
+.account-dialog form { gap: 18px; }
+.account-dialog input { width: 100%; min-width: 0; }
+.account-dialog .form-actions, .account-panel .form-actions { flex-wrap: wrap; }
+.account-panel { margin-bottom: 24px; }
+.account-panel output { display: block; margin-block: 12px; }
+.account-status { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media(max-width: 600px) { .account-status { max-width: 100px; } }

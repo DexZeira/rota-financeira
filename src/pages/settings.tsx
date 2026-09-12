@@ -157,8 +157,8 @@ export function SettingsView({
             : 'Ainda não registrado neste navegador'}
         </p>
         <p>
-          Seus dados ficam somente neste navegador. Exporte backups para guardar
-          uma cópia fora dele.
+          Seus dados são salvos neste navegador. Consulte Conta e sincronização
+          para verificar a cópia na nuvem. Continue exportando backups JSON.
         </p>
         <div className="button-row">
           <button

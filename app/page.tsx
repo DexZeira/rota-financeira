@@ -1,6 +1,10 @@
 'use client';
 import { GlobalSearch } from '../src/components/global-search';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '../src/components/auth-provider';
+import { AuthForm, AccountPanel } from '../src/components/account';
+import { useCloudSync } from '../src/hooks/use-cloud-sync';
+import { OWNER_KEY, recoveryKey } from '../src/services/sync-core';
 import {
   LayoutDashboard,
   Wallet,
@@ -161,6 +165,8 @@ function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
   );
 }
 export default function Home() {
+  const auth = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
   const [data, setData] = useState<Data>(defaults),
     [page, setPage] = useState('Dashboard'),
     [ready, setReady] = useState(false),
@@ -180,6 +186,22 @@ export default function Home() {
     [incoming, setIncoming] = useState<Data | null>(null);
   const disk = useRef<string | null>(null),
     current = useRef(data);
+  const applyCloud = useCallback((next: Data) => {
+    disk.current = localStorage.getItem(STORAGE_KEY);
+    current.current = next;
+    setData(next);
+    setEditor(null);
+    setUndo(null);
+    setIncoming(null);
+    setDeletion(null);
+    setReset(null);
+  }, []);
+  const cloud = useCloudSync(
+    auth.session?.user.id,
+    ready && !auth.loading && !blocked,
+    data,
+    applyCloud,
+  );
   useEffect(() => {
     current.current = data;
   }, [data]);
@@ -198,7 +220,12 @@ export default function Home() {
       }
       setReady(true);
     });
-    const stored = () => {
+    const stored = (event: StorageEvent) => {
+      if (event.key === OWNER_KEY) {
+        window.location.reload();
+        return;
+      }
+      if (event.key !== STORAGE_KEY) return;
       try {
         const d = load(localStorage);
         disk.current = localStorage.getItem(STORAGE_KEY);
@@ -226,6 +253,11 @@ export default function Home() {
     return () => media.removeEventListener('change', apply);
   }, [data.settings.theme]);
   function commit(next: Data) {
+    if (
+      auth.session &&
+      localStorage.getItem(OWNER_KEY) !== auth.session.user.id
+    )
+      throw Error('A conta mudou em outra aba. Recarregue antes de salvar.');
     if (blocked) throw Error('Recupere seus dados antes de salvar.');
     if (localStorage.getItem(STORAGE_KEY) !== disk.current)
       throw Error('Os dados mudaram em outra aba. Recarregue antes de salvar.');
@@ -234,6 +266,7 @@ export default function Home() {
     disk.current = JSON.stringify(next);
     setData(next);
     current.current = next;
+    cloud.changed();
     setError('');
   }
   function safely(action: () => void) {
@@ -253,11 +286,19 @@ export default function Home() {
     );
   }
   function recovery() {
-    localStorage.setItem('rota-recovery', backup(data));
+    localStorage.setItem(
+      recoveryKey(localStorage.getItem(OWNER_KEY)),
+      backup(data),
+    );
   }
   function go(p: string) {
     setPage(p);
     window.scrollTo({ top: 0 });
+  }
+  function cancelAccount() {
+    void auth.signOut().then(({ error: signOutError }) => {
+      if (signOutError) setError('Não foi possível sair. Tente novamente.');
+    }).catch(() => setError('Não foi possível sair. Tente novamente.'));
   }
   useEffect(() => {
     type Context = {
@@ -310,8 +351,83 @@ export default function Home() {
     }
     return () => lifecycle.abort();
   }, []);
-  if (!ready)
+  if (!ready || auth.loading)
     return <output className="loading">Carregando seus dados…</output>;
+  const accountUi = (
+    <>
+      {(showLogin || auth.recovery) && (
+        <AuthForm close={() => setShowLogin(false)} />
+      )}
+      <Dialog open={!!cloud.conflict} onOpenChange={() => {}}>
+        <DialogContent className="account-dialog">
+          <DialogTitle>
+            {cloud.conflict?.remote
+              ? 'Dados diferentes encontrados'
+              : 'Encontramos dados neste dispositivo'}
+          </DialogTitle>
+          <DialogDescription>
+            {cloud.conflict?.remote
+              ? 'Escolha qual conjunto completo deseja manter. Os dados não serão mesclados.'
+              : 'Deseja salvar seus dados atuais na sua conta?'}
+          </DialogDescription>
+          <p>
+            Este dispositivo · Última atualização:{' '}
+            {cloud.conflict?.localUpdated
+              ? new Date(cloud.conflict.localUpdated).toLocaleString('pt-BR')
+              : 'Data anterior não registrada'}
+          </p>
+          <p>
+            Nuvem · Última atualização:{' '}
+            {cloud.conflict?.remote
+              ? new Date(cloud.conflict.remote.updated_at).toLocaleString(
+                  'pt-BR',
+                )
+              : 'Sem dados'}
+          </p>
+          <div className="form-actions">
+            <button
+              className="primary"
+              onClick={() => {
+                void cloud.synchronize('local');
+              }}
+            >
+              {cloud.conflict?.remote
+                ? 'Usar dados deste dispositivo'
+                : 'Salvar na nuvem'}
+            </button>
+            <button
+              onClick={() => {
+                void cloud.synchronize(
+                  cloud.conflict?.remote ? 'cloud' : 'empty',
+                );
+              }}
+            >
+              {cloud.conflict?.remote ? 'Usar dados da nuvem' : 'Começar vazio'}
+            </button>
+            <button
+              onClick={() => {
+                cancelAccount();
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+  if ((!blocked && cloud.pending) || auth.recovery)
+    return (
+      <>
+        <div className="loading">
+          <p>Preparando os dados da sua conta…</p>
+          <output>{cloud.status}</output>
+          {error && <p role="alert">{error}</p>}
+          {!auth.recovery && <button onClick={cancelAccount}>Continuar sem conta</button>}
+        </div>
+        {accountUi}
+      </>
+    );
   const props = {
     data,
     saveSettings: (settings: Row) =>
@@ -357,7 +473,9 @@ export default function Home() {
           <Nav page={page} go={go} />
         </SidebarContent>
         <SidebarFooter>
-          <div className="local-status">● Dados neste navegador</div>
+          <div className="local-status">
+            <output>{cloud.status}</output>
+          </div>
           <small>
             {data.bike.brand} {data.bike.model} · {data.bike.year}
           </small>
@@ -393,7 +511,15 @@ export default function Home() {
                 <Moon size={17} />
               )}
             </button>
-            <span className="badge">LOCAL</span>
+            <button
+              className="account-status"
+              onClick={() =>
+                auth.session ? go('Configurações') : setShowLogin(true)
+              }
+              title={cloud.status}
+            >
+              {auth.session ? auth.session.user.email : 'Entrar'}
+            </button>
           </div>
         </header>
         <main className="workspace">
@@ -463,7 +589,9 @@ export default function Home() {
               <button
                 onClick={() =>
                   safely(() => {
-                    const text = localStorage.getItem('rota-recovery');
+                    const text = localStorage.getItem(
+                      recoveryKey(localStorage.getItem(OWNER_KEY)),
+                    );
                     if (!text)
                       throw Error('Nenhum backup automático disponível.');
                     setIncoming(parseBackup(text));
@@ -475,6 +603,19 @@ export default function Home() {
             </div>
           ) : (
             <>
+              {page === 'Configurações' && (
+                <AccountPanel
+                  status={cloud.status}
+                  lastSync={cloud.lastSync}
+                  login={() => setShowLogin(true)}
+                  sync={() => {
+                    void cloud.synchronize();
+                  }}
+                  choose={(choice) => {
+                    void cloud.synchronize(choice);
+                  }}
+                />
+              )}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}
@@ -507,7 +648,9 @@ export default function Home() {
                   }}
                   onRecovery={() =>
                     safely(() => {
-                      const text = localStorage.getItem('rota-recovery');
+                      const text = localStorage.getItem(
+                        recoveryKey(localStorage.getItem(OWNER_KEY)),
+                      );
                       if (!text)
                         throw Error('Nenhum backup automático disponível.');
                       setIncoming(parseBackup(text));
@@ -530,6 +673,7 @@ export default function Home() {
         </main>
       </SidebarInset>
       <MobileNav page={page} go={go} />
+      {accountUi}
       {editor && (
         <Editor
           key={editor.kind + (editor.row?.id || 'new')}
