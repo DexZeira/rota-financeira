@@ -7,6 +7,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfig } from '../services/supabase';
+import { observeSession } from '../services/auth-session';
 
 function client() {
   if (!supabase) throw Error(supabaseConfig.message);
@@ -45,25 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [recovery, setRecovery] = useState(false);
   useEffect(() => {
     if (!supabase) return;
-    let active = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, next) => {
-      if (!active) return;
+    return observeSession<Session>(supabase.auth, (next, event) => {
       setSession(next);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       if (event === 'SIGNED_OUT') setRecovery(false);
     });
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
   }, []);
   return (
     <AuthContext.Provider

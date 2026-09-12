@@ -28,7 +28,7 @@ export function resolveInitialSync(
 ) {
   const here = fingerprint(local);
   if (remote && here === fingerprint(remote.data)) return 'equal';
-  if (remote && (here === base || here === fingerprint(defaults())))
+  if (remote && (here === base || (base === undefined && here === fingerprint(defaults()))))
     return 'download';
   if (!remote && here === fingerprint(defaults())) return 'upload';
   if (remote && base && fingerprint(remote.data) === base) return 'upload';

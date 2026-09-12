@@ -39,6 +39,20 @@ const memory = () => {
     },
   };
 };
+void test('reset local após sincronização deve subir, sem restaurar dados antigos', () => {
+  const previous = data();
+  assert.equal(resolveInitialSync(defaults(), {
+    data: previous, updated_at: 'revision', device_id: 'A',
+  }, fingerprint(previous)), 'upload');
+});
+void test('reset local e edição remota concorrentes exigem conflito', () => {
+  const previous = data();
+  const remote = data();
+  remote.settings.essential = 999;
+  assert.equal(resolveInitialSync(defaults(), {
+    data: remote, updated_at: 'revision', device_id: 'B',
+  }, fingerprint(previous)), 'conflict');
+});
 void test('snapshot cloud usa backup validado com todos os domínios e schema atual', () => {
   const d = data();
   assert.deepEqual(

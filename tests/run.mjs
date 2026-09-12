@@ -3,6 +3,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 for (const file of [
+  'src/services/cloud-codec.ts',
+  'tests/cloud-codec.test.ts',
+  'src/services/auth-session.ts',
+  'tests/auth-session.test.ts',
   'src/services/supabase-config.ts',
   'tests/auth-config.test.ts',
   'src/services/sync-core.ts',
@@ -44,6 +48,8 @@ const result = spawnSync(
   process.execPath,
   [
     '--test',
+    '.test-output/tests/cloud-codec.test.js',
+    '.test-output/tests/auth-session.test.js',
     '.test-output/tests/auth-config.test.js',
     '.test-output/tests/cloud-sync.test.js',
     '.test-output/tests/core.test.js',
