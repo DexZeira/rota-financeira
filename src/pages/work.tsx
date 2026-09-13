@@ -8,6 +8,7 @@ import {
 import { emptyRow, id } from '../model';
 import { useState } from 'react';
 import { Card, Metrics, Choice, NoData, Records } from '../components/common';
+import { Sheet } from '../components/sheet';
 import { brDate, dec, money, num } from '../model';
 import {
   calculateWorkRevenues,
@@ -23,7 +24,8 @@ export function Work(p: ViewProps) {
   const [activity, setActivity] = useState('todos'),
     [from, setFrom] = useState(''),
     [to, setTo] = useState(''),
-    [search, setSearch] = useState('');
+    [search, setSearch] = useState(''),
+    [filtersOpen, setFiltersOpen] = useState(false);
   const rows = filterWork(d.work, activity, from, to, search).sort((a, b) =>
     String(b.date).localeCompare(String(a.date)),
   );
@@ -40,7 +42,7 @@ export function Work(p: ViewProps) {
   return (
     <>
       <header className="work-page-header">
-        <div><p className="eyebrow">DESEMPENHO</p><h1>Trabalho</h1><p className="page-subtitle">Acompanhe seus ganhos e desempenho.</p></div>
+        <div><p className="eyebrow">DESEMPENHO</p><h1>Trabalho</h1><p className="page-subtitle">Acompanhe seus ganhos e eficiência.</p></div>
         <button className="primary" onClick={() => edit('work')}>+ Registrar trabalho</button>
       </header>
       <section className="work-filters card">
@@ -67,7 +69,10 @@ export function Work(p: ViewProps) {
             Todos / personalizado
           </button>
         </div>
-        <div className="list-tools work-filter-controls">
+        <button className="mobile-filter-button" type="button" onClick={() => setFiltersOpen(true)}>
+          Filtros{activity !== 'todos' || from || to || search ? ' · ativos' : ''}
+        </button>
+        <div className="list-tools work-filter-controls desktop-filters">
           <Choice
             label="Atividade do trabalho"
             value={activity}
@@ -111,6 +116,23 @@ export function Work(p: ViewProps) {
           <p role="alert">A data inicial deve ser anterior à final.</p>
         )}
       </section>
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar trabalho">
+        <Choice
+          label="Atividade do trabalho"
+          value={activity}
+          onChange={setActivity}
+          options={[{ value: 'todos', label: 'Todos' }, ...new Set([
+            'Uber Moto',
+            'Entrega de cartões',
+            ...d.activities.map((r) => String(r.name)),
+            ...d.work.map((r) => String(r.activity)),
+          ])]}
+        />
+        <label>De<input aria-label="Data inicial Trabalho" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label>Até<input aria-label="Data final Trabalho" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label>Busca<input aria-label="Pesquisar Trabalho" placeholder="Pesquisar registros…" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
+        <button className="primary" type="button" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button>
+      </Sheet>
       <Metrics items={[
         ['Ganhos no período', money(actual.revenue), 'Receita registrada'],
         ['Lucro de caixa', money(actual.cashProfit), 'Após despesas atribuídas'],
@@ -320,7 +342,7 @@ export function Work(p: ViewProps) {
             );
           })
         ) : (
-          <NoData text="Nenhum trabalho para os filtros selecionados." />
+          <NoData text="Nenhum trabalho encontrado. Registre sua primeira atividade para acompanhar ganhos e custos." />
         )}
       </div>
       <Records {...p} kind="activities" rows={d.activities} sortKey="name" />

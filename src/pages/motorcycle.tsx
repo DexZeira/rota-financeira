@@ -18,7 +18,7 @@ export function Motorcycle(p: ViewProps) {
   return (
     <>
       <header className="work-page-header"><div><p className="eyebrow">MOBILIDADE</p><h1>Moto</h1><p className="page-subtitle">Controle o uso e o custo da sua XRE.</p></div></header>
-      <Card
+      <Card className="page-hero"
         title={`${d.bike.brand} ${d.bike.model} · ${d.bike.year}`}
         action={
           <button onClick={() => edit('bike', d.bike)}>Editar moto</button>

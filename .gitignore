@@ -36,6 +36,9 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /outputs/
+/.qa-artifacts/
+/test-results/
+/playwright-report/
 /work/
 
 .test-output/

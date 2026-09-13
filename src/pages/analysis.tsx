@@ -81,13 +81,9 @@ export function Analysis(p: ViewProps) {
           options={['7 dias', '30 dias', 'mês', 'ano']}
         />
       </div>
-      <div className="three-grid">
-        {['Faturamento', 'Lucro', 'Gastos'].map((m) => (
-          <Chart
-            title={m + (m === 'Lucro' ? ' estimado' : ' (R$)')}
-            key={m}
-            items={series(m)}
-          />
+      <div className="analysis-questions">
+        {([['Lucro', 'Seu lucro está melhorando?'], ['Gastos', 'Onde você mais gasta?'], ['Faturamento', 'Como seu faturamento evoluiu?']] as const).map(([m, question]) => (
+          <section className="analysis-question" key={m}><div className="section-heading"><div><p className="eyebrow">ANÁLISE</p><h2>{question}</h2></div></div><Chart title={m === 'Lucro' ? 'Lucro estimado (R$)' : `${m} (R$)`} items={series(m)} />{!series(m).length && <p className="empty-state">Ainda não há dados suficientes para esta análise.</p>}</section>
         ))}
       </div>
       <div className="two-grid">

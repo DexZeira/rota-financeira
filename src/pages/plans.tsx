@@ -19,6 +19,7 @@ export function Plans(p: ViewProps) {
   return (
     <>
       <header className="work-page-header"><div><p className="eyebrow">OBJETIVOS</p><h1>Planos</h1><p className="page-subtitle">Transforme seus objetivos em próximos passos.</p></div></header>
+      <div className="section-heading page-section-intro"><div><p className="eyebrow">SEUS OBJETIVOS</p><h2>Metas que avançam com você</h2></div></div>
       <NextBike data={d} />
       <Metrics
         items={[

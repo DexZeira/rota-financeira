@@ -57,6 +57,8 @@ import {
   validateRow,
   today,
   brDate,
+  emptyRow,
+  id,
   type Data,
   type Collection,
   type Row,
@@ -144,7 +146,12 @@ function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
   const { setOpenMobile } = useSidebar();
   return (
     <nav className="mobile-nav" aria-label="Navegação móvel">
-      {['Dashboard', 'Trabalho', 'Dívidas', 'Moto'].map((name) => {
+      {[
+        ['Dashboard', 'Início'],
+        ['Trabalho', 'Trabalho'],
+        ['Gastos', 'Gastos'],
+        ['Investimentos', 'Investimentos'],
+      ].map(([name, label]) => {
         const entry = navigation.find(([n]) => n === name)!;
         const Icon = entry[1];
         return (
@@ -154,7 +161,7 @@ function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
             onClick={() => go(name)}
           >
             <Icon size={19} />
-            <span>{name}</span>
+            <span>{label}</span>
           </button>
         );
       })}
@@ -174,6 +181,7 @@ export default function Home() {
     [error, setError] = useState(''),
     [blocked, setBlocked] = useState(false),
     [message, setMessage] = useState(''),
+    [quickOpen, setQuickOpen] = useState(false),
     [undo, setUndo] = useState<Data | null>(null);
   const [editor, setEditor] = useState<{
       kind: Collection | 'settings' | 'bike';
@@ -495,6 +503,7 @@ export default function Home() {
           </div>
           <div>
             <span className="header-date">{brDate(today())}</span>
+            <div className="quick-add"><button className="quick-add-trigger" aria-expanded={quickOpen} onClick={() => setQuickOpen((open) => !open)}><Plus size={16} /> Novo</button>{quickOpen && <div className="quick-add-menu" role="menu"><button role="menuitem" onClick={() => { setQuickOpen(false); edit('work'); }}>Trabalho</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('expenses'); }}>Gasto</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('movements'); }}>Aporte</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('services'); }}>Manutenção</button><button role="menuitem" onClick={() => { setQuickOpen(false); if (data.debts.length) edit('payments', { ...emptyRow('payments'), id: id(), debtId: data.debts[0].id, date: today(), amount: 0, installments: 0, kind: 'normal' }); else go('Dívidas'); }}>Pagamento</button></div>}</div>
             <button
               aria-label="Alternar tema"
               onClick={() =>

@@ -20,27 +20,21 @@ export function Maintenance(p: ViewProps) {
   return (
     <>
       <header className="work-page-header"><div><p className="eyebrow">CUIDADOS</p><h1>Manutenção</h1><p className="page-subtitle">Saiba qual cuidado vem a seguir.</p></div></header>
-      <div className="three-grid">
-        {rows
-          .filter((r) => r.status !== 'concluída')
-          .slice(0, 6)
-          .map((r) => (
-            <Card
-              key={r.id}
-              title={String(r.name)}
-              action={
-                <button
-                  onClick={() =>
-                    edit(
-                      'maintenance',
-                      d.maintenance.find((x) => x.id === r.id),
-                    )
-                  }
-                >
-                  Editar
-                </button>
-              }
-            >
+      <Card title="Manutenção" className="page-hero"><div className="hero-summary"><strong>{late.length + near.length}</strong><span>itens precisam de atenção</span></div><button className="primary" onClick={() => edit('services')}>+ Registrar manutenção</button></Card>
+      <section className="maintenance-priority"><div className="section-heading"><div><p className="eyebrow">PRIORIDADE</p><h2>Precisa de atenção</h2></div></div><div className="maintenance-list">{rows
+          .filter((r) => ['atrasada', 'próxima'].includes(String(r.status)))
+          .sort((a, b) => a.days - b.days)
+          .map((r) => (<article className="maintenance-list-item" key={r.id}>
+              <div><h3>{String(r.name)}</h3><p>{r.status === 'atrasada' ? `Atrasado ${dec(Math.abs(r.kmLeft || 0))} km` : r.kmLeft !== null ? `Faltam ${dec(r.kmLeft)} km` : brDate(r.nextDate)}</p></div>
+              <div className="maintenance-list-value"><strong>{money(num(r.estimated))}</strong><button onClick={() => edit('maintenance', d.maintenance.find((x) => x.id === r.id))}>Editar</button></div>
+            </article>))}</div>{!late.length && !near.length && <p className="empty-state">Nenhuma manutenção pendente. Quando houver uma próxima, ela aparecerá aqui.</p>}</section>
+      <details className="history-disclosure"><summary>Ver manutenções futuras e configuradas</summary><div className="maintenance-list">{rows
+          .filter((r) => !['atrasada', 'próxima', 'concluída'].includes(String(r.status)))
+          .map((r) => (<article className="maintenance-list-item" key={r.id}><div><h3>{String(r.name)}</h3><p>{String(r.status)}</p></div><div className="maintenance-list-value"><strong>{money(num(r.estimated))}</strong><button onClick={() => edit('maintenance', d.maintenance.find((x) => x.id === r.id))}>Editar</button></div></article>))}</div></details>
+      {/* detalhes técnicos permanecem abaixo da prioridade */}
+      <div className="three-grid maintenance-legacy-details">
+        {rows.filter((r) => r.status !== 'concluída').slice(0, 6).map((r) => (
+            <Card key={r.id} title={String(r.name)}>
               <span className={'status ' + r.status}>
                 {r.status === 'não configurada'
                   ? 'Configure último km/data'
@@ -70,8 +64,7 @@ export function Maintenance(p: ViewProps) {
                   </strong>
                 </div>
               </div>
-            </Card>
-          ))}
+            </Card>))}
       </div>
       <MaintenanceCostSummary data={d} />
       <ComponentLinks data={d} onSave={(r) => p.update('costs', r)} />

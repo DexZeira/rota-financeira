@@ -24,6 +24,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { activityForWorkType, workTypeForActivity, type WorkType } from '../services/work-type';
 import { Empty, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import {
   Table,
@@ -308,6 +309,7 @@ export function Editor({
         row.revenue === calculateWorkRevenues(row).expected),
   );
   const isCards = kind === 'work' && value.activity === 'Entrega de cartões';
+  const workType: WorkType = kind === 'work' ? workTypeForActivity(String(value.activity || '')) : 'other';
   const expected = calculateWorkRevenues(value).expected;
   const title =
     kind === 'settings'
@@ -346,6 +348,13 @@ export function Editor({
             }
           }}
         >
+          {kind === 'work' && <fieldset className="work-type-choice wide">
+            <legend>O que você vai registrar?</legend>
+            <div className="segmented-choice" role="radiogroup" aria-label="Tipo de trabalho">
+              {([['uber', 'Uber / corrida'], ['cards', 'Entrega de cartões'], ['other', 'Outro']] as const).map(([type, label]) => <label key={type} className={workType === type ? 'selected' : ''}><input type="radio" name="work-type" value={type} checked={workType === type} onChange={() => setValue({ ...value, activity: activityForWorkType(type, String(value.activity || '')) })} /><span>{label}</span></label>)}
+            </div>
+            {workType === 'other' && <label htmlFor="work-activity-name"><span>Nome da atividade *</span><input id="work-activity-name" required value={String(value.activity || '')} onChange={(e) => setValue({ ...value, activity: e.target.value })} placeholder="Ex.: Corrida particular" /></label>}
+          </fieldset>}
           <Fields
             kind={kind}
             fields={
@@ -353,6 +362,7 @@ export function Editor({
                 ? schemas.work
                     .filter(
                       (f) =>
+                        f.key !== 'activity' &&
                         f.key !== 'expectedRevenue' &&
                         (isCards ||
                           !['cardQuantity', 'cardUnitValue'].includes(f.key)),
@@ -384,6 +394,7 @@ export function Editor({
                     if (f.key === 'indexer' || f.key === 'indexerPercent') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type) && String(value.rateType || 'Pós-fixado') === 'Pós-fixado';
                     if (f.key === 'rateType') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type);
                     if (f.key === 'maturity') return type.startsWith('Tesouro') || ['CDB', 'LCI', 'LCA'].includes(type);
+                    if (f.key === 'anniversaryDay') return type === 'Poupança';
                     if (f.key === 'quantity' || f.key === 'averagePrice') return ['Ação', 'ETF', 'FII', 'Criptomoeda'].includes(type);
                     if (f.key === 'currentValue') return true;
                     return true;

@@ -1,7 +1,7 @@
 export type MarketRate = {
   value: number;
   rawValue: number;
-  unit: '% a.a.' | '% p.d.';
+  unit: '% a.a.' | '% p.d.' | '% a.m.';
   date: string;
   source: string;
 };
@@ -9,6 +9,8 @@ export type MarketRates = {
   selic?: MarketRate;
   cdi?: MarketRate;
   ipca?: MarketRate;
+  tr?: MarketRate;
+  selicTarget?: MarketRate;
   updatedAt?: string;
 };
 
@@ -18,10 +20,18 @@ const endpoints = {
   selic: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json',
   cdi: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json',
   ipca: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json',
+  tr: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.226/dados/ultimos/1?formato=json',
+  selicTarget: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json',
 } as const;
+let inFlight: Promise<MarketRates> | undefined;
 
 export function annualizeDailyRate(dailyPercent: number, businessDays = 252): number {
   return (Math.pow(1 + dailyPercent / 100, businessDays) - 1) * 100;
+}
+export function annualizePercentOfCdi(cdiDailyPercent: number, percentOfCdi: number, businessDays = 252): number | undefined {
+  if (!Number.isFinite(cdiDailyPercent) || !Number.isFinite(percentOfCdi) || cdiDailyPercent < 0 || percentOfCdi < 0) return undefined;
+  const dailyRate = (cdiDailyPercent / 100) * (percentOfCdi / 100);
+  return (Math.pow(1 + dailyRate, businessDays) - 1) * 100;
 }
 
 export function parseMarketRate(raw: string, unit: MarketRate['unit'] = '% a.a.'): MarketRate | undefined {
@@ -42,6 +52,11 @@ function readCache(): MarketRates | undefined {
 }
 
 export async function loadMarketRates(fetcher: typeof fetch = fetch): Promise<MarketRates> {
+  if (inFlight) return inFlight;
+  inFlight = loadMarketRatesInternal(fetcher);
+  try { return await inFlight; } finally { inFlight = undefined; }
+}
+async function loadMarketRatesInternal(fetcher: typeof fetch): Promise<MarketRates> {
   const cached = readCache();
   let rates = cached || {};
   let changed = false;
@@ -52,7 +67,7 @@ export async function loadMarketRates(fetcher: typeof fetch = fetch): Promise<Ma
       try {
         const response = await fetcher(endpoint, { signal: controller.signal });
         if (!response.ok) return;
-        const rate = parseMarketRate(await response.text(), key === 'cdi' ? '% p.d.' : '% a.a.');
+        const rate = parseMarketRate(await response.text(), key === 'cdi' ? '% p.d.' : key === 'tr' ? '% a.m.' : '% a.a.');
         if (rate && key === 'cdi') rate.value = annualizeDailyRate(rate.rawValue);
         if (rate) { rates = { ...rates, [key]: rate }; changed = true; }
       } catch { /* mantém o último valor conhecido */ }

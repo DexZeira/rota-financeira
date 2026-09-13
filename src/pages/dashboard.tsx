@@ -5,6 +5,7 @@ import { Card, Metrics, Bar } from '../components/common';
 import { num, money, dec, brDate, today } from '../model';
 import { costs, financial, targets, prioritized, investmentBalance, plan, maintenanceState, workResult, sum, progress } from '../calculations';
 import { type ViewProps, value } from './shared';
+import { monthComparison } from '../insights';
 export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
   const f = financial(d),
     c = costs(d),
@@ -38,6 +39,9 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
       .reduce((a, r) => a + investmentBalance(d, r), 0),
     emergencyTarget =
       num(d.settings.essential) * num(d.settings.emergencyMonths);
+  const comparison = monthComparison(d), smartInsight = comparison.expenseChange !== null
+    ? `Seus gastos variaram ${dec(Math.abs(comparison.expenseChange), 1)}% ${comparison.expenseChange <= 0 ? 'para baixo' : 'para cima'} em relação ao mês passado.`
+    : t.ideal > 0 ? `Você precisa de ${money(t.ideal)} por dia para atingir sua meta.` : 'Registre seus movimentos para receber insights do período.';
   return (
     <>
       <SelectedGoal
@@ -84,6 +88,8 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
           ],
         ]}
       />
+      <Card title="Resumo inteligente"><p className="inline-note">{smartInsight}</p><p className="inline-note">Baseado somente nos dados registrados no aplicativo.</p></Card>
+      <nav className="quick-actions" aria-label="Ações rápidas"><button onClick={() => edit('work')}>+ Trabalho</button><button onClick={() => edit('expenses')}>+ Gasto</button><button onClick={() => edit('movements')}>+ Aporte</button></nav>
       <details className="dashboard-secondary"><summary>Ver detalhes da moto</summary><div className="dashboard-grid">
         <Card
           title={`${d.bike.brand} ${d.bike.model}`}

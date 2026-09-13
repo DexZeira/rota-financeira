@@ -196,6 +196,7 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     name,
     f('ticker', 'Ticker / símbolo'),
     f('coinGeckoId', 'CoinGecko ID'),
+    f('anniversaryDay', 'Dia de aniversário (poupança)', 'number', { integer: true }),
     f('institution', 'Instituição'),
     f('balance', 'Saldo inicial (R$)', 'number', { required: true }),
     f('date', 'Data do saldo inicial', 'date', { required: true }),

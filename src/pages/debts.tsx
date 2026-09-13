@@ -12,6 +12,7 @@ export function Debts(p: ViewProps) {
   return (
     <>
       <header className="work-page-header"><div><p className="eyebrow">COMPROMISSOS</p><h1>Dívidas</h1><p className="page-subtitle">Veja o que falta pagar e organize suas prioridades.</p></div></header>
+      <Card title="Saldo devedor" className="page-hero"><div className="hero-summary"><strong>{money(financial(d).debt)}</strong><span>{money(targets(d).installments)} previstos neste mês</span></div></Card>
       <Metrics
         items={[
           ['Dívidas restantes', money(financial(d).debt)],
@@ -60,7 +61,7 @@ export function Debts(p: ViewProps) {
         )}
       </Card>
       <DebtCards data={d} edit={edit} />
-      <Records
+      <details className="history-disclosure"><summary>Ver todas as dívidas</summary><Records
         {...p}
         kind="debts"
         rows={all}
@@ -101,8 +102,8 @@ export function Debts(p: ViewProps) {
             Pagar
           </button>
         )}
-      />
-      <Records
+      /></details>
+      <details className="history-disclosure"><summary>Ver pagamentos registrados</summary><Records
         {...p}
         kind="payments"
         rows={d.payments}
@@ -120,7 +121,7 @@ export function Debts(p: ViewProps) {
           },
         ]}
         filterKey="kind"
-      />
+      /></details>
     </>
   );
 }

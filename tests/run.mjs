@@ -40,6 +40,11 @@ for (const file of [
   'src/services/market-quotes.ts',
   'tests/investment-features.test.ts',
   'src/services/market-expectations.ts',
+  'src/services/savings-yield.ts',
+  'tests/savings-yield.test.ts',
+  'tests/savings-integration.test.ts',
+  'src/services/work-type.ts',
+  'tests/work-type.test.ts',
 ]) {
   const output = ts
     .transpileModule(readFileSync(file, 'utf8'), {
@@ -75,6 +80,9 @@ const result = spawnSync(
     '.test-output/tests/attribution-matching.test.js',
     '.test-output/tests/market-rates.test.js',
     '.test-output/tests/investment-features.test.js',
+    '.test-output/tests/savings-yield.test.js',
+    '.test-output/tests/savings-integration.test.js',
+    '.test-output/tests/work-type.test.js',
   ],
   { stdio: 'inherit' },
 );
