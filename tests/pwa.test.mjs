@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { workerSource } from '../scripts/pwa-worker.mjs';
-function worker() {
+function worker(fetchImpl = async () => {throw Error('Offline');}) {
   const events = new Map(), added = [], removed = [];
   runInNewContext(workerSource('rota-shell-current',['/index.html','/assets/page.js']), {
     URL, self:{ location:{origin:'https://example.test'}, addEventListener:(name, callback) => events.set(name,callback) },
-    caches:{open:async () => ({ addAll:async (urls) => added.push(...urls), match:async (path) => ({cached:path}) }),
+    caches:{open:async () => ({ addAll:async (urls) => added.push(...urls), match:async (path) => ({cached:path}), put:async () => {} }), match:async (path) => ({cached:path}),
       keys:async () => ['rota-shell-old','rota-shell-current','another-app'], delete:async (key) => removed.push(key) },
-    fetch:async () => {throw Error('Offline');},
+    fetch:fetchImpl,
   });
   return {events,added,removed};
 }
@@ -20,6 +20,12 @@ void test('PWA: instalação pública, limpeza restrita e navegação offline',a
   assert.deepEqual(w.removed,['rota-shell-old']);
   w.events.get('fetch')({request:{url:'https://example.test/',method:'GET',mode:'navigate'},respondWith:(p) => {pending=p;}});
   assert.equal((await Promise.resolve(pending)).cached,'/index.html');
+});
+void test('PWA: navegação online sempre atualiza o shell em cache',async () => {
+  const response = { clone: () => ({ updated: true }), updated: true };
+  const w = worker(async () => response); let pending;
+  w.events.get('fetch')({request:{url:'https://example.test/',method:'GET',mode:'navigate'},respondWith:(p) => {pending=p;}});
+  assert.equal((await Promise.resolve(pending)).updated, true);
 });
 void test('PWA nunca intercepta Auth, dados, POST, origens externas ou URLs com tokens',() => {
   const w = worker();
