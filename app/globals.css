@@ -674,6 +674,11 @@ textarea:focus {
   gap: 12px;
   margin-top: 24px;
 }
+.asset-search { position: relative; }
+.asset-search ul { position: absolute; z-index: 5; width: 100%; max-height: 220px; overflow: auto; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--surface, #fff); border: 1px solid var(--border, #d6ddda); border-radius: 10px; box-shadow: 0 8px 20px #0002; }
+.asset-search li { display: flex; gap: 10px; padding: 10px; border-radius: 7px; cursor: pointer; }
+.asset-search li:hover, .asset-search li[aria-selected="true"] { background: color-mix(in srgb, var(--accent, #2f7d68) 14%, transparent); }
+.asset-search li span { color: var(--muted, #64716d); }
 .dashboard-secondary { margin: 18px 0; }
 .dashboard-secondary > summary { cursor: pointer; color: var(--muted-foreground); font-size: 14px; padding: 10px 0; }
 .dashboard-secondary > .dashboard-grid, .dashboard-secondary > .three-grid, .dashboard-secondary > .card { margin-top: 10px; }

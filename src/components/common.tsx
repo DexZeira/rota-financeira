@@ -7,6 +7,8 @@ import {
   maintenanceCosts,
 } from '../calculations';
 import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect } from 'react';
+import { searchB3, searchCrypto, type AssetSuggestion } from '../services/market-quotes';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -152,16 +154,20 @@ export function Fields({
   value,
   setValue,
   data,
+  kind,
 }: {
   fields: Field[];
   value: Row;
   setValue: (r: Row) => void;
   data: Data;
+  kind?: Collection | 'settings' | 'bike';
 }) {
   const prefix = useId();
   return (
     <div className="form-grid">
       {fields.map((f) => {
+        const assetType = String(value.category || '');
+        const isAssetSearch = kind === 'investments' && f.key === 'ticker' && ['Ação', 'ETF', 'FII', 'Criptomoeda'].includes(assetType);
         let options: (string | { value: string; label: string })[] =
           f.options || [];
         const ref =
@@ -192,11 +198,13 @@ export function Fields({
           options = [{ value: '', label: 'Nenhuma' }, ...options];
         return (
           <label htmlFor={`${prefix}-${f.key}`} className={f.type === 'textarea' ? 'wide' : ''} key={f.key}>
-            <span>
-              {f.label}
+              <span>
+              {isAssetSearch ? (assetType === 'Criptomoeda' ? 'Buscar criptomoeda' : 'Buscar ativo') : f.label}
               {f.required ? ' *' : ''}
             </span>
-            {f.type === 'select' ? (
+            {isAssetSearch ? (
+              <AssetSearch value={value} setValue={setValue} crypto={assetType === 'Criptomoeda'} />
+            ) : f.type === 'select' ? (
               <Choice
                 inputId={`${prefix}-${f.key}`}
                 name={f.key}
@@ -260,6 +268,23 @@ export function Fields({
     </div>
   );
 }
+
+function AssetSearch({ value, setValue, crypto }: { value: Row; setValue: (r: Row) => void; crypto: boolean }) {
+  const [query, setQuery] = useState(String(value.ticker || value.coinGeckoId || ''));
+  const [items, setItems] = useState<AssetSuggestion[]>([]), [loading, setLoading] = useState(false), [message, setMessage] = useState('');
+  const [active, setActive] = useState(-1); const request = useRef(0);
+  useEffect(() => {
+    if (!query.trim()) return;
+    const current = ++request.current; const timer = setTimeout(async () => {
+      const result = crypto ? await searchCrypto(query) : await searchB3(query);
+      if (current !== request.current) return;
+      setItems(result); setLoading(false); setActive(-1); setMessage(result.length ? '' : 'Nenhum ativo encontrado. Você pode informar o ticker manualmente.');
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query, crypto]);
+  const choose = (item: AssetSuggestion) => { setValue({ ...value, name: item.name, ticker: item.symbol, coinGeckoId: item.id || value.coinGeckoId || '' }); setQuery(item.symbol); setItems([]); };
+  return <div className="asset-search"><input id="asset-search-input" role="combobox" aria-expanded={items.length > 0} aria-controls="asset-search-results" aria-autocomplete="list" value={query} onChange={(e) => { setQuery(e.target.value); setValue({ ...value, ticker: e.target.value }); }} onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setActive((x) => Math.min(x + 1, items.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((x) => Math.max(x - 1, 0)); } else if (e.key === 'Enter' && items[active]) { e.preventDefault(); choose(items[active]); } else if (e.key === 'Escape') setItems([]); }} />{loading && <small>Buscando ativos...</small>}{message && <small>{message}</small>}{items.length > 0 && <div id="asset-search-results">{items.map((item, index) => <button type="button" className="asset-option" key={item.id || item.symbol} aria-current={index === active ? 'true' : undefined} onMouseDown={() => choose(item)}><strong>{item.symbol}</strong><span>{item.name}</span></button>)}</div>}</div>;
+}
 export function Editor({
   kind,
   row,
@@ -304,7 +329,7 @@ export function Editor({
             : kind === 'services'
               ? 'Este custo entra no saldo como despesa real. Não cadastre novamente em Gastos.'
               : kind === 'investments'
-                ? 'O saldo inicial é patrimônio já existente. Use movimentações para novos aportes, retiradas e rendimentos.'
+                ? 'Comece pelo tipo e nome. O saldo inicial é patrimônio já existente; use movimentações para aportes, retiradas e rendimentos.'
                 : 'Preencha os dados. As alterações serão salvas neste navegador.'}
         </DialogDescription>
         <form
@@ -322,6 +347,7 @@ export function Editor({
           }}
         >
           <Fields
+            kind={kind}
             fields={
               kind === 'work'
                 ? schemas.work
@@ -352,7 +378,16 @@ export function Editor({
                         f.key === 'componentId' &&
                         value.matchMode !== 'manual'
                       ),
-                  )
+                  ).filter((f) => {
+                    if (kind !== 'investments') return true;
+                    const type = String(value.category || '');
+                    if (f.key === 'indexer' || f.key === 'indexerPercent') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type) && String(value.rateType || 'Pós-fixado') === 'Pós-fixado';
+                    if (f.key === 'rateType') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type);
+                    if (f.key === 'maturity') return type.startsWith('Tesouro') || ['CDB', 'LCI', 'LCA'].includes(type);
+                    if (f.key === 'quantity' || f.key === 'averagePrice') return ['Ação', 'ETF', 'FII', 'Criptomoeda'].includes(type);
+                    if (f.key === 'currentValue') return true;
+                    return true;
+                  })
             }
             value={value}
             setValue={(next) => {
