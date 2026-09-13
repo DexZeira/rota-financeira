@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { serializeSnapshot, type CloudState } from './sync-core';
 import { decode, syncError } from './cloud-codec';
 import type { Data } from '../model';
+import { MONEY_SCHEMA_VERSION } from './money-codec';
 export type { SyncErrorDetails } from './sync-core';
 export async function loadCloudState(user: string): Promise<CloudState | null> {
   if (!supabase) throw Error('Configure o Supabase para sincronizar.');
@@ -25,7 +26,7 @@ export async function saveCloudState(
     .rpc('save_app_state', {
       p_user_id: user,
       p_data: serializeSnapshot(data),
-      p_schema_version: data.dataVersion,
+      p_schema_version: MONEY_SCHEMA_VERSION,
       p_device_id: device,
       p_expected_updated_at: revision,
     })

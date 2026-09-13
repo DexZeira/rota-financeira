@@ -4,7 +4,6 @@ import {
   CashDetails,
   ActivityComparison,
   ExpenseBreakdown,
-  cashMetrics,
 } from '../components/work-cash';
 import { emptyRow, id } from '../model';
 import { useState } from 'react';
@@ -40,14 +39,12 @@ export function Work(p: ViewProps) {
   );
   return (
     <>
-      <Card
-        title="Trabalho"
-        action={
-          <button className="primary" onClick={() => edit('work')}>
-            Adicionar trabalho
-          </button>
-        }
-      >
+      <header className="work-page-header">
+        <div><p className="eyebrow">DESEMPENHO</p><h1>Trabalho</h1><p className="page-subtitle">Acompanhe seus ganhos e desempenho.</p></div>
+        <button className="primary" onClick={() => edit('work')}>+ Registrar trabalho</button>
+      </header>
+      <section className="work-filters card">
+        <div className="section-heading"><h2>Período</h2><span className="supporting-text">Escolha um intervalo para analisar seus resultados</span></div>
         <div className="period-tabs">
           {['Hoje', '7 dias', '30 dias', 'Este mês'].map((period) => (
             <button
@@ -70,7 +67,7 @@ export function Work(p: ViewProps) {
             Todos / personalizado
           </button>
         </div>
-        <div className="list-tools">
+        <div className="list-tools work-filter-controls">
           <Choice
             label="Atividade do trabalho"
             value={activity}
@@ -113,30 +110,34 @@ export function Work(p: ViewProps) {
         {from && to && from > to && (
           <p role="alert">A data inicial deve ser anterior à final.</p>
         )}
-      </Card>
-      <Metrics items={cashMetrics(actual)} />
-      <p className="notice">
+      </section>
+      <Metrics items={[
+        ['Ganhos no período', money(actual.revenue), 'Receita registrada'],
+        ['Lucro de caixa', money(actual.cashProfit), 'Após despesas atribuídas'],
+        ['Horas trabalhadas', dec(actual.hours), 'Tempo registrado'],
+        ['Lucro por hora', money(actual.cashHour), 'Indicador do período'],
+      ]} />
+      <details className="work-note"><summary>Como estes números são calculados</summary><p className="notice">
         Lucro de caixa desconta somente pagamentos atribuídos. Provisões usam as
         previsões por km atuais; depreciação aparece apenas no resultado
         econômico. Combustível estimado não entra nesses três resultados:
         registre o combustível pago como despesa. Nenhum desses cálculos cria
         saídas adicionais no saldo.
-      </p>
-      <p className="inline-note">
+      </p><p className="inline-note">
         Despesas vinculadas seguem a sessão selecionada, mesmo se pagas em outra
         data. Despesas gerais seguem a data do pagamento. A busca textual filtra
         sessões; não exclui despesas gerais do período. Sem despesas atribuídas,
         o lucro de caixa coincide com a receita e pode estar incompleto.
-      </p>
-      <ActivityComparison
+      </p></details>
+      <details className="work-secondary"><summary>Comparar atividades</summary><ActivityComparison
         data={d}
         rows={rows}
         from={from}
         to={to}
         activity={activity}
-      />
-      <ExpenseBreakdown data={d} result={actual} edit={edit} />
-      <Card title="Resumo de cartões no período filtrado">
+      /></details>
+      <details className="work-secondary"><summary>Despesas atribuídas</summary><ExpenseBreakdown data={d} result={actual} edit={edit} /></details>
+      <Card title="Resumo de cartões no período filtrado" className="secondary-section">
         <div className="work-stats">
           {[
             ['Cartões entregues', dec(cards.quantity)],
@@ -190,11 +191,11 @@ export function Work(p: ViewProps) {
               ),
               revenues = calculateWorkRevenues(r);
             return (
-              <Card
+              <article
                 key={r.id}
-                title={`${r.activity} · ${brDate(r.date)}`}
-                action={
-                  <div className="row-actions">
+                className="work-session"
+              >
+                <div className="work-session-header"><div><h2>{r.activity}</h2><p>{brDate(r.date)}</p></div><details className="action-menu"><summary aria-label={'Ações de ' + r.activity}>•••</summary><div className="row-actions">
                     <button
                       onClick={() =>
                         edit('expenses', {
@@ -220,10 +221,9 @@ export function Work(p: ViewProps) {
                     >
                       Excluir
                     </button>
-                  </div>
-                }
-              >
-                <CashDetails
+                  </div></details></div>
+                <div className="work-session-primary"><strong>{money(result.revenue)}</strong><span>{dec(result.hours)}h · {dec(result.km)} km</span></div>
+                <details><summary>Ver detalhes</summary><CashDetails
                   result={workCashResult(
                     d,
                     [r],
@@ -315,7 +315,8 @@ export function Work(p: ViewProps) {
                   </div>
                 </details>
                 {r.notes && <p className="inline-note">{r.notes}</p>}
-              </Card>
+                </details>
+              </article>
             );
           })
         ) : (

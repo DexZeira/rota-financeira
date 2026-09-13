@@ -1,5 +1,5 @@
 import { defaults, type Data } from '../model';
-import { backup, parseBackup, STORAGE_KEY } from './storage';
+import { backup, parseBackup, STORAGE_KEY, save } from './storage';
 
 export type CloudState = {
   data: Data;
@@ -71,11 +71,11 @@ export function switchAccount(
   if (owner) storage.setItem(accountKey(owner), backup(local));
   else storage.setItem('rota-cloud-guest-recovery', backup(local));
   const cached = storage.getItem(accountKey(user));
-  const next = cached ? parseBackup(cached) : owner ? defaults() : local;
+  let next = cached ? parseBackup(cached) : owner ? defaults() : local;
   const previous = storage.getItem(STORAGE_KEY) || JSON.stringify(local);
   // Prepare the new account snapshot before publishing its ownership marker.
   try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(next));
+    next = save(storage, next);
     storage.setItem(OWNER_KEY, user);
   } catch (error) {
     storage.setItem(STORAGE_KEY, previous);

@@ -1,6 +1,9 @@
 'use client';
 import { GlobalSearch } from '../src/components/global-search';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { storageFailure } from '../src/services/storage-quota';
+import { PageBoundary } from '../src/components/page-boundary';
+import { MONEY_SCHEMA_VERSION } from '../src/services/money-codec';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../src/components/auth-provider';
 import { AuthForm, AccountPanel } from '../src/components/account';
 import { useCloudSync } from '../src/hooks/use-cloud-sync';
@@ -58,18 +61,16 @@ import {
   type Collection,
   type Row,
 } from '../src/model';
-import {
-  Dashboard,
-  Work,
-  Debts,
-  Expenses,
-  Motorcycle,
-  Maintenance,
-  Investments,
-  Plans,
-  Analysis,
-  SettingsView,
-} from '../src/pages/views';
+import { Dashboard } from '../src/pages/dashboard';
+const Work = lazy(() => import('../src/pages/work').then((m) => ({ default: m.Work })));
+const Debts = lazy(() => import('../src/pages/debts').then((m) => ({ default: m.Debts })));
+const Expenses = lazy(() => import('../src/pages/expenses').then((m) => ({ default: m.Expenses })));
+const Motorcycle = lazy(() => import('../src/pages/motorcycle').then((m) => ({ default: m.Motorcycle })));
+const Maintenance = lazy(() => import('../src/pages/maintenance').then((m) => ({ default: m.Maintenance })));
+const Investments = lazy(() => import('../src/pages/investments').then((m) => ({ default: m.Investments })));
+const Plans = lazy(() => import('../src/pages/plans').then((m) => ({ default: m.Plans })));
+const Analysis = lazy(() => import('../src/pages/analysis').then((m) => ({ default: m.Analysis })));
+const SettingsView = lazy(() => import('../src/pages/settings').then((m) => ({ default: m.SettingsView })));
 import {
   STORAGE_KEY,
   load,
@@ -208,7 +209,11 @@ export default function Home() {
   useEffect(() => {
     queueMicrotask(() => {
       try {
-        const d = load(localStorage);
+        let d = load(localStorage);
+        const storedData = localStorage.getItem(STORAGE_KEY);
+        if ((storedData && JSON.parse(storedData).dataVersion !== MONEY_SCHEMA_VERSION) || (!storedData && localStorage.getItem('rota-financeira'))) {
+          d = save(localStorage, d);
+        }
         disk.current = localStorage.getItem(STORAGE_KEY);
         setData(d);
       } catch (e) {
@@ -262,8 +267,8 @@ export default function Home() {
     if (localStorage.getItem(STORAGE_KEY) !== disk.current)
       throw Error('Os dados mudaram em outra aba. Recarregue antes de salvar.');
     validateRelations(next);
-    save(localStorage, next);
-    disk.current = JSON.stringify(next);
+    next = save(localStorage, next);
+    disk.current = localStorage.getItem(STORAGE_KEY) || '';
     setData(next);
     current.current = next;
     cloud.changed();
@@ -273,7 +278,7 @@ export default function Home() {
     try {
       action();
     } catch (e) {
-      setError((e as Error).message);
+      setError(storageFailure(e));
     }
   }
   function edit(kind: Collection | 'settings' | 'bike', row?: Row) {
@@ -617,6 +622,7 @@ export default function Home() {
                   syncError={cloud.error}
                 />
               )}
+              <PageBoundary key={page}><Suspense fallback={<output className="card">Carregando página…</output>}>
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}
@@ -663,6 +669,7 @@ export default function Home() {
                   }}
                 />
               )}
+              </Suspense></PageBoundary>
             </>
           )}
           <footer className="page-footer">
@@ -804,9 +811,9 @@ export default function Home() {
                       '';
                     localStorage.setItem('rota-corrupted-recovery', raw);
                     download(raw, 'rota-dados-preservados.json');
-                    save(localStorage, incoming);
-                    disk.current = JSON.stringify(incoming);
-                    setData(incoming);
+                    const restored = save(localStorage, incoming);
+                    disk.current = localStorage.getItem(STORAGE_KEY) || '';
+                    setData(restored);
                     setBlocked(false);
                     setError('');
                   } else {

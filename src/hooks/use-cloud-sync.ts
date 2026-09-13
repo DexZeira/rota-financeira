@@ -147,8 +147,8 @@ export function useCloudSync(
             return;
           }
           localStorage.setItem(`rota-cloud-recovery:${owner}`, backup(local));
-          save(localStorage, next);
-          latest.current.apply(next);
+          const persisted = save(localStorage, next);
+          latest.current.apply(persisted);
         }
         meta.current = {
           ...meta.current,

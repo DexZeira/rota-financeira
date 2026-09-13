@@ -1,4 +1,5 @@
 import { defaultAliases } from '../component-matching';
+import { decodeMoney, encodeMoney, serializeData, MONEY_SCHEMA_VERSION } from './money-codec';
 import { validateAttribution, detachWorkExpense } from '../expense-allocation';
 import { calculateWorkRevenues } from '../calculations';
 import {
@@ -18,7 +19,7 @@ export const STORAGE_KEY = 'rota-financeira-v1';
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
-  const raw = value as Record<string, unknown>;
+  const raw = decodeMoney(value as Record<string, unknown>);
   if (
     raw.dataVersion !== 4 &&
     raw.dataVersion !== 3 &&
@@ -282,14 +283,17 @@ export function resetData(d: Data, kind: ResetKind): Data {
 }
 export const backup = (d: Data) =>
   JSON.stringify(
-    { version: 4, exportDate: new Date().toISOString(), data: d },
+    { version: MONEY_SCHEMA_VERSION, exportDate: new Date().toISOString(), data: encodeMoney(d) },
     null,
     2,
   );
 export function parseBackup(text: string) {
   if (text.length > 20_000_000) throw Error('Arquivo maior que 20 MB.');
   const b = JSON.parse(text);
+  // Exact pre-migration snapshots are deliberately kept in their original raw format.
+  if (b && b.version === undefined && b.dataVersion !== undefined) return validateData(b);
   if (
+    b.version !== MONEY_SCHEMA_VERSION &&
     b.version !== 4 &&
     b.version !== 3 &&
     b.version !== 2 &&
@@ -310,8 +314,24 @@ export function load(storage: Pick<Storage, 'getItem'>): Data {
     ? validateData({ ...JSON.parse(legacy), dataVersion: 0 })
     : defaults();
 }
-export function save(storage: Pick<Storage, 'setItem'>, d: Data) {
-  storage.setItem(STORAGE_KEY, JSON.stringify(d));
+export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>, d: Data) {
+  const normalized = validateData(JSON.parse(serializeData(d)));
+  // Recompute derived fields after rounding their source records, before publishing bytes.
+  const encoded = serializeData(normalized);
+  const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
+  const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
+  const migrationKey = `rota-money-before-migration:${owner}`;
+  // Archive the exact previous bytes before the first v5 write. Failure aborts the write.
+  let previousVersion: unknown;
+  try { previousVersion = previous ? JSON.parse(previous).dataVersion : undefined; } catch { /* Preserve corrupt bytes too. */ }
+  if (previousVersion !== MONEY_SCHEMA_VERSION && !storage.getItem?.(migrationKey)) {
+    storage.setItem(migrationKey, previous || JSON.stringify(d));
+  }
+  if (JSON.stringify(d) !== JSON.stringify(normalized)) {
+    storage.setItem(`rota-money-rounding:${crypto.randomUUID()}`, JSON.stringify(d));
+  }
+  storage.setItem(STORAGE_KEY, encoded);
+  return normalized;
 }
 export function download(text: string, name: string) {
   const url = URL.createObjectURL(

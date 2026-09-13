@@ -1,0 +1,28 @@
+name: Supabase dedicado
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rls-cas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: supabase-test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:rls
+        env:
+          ROTA_LIVE_TEST: dedicated
+          ROTA_TEST_SUPABASE_URL: ${{ secrets.ROTA_TEST_SUPABASE_URL }}
+          ROTA_TEST_SUPABASE_KEY: ${{ secrets.ROTA_TEST_SUPABASE_KEY }}
+          ROTA_TEST_EMAIL_A: ${{ secrets.ROTA_TEST_EMAIL_A }}
+          ROTA_TEST_PASSWORD_A: ${{ secrets.ROTA_TEST_PASSWORD_A }}
+          ROTA_TEST_EMAIL_B: ${{ secrets.ROTA_TEST_EMAIL_B }}
+          ROTA_TEST_PASSWORD_B: ${{ secrets.ROTA_TEST_PASSWORD_B }}

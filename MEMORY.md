@@ -6,6 +6,8 @@
  
 Decisão de 2026-09-12: login e sincronização opcionais via Supabase Auth + snapshot completo do backup (schema atual) em `user_app_state`, com RLS e gravação condicional atômica por `updated_at`. Persistência permanece local-first; nenhuma fórmula financeira foi alterada. Divergências exigem escolha, contas têm cópias locais isoladas e logout conserva dados. Usuário confirmou produção configurada e sincronizando em `ad920cf`; nunca colocar chaves administrativas no frontend.
 
+Decisão de 2026-09-13: telemetria externa não será usada por privacidade. Diagnósticos ficam locais e não registram dados financeiros, tokens, emails ou backups. Valores monetários persistidos usam centavos inteiros a partir do schema5, arredondados por registro; taxas, percentuais, preço por litro, distâncias e razões mantêm precisão original. Antes da primeira migração é preservada uma cópia protegida; backups legados continuam importáveis.
+
 Integridade de sincronização: estado zerado com base anterior representa edição/reset e não dispositivo novo; deve subir ou conflitar. Eventos de Auth mais recentes prevalecem sobre restauração atrasada. Versão do snapshot remoto deve ser comparada antes da migração, conservando o timestamp CAS literal.
 
 

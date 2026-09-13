@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { StorageManager } from '../components/storage-manager';
+import { MONEY_SCHEMA_VERSION } from '../services/money-codec';
 import { backup } from '../services/storage';
 import { downloadBackup } from '../services/backup-download';
 import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
@@ -33,8 +35,9 @@ export function SettingsView({
   );
   function markBackup() {
     const time = new Date().toISOString();
-    localStorage.setItem('rota-financeira-last-backup', time);
     setLastBackup(time);
+    try { localStorage.setItem('rota-financeira-last-backup', time); }
+    catch { setDownloadStatus('Backup solicitado; não foi possível registrar sua data neste navegador.'); }
   }
   const [copyStatus, setCopyStatus] = useState('');
   const [downloadStatus, setDownloadStatus] = useState('');
@@ -64,6 +67,8 @@ export function SettingsView({
   }
   return (
     <>
+      <StorageManager />
+      <div className="settings-groups">
       <Card
         title="Seu planejamento"
         action={
@@ -146,7 +151,7 @@ export function SettingsView({
       </Card>
       <Card title="Dados e backup">
         <p>
-          Versão dos dados: {d.dataVersion} ·{' '}
+          Versão dos dados: {MONEY_SCHEMA_VERSION} ·{' '}
           {collections.reduce((count, key) => count + d[key].length, 0)}{' '}
           registros
         </p>
@@ -208,12 +213,13 @@ export function SettingsView({
         {copyStatus && <output>{copyStatus}</output>}
         {downloadStatus && <output>{downloadStatus}</output>}
         <p className="inline-note">
-          Formato JSON · versão {d.dataVersion} ·{' '}
+          Formato JSON · versão {MONEY_SCHEMA_VERSION} ·{' '}
           {collections.reduce((s, k) => s + d[k].length, 0)} registros. A
           importação valida os dados e pede confirmação antes de substituir.
         </p>
       </Card>
-      <Card title="Reset">
+      </div>
+      <details className="settings-advanced"><summary>Avançado: reset e limpeza de dados</summary><Card title="Reset">
         <p className="inline-note">
           Cada ação pede confirmação. Um backup local de recuperação é salvo
           antes de limpar; no reset total, também é baixado um JSON.
@@ -257,7 +263,7 @@ export function SettingsView({
             </div>
           ))}
         </div>
-      </Card>
+      </Card></details>
     </>
   );
 }

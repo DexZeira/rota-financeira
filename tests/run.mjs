@@ -3,6 +3,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 for (const file of [
+  'src/services/money-codec.ts',
+  'src/services/storage-quota.ts',
+  'tests/money-quota.test.ts',
+  'src/hooks/use-virtual-records.ts',
+  'tests/virtual-records.test.ts',
   'src/services/cloud-codec.ts',
   'tests/cloud-codec.test.ts',
   'src/services/auth-session.ts',
@@ -48,6 +53,9 @@ const result = spawnSync(
   process.execPath,
   [
     '--test',
+    'tests/pwa.test.mjs',
+    '.test-output/tests/money-quota.test.js',
+    '.test-output/tests/virtual-records.test.js',
     '.test-output/tests/cloud-codec.test.js',
     '.test-output/tests/auth-session.test.js',
     '.test-output/tests/auth-config.test.js',

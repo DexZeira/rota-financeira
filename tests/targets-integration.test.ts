@@ -297,7 +297,7 @@ void test('storage → estado carregado → cálculo → linhas consumidas pelo 
   save(storage, d);
   const before = [...memory];
   const loaded = load(storage);
-  assert.equal(writes, 1);
+  assert.equal(writes, 2); // Snapshot anterior obrigatório + gravação v5 em centavos.
   assert.deepEqual([...memory], before);
   const t = targets(loaded, at),
     sections = targetBreakdownRows(t);

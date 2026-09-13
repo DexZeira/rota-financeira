@@ -1,11 +1,12 @@
 import { AttributionFields } from './attribution-fields';
+import { useVirtualRecords } from '../hooks/use-virtual-records';
 import { attributionKeys } from '../expense-allocation';
 import {
   calculateWorkRevenues,
   updateCardWork,
   maintenanceCosts,
 } from '../calculations';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -487,6 +488,8 @@ export function Records({
         (order === 'asc' ? 1 : -1)
       );
     });
+  const recordsRef = useRef<HTMLDivElement>(null);
+  const virtual = useVirtualRecords(visible, recordsRef);
   const cols =
     columns ||
     fields.slice(0, 4).map((f) => ({
@@ -502,7 +505,7 @@ export function Records({
     <Card
       title={labels[kind]}
       action={
-        <button className="primary" onClick={() => edit(kind)}>
+        <button className={kind === 'activities' ? 'secondary' : 'primary'} onClick={() => edit(kind)}>
           <Plus size={16} /> Adicionar
         </button>
       }
@@ -560,8 +563,18 @@ export function Records({
           ]}
         />
       </div>
+      {visible.length > 200 && <button onClick={() => virtual.setAll(!virtual.all)}>
+        {virtual.all ? 'Ativar lista otimizada' : 'Mostrar lista completa para leitura e busca do navegador'}
+      </button>}
       {visible.length ? (
-        <Table>
+        <div ref={recordsRef} className={virtual.enabled ? 'virtual-records' : undefined}
+          onScroll={(event) => virtual.setScroll(event.currentTarget.scrollTop)}
+          onFocusCapture={(event) => {
+            const row = (event.target as HTMLElement).closest<HTMLElement>('[data-record-index]');
+            virtual.setFocused(row ? Number(row.dataset.recordIndex) : undefined);
+          }}
+          onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) virtual.setFocused(undefined); }}>
+        <Table aria-rowcount={visible.length + 1}>
           <TableHeader>
             <TableRow>
               {cols.map((c) => (
@@ -571,40 +584,28 @@ export function Records({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visible.map((r) => (
-              <TableRow key={r.id}>
+            {virtual.enabled && virtual.top > 0 && <TableRow aria-hidden="true"><TableCell colSpan={cols.length + 1} style={{ height: virtual.top, padding: 0, border: 0 }} /></TableRow>}
+            {virtual.rows.map((r, index) => (
+              <TableRow key={r.id} data-record-id={r.id} data-record-index={virtual.start + index} aria-rowindex={virtual.start + index + 2}>
                 {cols.map((c) => (
                   <TableCell key={c.label}>{c.render(r)}</TableCell>
                 ))}
                 <TableCell>
-                  <div className="row-actions">
-                    {extra?.(r)}
-                    <button
-                      aria-label={
-                        'Editar ' +
-                        String(r.name || r.activity || brDate(r.date))
-                      }
-                      onClick={() =>
-                        edit(kind, data[kind].find((x) => x.id === r.id) || r)
-                      }
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      aria-label={
-                        'Excluir ' +
-                        String(r.name || r.activity || brDate(r.date))
-                      }
-                      onClick={() => del(kind, r)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  <details className="action-menu table-action-menu">
+                    <summary aria-label={'Ações de ' + String(r.name || r.activity || brDate(r.date))}>•••</summary>
+                    <div className="row-actions">
+                      {extra?.(r)}
+                      <button aria-label={'Editar ' + String(r.name || r.activity || brDate(r.date))} onClick={() => edit(kind, data[kind].find((x) => x.id === r.id) || r)}><Pencil size={15} /> Editar</button>
+                      <button aria-label={'Excluir ' + String(r.name || r.activity || brDate(r.date))} onClick={() => del(kind, r)}><Trash2 size={15} /> Excluir</button>
+                    </div>
+                  </details>
                 </TableCell>
               </TableRow>
             ))}
+            {virtual.enabled && virtual.bottom > 0 && <TableRow aria-hidden="true"><TableCell colSpan={cols.length + 1} style={{ height: virtual.bottom, padding: 0, border: 0 }} /></TableRow>}
           </TableBody>
         </Table>
+        </div>
       ) : (
         <NoData
           text={rows.length ? 'Nenhum resultado para os filtros.' : undefined}
