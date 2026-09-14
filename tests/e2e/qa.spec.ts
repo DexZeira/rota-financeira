@@ -1,3 +1,4 @@
+import { navigate } from './navigation';
 import { test, expect } from '@playwright/test';
 
 const pages = ['Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
@@ -5,6 +6,30 @@ const pages = ['Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', '
 let runtimeErrors: string[] = [];
 test.beforeEach(async ({ page }) => {
   runtimeErrors = [];
+  // Keep browser QA deterministic: external market providers are covered by
+  // dedicated integration tests and must not influence layout/form checks.
+  await page.route('https://api.bcb.gov.br/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ data: '13/09/2026', valor: '10,00' }]) });
+  });
+  await page.route('https://olinda.bcb.gov.br/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ value: [{ Selic: 10, IPCA: 4, DataReferencia: 2026 }] }) });
+  });
+  await page.route('https://brapi.dev/**', async (route) => {
+    const url = route.request().url();
+    if (url.includes('/quote/list')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ stocks: [{ stock: 'PETR4', name: 'Petrobras PN' }] }) });
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [{ regularMarketPrice: 42.5 }] }) });
+    }
+  });
+  await page.route('https://api.coingecko.com/**', async (route) => {
+    const url = route.request().url();
+    if (url.includes('/search')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ coins: [{ id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }] }) });
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ bitcoin: { brl: 300000 } }) });
+    }
+  });
   page.on('console', (message) => { if (message.type() === 'error') runtimeErrors.push(message.text()); });
   page.on('pageerror', (error) => runtimeErrors.push(error.message));
   page.on('requestfailed', (request) => {
@@ -21,9 +46,11 @@ test.afterEach(() => { expect(runtimeErrors, 'erros de console/rede internos').t
 test('todas as páginas carregam sem overflow horizontal no tema claro e escuro', async ({ page }, testInfo) => {
   await page.goto('/');
   for (const theme of ['claro', 'escuro']) {
-    if (theme === 'escuro') await page.getByRole('button', { name: 'Alternar tema' }).click();
+    await navigate(page, 'Configurações');
+    await page.getByRole('combobox', { name: 'Tema', exact: true }).click();
+    await page.getByRole('option', { name: theme, exact: true }).click();
     for (const name of pages) {
-      await page.getByRole('button', { name, exact: true }).first().click();
+      await navigate(page, name);
       await expect(page.locator('main')).toBeVisible();
       const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: window.innerWidth }));
       expect(overflow.scroll, `${name} ${theme} overflow`).toBeLessThanOrEqual(overflow.width);
@@ -36,23 +63,23 @@ test('todas as páginas carregam sem overflow horizontal no tema claro e escuro'
 
 test('fluxo Trabalho alterna Uber, Cartões, Outro e volta a Uber', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Trabalho', exact: true }).first().click();
+  await navigate(page, 'Trabalho');
   await page.getByRole('button', { name: /Registrar trabalho/ }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   const uber = dialog.getByRole('radio', { name: /Uber/ });
-  const cards = dialog.getByRole('radio', { name: /Entrega de cartões/ });
-  const other = dialog.getByRole('radio', { name: 'Outro' });
-  await uber.check();
+  const cards = dialog.getByRole('radio', { name: /Cartões/ });
+  const other = dialog.getByRole('radio', { name: /Outro/ });
+  await uber.locator("..").click();
   await expect(uber).toBeChecked();
   await expect(dialog.getByLabel('Quantidade de cartões')).toHaveCount(0);
-  await cards.check();
+  await cards.locator("..").click();
   await expect(cards).toBeChecked();
   await expect(dialog.getByLabel('Quantidade de cartões')).toBeVisible();
-  await other.check();
+  await other.locator("..").click();
   await expect(other).toBeChecked();
   await dialog.getByLabel('Nome da atividade *').fill('Corrida particular');
-  await uber.check();
+  await uber.locator("..").click();
   await expect(uber).toBeChecked();
   await expect(dialog.getByLabel('Quantidade de cartões')).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -61,15 +88,17 @@ test('fluxo Trabalho alterna Uber, Cartões, Outro e volta a Uber', async ({ pag
 
 test('investimentos exibem formulários condicionais e autocomplete manual tolerante', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Investimentos', exact: true }).first().click();
-  await page.getByRole('button', { name: /Adicionar registro/ }).first().click();
+  await navigate(page, 'Investimentos');
+  await page.getByRole('button', { name: '+ Novo investimento', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Tipo de investimento *').click();
+  await dialog.getByRole('combobox', { name: 'Tipo de investimento' }).click();
   await page.getByRole('option', { name: 'Ação' }).click();
-  await expect(dialog.getByLabel('Buscar ativo')).toBeVisible();
-  await dialog.getByLabel('Buscar ativo').fill('PETR4');
-  await expect(dialog.getByLabel('Buscar ativo')).toHaveValue('PETR4');
+  await expect(dialog.locator('input[role="combobox"]')).toBeVisible();
+  await dialog.locator('input[role="combobox"]').fill('PETR4');
+  await expect(dialog.locator('input[role="combobox"]')).toHaveValue('PETR4');
+  await expect(dialog.locator('#asset-search-results .asset-option').first()).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(dialog.locator('#asset-search-results')).toHaveCount(0);
   await expect(dialog).toBeVisible();
 });
 

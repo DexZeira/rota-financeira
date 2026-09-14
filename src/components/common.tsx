@@ -1,3 +1,4 @@
+import { openDatePicker } from './native-input';
 import { AttributionFields } from './attribution-fields';
 import { useVirtualRecords } from '../hooks/use-virtual-records';
 import { attributionKeys } from '../expense-allocation';
@@ -199,7 +200,7 @@ export function Fields({
               {f.required ? ' *' : ''}
             </span>
             {isAssetSearch ? (
-              <AssetSearch value={value} setValue={setValue} crypto={assetType === 'Criptomoeda'} />
+              <AssetSearch inputId={`${prefix}-${f.key}`} value={value} setValue={setValue} crypto={assetType === 'Criptomoeda'} />
             ) : f.type === 'select' ? (
               <Choice
                 inputId={`${prefix}-${f.key}`}
@@ -227,6 +228,7 @@ export function Fields({
                   autoComplete="off"
                   required={f.required}
                   type={f.type || 'text'}
+                  onClick={openDatePicker}
                   min={f.type === 'number' && !f.signed ? 0 : undefined}
                   step={
                     f.type === 'number' ? (f.integer ? '1' : 'any') : undefined
@@ -265,7 +267,7 @@ export function Fields({
   );
 }
 
-function AssetSearch({ value, setValue, crypto }: { value: Row; setValue: (r: Row) => void; crypto: boolean }) {
+function AssetSearch({ inputId, value, setValue, crypto }: { inputId: string; value: Row; setValue: (r: Row) => void; crypto: boolean }) {
   const [query, setQuery] = useState(String(value.ticker || value.coinGeckoId || ''));
   const [items, setItems] = useState<AssetSuggestion[]>([]), [loading, setLoading] = useState(false), [message, setMessage] = useState('');
   const [active, setActive] = useState(-1); const request = useRef(0);
@@ -279,7 +281,7 @@ function AssetSearch({ value, setValue, crypto }: { value: Row; setValue: (r: Ro
     return () => clearTimeout(timer);
   }, [query, crypto]);
   const choose = (item: AssetSuggestion) => { setValue({ ...value, name: item.name, ticker: item.symbol, coinGeckoId: item.id || value.coinGeckoId || '' }); setQuery(item.symbol); setItems([]); };
-  return <div className="asset-search"><input id="asset-search-input" role="combobox" aria-expanded={items.length > 0} aria-controls="asset-search-results" aria-autocomplete="list" value={query} onChange={(e) => { setQuery(e.target.value); setValue({ ...value, ticker: e.target.value }); }} onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setActive((x) => Math.min(x + 1, items.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((x) => Math.max(x - 1, 0)); } else if (e.key === 'Enter' && items[active]) { e.preventDefault(); choose(items[active]); } else if (e.key === 'Escape') setItems([]); }} />{loading && <small>Buscando ativos...</small>}{message && <small>{message}</small>}{items.length > 0 && <div id="asset-search-results">{items.map((item, index) => <button type="button" className="asset-option" key={item.id || item.symbol} aria-current={index === active ? 'true' : undefined} onMouseDown={() => choose(item)}><strong>{item.symbol}</strong><span>{item.name}</span></button>)}</div>}</div>;
+  return <div className="asset-search"><input id={inputId} role="combobox" aria-expanded={items.length > 0} aria-controls="asset-search-results" aria-autocomplete="list" value={query} onChange={(e) => { setQuery(e.target.value); setValue({ ...value, ticker: e.target.value }); }} onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setActive((x) => Math.min(x + 1, items.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((x) => Math.max(x - 1, 0)); } else if (e.key === 'Enter' && items[active]) { e.preventDefault(); choose(items[active]); } else if (e.key === 'Escape' && items.length > 0) { e.preventDefault(); e.stopPropagation(); setItems([]); } }} />{loading && <small>Buscando ativos...</small>}{message && <small>{message}</small>}{items.length > 0 && <div id="asset-search-results">{items.map((item, index) => <button type="button" className="asset-option" key={item.id || item.symbol} aria-current={index === active ? 'true' : undefined} onMouseDown={() => choose(item)}><strong>{item.symbol}</strong><span>{item.name}</span></button>)}</div>}</div>;
 }
 export function Editor({
   kind,
@@ -344,6 +346,7 @@ export function Editor({
             }
           }}
         >
+          <div className="editor-body">
           {kind === 'work' && <fieldset className="work-type-choice wide">
             <legend>O que você vai registrar?</legend>
             <div className="segmented-choice" role="radiogroup" aria-label="Tipo de trabalho">
@@ -472,6 +475,7 @@ export function Editor({
               {error}
             </p>
           )}
+          </div>
           <div className="form-actions">
             <button type="button" onClick={onClose}>
               Cancelar
@@ -583,7 +587,7 @@ export function Records({
               De
               <input
                 aria-label={'Data inicial ' + labels[kind]}
-                type="date"
+                type="date" onClick={openDatePicker}
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
@@ -592,7 +596,7 @@ export function Records({
               Até
               <input
                 aria-label={'Data final ' + labels[kind]}
-                type="date"
+                type="date" onClick={openDatePicker}
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               />

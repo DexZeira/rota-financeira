@@ -17,6 +17,7 @@ export default defineConfig({
     timeout: 30_000,
   },
   projects: [
+    { name: '320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 800 } } },
     { name: '360', use: { ...devices['Desktop Chrome'], viewport: { width: 360, height: 800 } } },
     { name: '390', use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } } },
     { name: '430', use: { ...devices['Desktop Chrome'], viewport: { width: 430, height: 932 } } },

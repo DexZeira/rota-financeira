@@ -1,3 +1,4 @@
+import { openDatePicker } from '../components/native-input';
 import { HeroMetric, PageHeader, ActionsMenu } from '../components/finance-ui';
 import { dateRange } from '../insights';
 import { workCashResult } from '../work-results';
@@ -91,7 +92,7 @@ export function Work(p: ViewProps) {
             De
             <input
               aria-label="Data inicial Trabalho"
-              type="date"
+              type="date" onClick={openDatePicker}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
@@ -100,7 +101,7 @@ export function Work(p: ViewProps) {
             Até
             <input
               aria-label="Data final Trabalho"
-              type="date"
+              type="date" onClick={openDatePicker}
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -128,8 +129,8 @@ export function Work(p: ViewProps) {
             ...d.work.map((r) => String(r.activity)),
           ])]}
         />
-        <label>De<input aria-label="Data inicial Trabalho" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label>Até<input aria-label="Data final Trabalho" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label>De<input aria-label="Data inicial Trabalho" type="date" onClick={openDatePicker} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label>Até<input aria-label="Data final Trabalho" type="date" onClick={openDatePicker} value={to} onChange={(e) => setTo(e.target.value)} /></label>
         <label>Busca<input aria-label="Pesquisar Trabalho" placeholder="Pesquisar registros…" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
         <button className="primary" type="button" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button>
       </Sheet>

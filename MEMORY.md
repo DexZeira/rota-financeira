@@ -3,6 +3,8 @@
 
 
 Última revisão: 2026-09-11
+
+Layout de overlays (2026-09-14): validar editores no build de produção com Playwright. A compilação CSS converteu `transform: none; translate: none` em `transform: translate(0)`, deixando o `translate: -50% -50%` das utilities Tailwind ativo apenas no build. DialogContent agora posiciona via `transform` em CSS, sem utilities independentes de translate; manter uma única propriedade para centralização e reset mobile. Regressão coberta em `tests/e2e/editor-layout.spec.ts`.
  
 Decisão de 2026-09-12: login e sincronização opcionais via Supabase Auth + snapshot completo do backup (schema atual) em `user_app_state`, com RLS e gravação condicional atômica por `updated_at`. Persistência permanece local-first; nenhuma fórmula financeira foi alterada. Divergências exigem escolha, contas têm cópias locais isoladas e logout conserva dados. Usuário confirmou produção configurada e sincronizando em `ad920cf`; nunca colocar chaves administrativas no frontend.
 

@@ -1,3 +1,4 @@
+import { openDatePicker } from '../components/native-input';
 import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { dateRange, monthComparison } from '../insights';
 import { useState } from 'react';
@@ -53,7 +54,7 @@ export function Expenses(p: ViewProps) {
             De
             <input
               aria-label="Gastos de"
-              type="date"
+              type="date" onClick={openDatePicker}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
@@ -62,7 +63,7 @@ export function Expenses(p: ViewProps) {
             Até
             <input
               aria-label="Gastos até"
-              type="date"
+              type="date" onClick={openDatePicker}
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -96,7 +97,7 @@ export function Expenses(p: ViewProps) {
           ]}
         />
       </Card>
-      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros de gastos"><div className="list-tools"><label>De<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label>Até<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label><Choice label="Recorrência" value={kind} onChange={setKind} options={['todas', 'única', 'mensal', 'anual']} /></div><button className="primary" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button></Sheet>
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros de gastos"><div className="list-tools"><label>De<input type="date" onClick={openDatePicker} value={from} onChange={(e) => setFrom(e.target.value)} /></label><label>Até<input type="date" onClick={openDatePicker} value={to} onChange={(e) => setTo(e.target.value)} /></label><Choice label="Recorrência" value={kind} onChange={setKind} options={['todas', 'única', 'mensal', 'anual']} /></div><button className="primary" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button></Sheet>
       <section className="content-section"><h2>Para onde foi seu dinheiro?</h2>
         {categories.length ? categories.slice(0,6).map((category) => <div className="category-row" key={category.label}><span>{category.label}</span><strong>{money(category.value)}</strong><Bar label={category.label} value={ratio(category.value, total) * 100}/></div>) : <EmptyState title="Comece pelo primeiro gasto" description="Suas categorias aparecem aqui conforme você registra despesas." action={<button onClick={() => p.edit('expenses')}>Registrar gasto</button>}/>}
       </section>
