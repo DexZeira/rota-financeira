@@ -24,5 +24,12 @@ export default defineConfig({
     { name: '768', use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } } },
     { name: '1366', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 768 } } },
     { name: '1920', use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 } } },
+    ...[
+      [320, 568], [360, 640], [360, 740], [390, 664], [390, 844], [412, 732], [430, 932],
+    ].map(([width, height]) => ({
+      name: `${width}x${height}`,
+      testMatch: /viewport-height\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width, height } },
+    })),
   ],
 });
