@@ -1,6 +1,7 @@
+import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { ComponentLinks } from '../components/component-links';
 import { MaintenanceCostSummary } from './maintenance-costs';
-import { Card, Metrics, Records } from '../components/common';
+import { Metrics, Records } from '../components/common';
 import { num, money, dec, brDate, today, id } from '../model';
 import { maintenanceState, maintenanceCosts, forecast } from '../calculations';
 import { type ViewProps, dateCol, amountCol } from './shared';
@@ -11,62 +12,23 @@ export function Maintenance(p: ViewProps) {
     near = rows.filter((r) => r.status === 'próxima'),
     configured = rows.some((r) => r.status !== 'não configurada');
   const status = late.length
-    ? '🔴 MANUTENÇÃO ATRASADA'
+    ? 'MANUTENÇÃO ATRASADA'
     : near.length
-      ? '🟡 MANUTENÇÃO PRÓXIMA'
+      ? 'MANUTENÇÃO PRÓXIMA'
       : configured
-        ? '🟢 EM DIA'
+        ? 'EM DIA'
         : 'CONFIGURE OS INTERVALOS';
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">CUIDADOS</p><h1>Manutenção</h1><p className="page-subtitle">Saiba qual cuidado vem a seguir.</p></div></header>
-      <Card title="Manutenção" className="page-hero"><div className="hero-summary"><strong>{late.length + near.length}</strong><span>itens precisam de atenção</span></div><button className="primary" onClick={() => edit('services')}>+ Registrar manutenção</button></Card>
-      <section className="maintenance-priority"><div className="section-heading"><div><p className="eyebrow">PRIORIDADE</p><h2>Precisa de atenção</h2></div></div><div className="maintenance-list">{rows
-          .filter((r) => ['atrasada', 'próxima'].includes(String(r.status)))
-          .sort((a, b) => a.days - b.days)
-          .map((r) => (<article className="maintenance-list-item" key={r.id}>
-              <div><h3>{String(r.name)}</h3><p>{r.status === 'atrasada' ? `Atrasado ${dec(Math.abs(r.kmLeft || 0))} km` : r.kmLeft !== null ? `Faltam ${dec(r.kmLeft)} km` : brDate(r.nextDate)}</p></div>
-              <div className="maintenance-list-value"><strong>{money(num(r.estimated))}</strong><button onClick={() => edit('maintenance', d.maintenance.find((x) => x.id === r.id))}>Editar</button></div>
-            </article>))}</div>{!late.length && !near.length && <p className="empty-state">Nenhuma manutenção pendente. Quando houver uma próxima, ela aparecerá aqui.</p>}</section>
+      <PageHeader title="Manutenção" description="Cuidado em dia. Caminho tranquilo." />
+      <HeroMetric label="Precisam de atenção" value={String(late.length + near.length) + ' itens'} context={status} action={<button className="primary" onClick={() => edit('services')}>+ Registrar manutenção</button>} />
+      <section className="content-section"><h2>O próximo cuidado</h2>{[...late, ...near].map((r) => <FinancialItem key={r.id} title={String(r.name)} description={r.status === 'atrasada' ? 'Atrasada' : 'Próxima'} value={r.kmLeft !== null ? (r.kmLeft < 0 ? 'Atrasado ' : 'Faltam ') + dec(Math.abs(r.kmLeft)) + ' km' : brDate(r.nextDate)} context={money(num(r.estimated)) + ' estimados'} action={<button onClick={() => edit('services', { id: id(), maintenanceId: r.id, date: today(), km: num(d.bike.km), amount: 0, notes: '' })}>Registrar</button>}/>)}
+        {!late.length && !near.length && <EmptyState title="Nenhum cuidado pendente" description="As próximas manutenções aparecem aqui conforme os intervalos cadastrados."/>}
+      </section>
       <details className="history-disclosure"><summary>Ver manutenções futuras e configuradas</summary><div className="maintenance-list">{rows
           .filter((r) => !['atrasada', 'próxima', 'concluída'].includes(String(r.status)))
           .map((r) => (<article className="maintenance-list-item" key={r.id}><div><h3>{String(r.name)}</h3><p>{String(r.status)}</p></div><div className="maintenance-list-value"><strong>{money(num(r.estimated))}</strong><button onClick={() => edit('maintenance', d.maintenance.find((x) => x.id === r.id))}>Editar</button></div></article>))}</div></details>
-      {/* detalhes técnicos permanecem abaixo da prioridade */}
-      <div className="three-grid maintenance-legacy-details">
-        {rows.filter((r) => r.status !== 'concluída').slice(0, 6).map((r) => (
-            <Card key={r.id} title={String(r.name)}>
-              <span className={'status ' + r.status}>
-                {r.status === 'não configurada'
-                  ? 'Configure último km/data'
-                  : String(r.status)}
-              </span>
-              <div className="target-source-list">
-                <div className="detail">
-                  <span>Estimativa</span>
-                  <strong>{money(num(r.estimated))}</strong>
-                </div>
-                <div className="detail">
-                  <span>Vida útil</span>
-                  <strong>{dec(num(r.lifeKm) || num(r.intervalKm))} km</strong>
-                </div>
-                <div className="detail">
-                  <span>Custo por km</span>
-                  <strong>
-                    {maintenanceCosts(d, r).estimatedCostPerKm === null
-                      ? 'Não definido'
-                      : money(maintenanceCosts(d, r).estimatedCostPerKm!)}
-                  </strong>
-                </div>
-                <div className="detail">
-                  <span>Faltam</span>
-                  <strong>
-                    {r.kmLeft === null ? 'Sem base' : dec(r.kmLeft) + ' km'}
-                  </strong>
-                </div>
-              </div>
-            </Card>))}
-      </div>
-      <MaintenanceCostSummary data={d} />
+      <details className="disclosure"><summary>Custos e projeções de manutenção</summary>      <MaintenanceCostSummary data={d} />
       <ComponentLinks data={d} onSave={(r) => p.update('costs', r)} />
       <div className={'notice ' + (late.length ? 'error' : '')}>
         <b>{status}</b> · {late.length} atrasadas · {near.length} próximas
@@ -84,7 +46,7 @@ export function Maintenance(p: ViewProps) {
         primeiro prazo entre km e data; dias por km usam a média dos últimos 30
         dias. Sem média ou data, não é possível projetar um prazo.
       </p>
-      <Records
+      </details><details className="disclosure"><summary>Gerenciar intervalos e itens</summary><Records
         {...p}
         kind="maintenance"
         rows={rows}
@@ -162,7 +124,7 @@ export function Maintenance(p: ViewProps) {
           </button>
         )}
       />
-      <Records
+      </details><details className="disclosure"><summary>Histórico de serviços realizados</summary><Records
         {...p}
         kind="services"
         rows={d.services}
@@ -179,7 +141,7 @@ export function Maintenance(p: ViewProps) {
           amountCol,
         ]}
       />
-      <Records
+      </details><details className="disclosure"><summary>Inspeções e checklists</summary><Records
         {...p}
         kind="checklists"
         rows={d.checklists}
@@ -189,14 +151,14 @@ export function Maintenance(p: ViewProps) {
             label: 'Condição',
             render: (r) =>
               Object.values(r).includes('Problema')
-                ? '🔴 Problema'
+                ? 'Problema'
                 : Object.values(r).includes('Atenção')
-                  ? '🟡 Atenção'
-                  : '🟢 OK',
+                  ? 'Atenção'
+                  : 'OK',
           },
           { label: 'Observações', render: (r) => String(r.notes) },
         ]}
       />
-    </>
+    </details></>
   );
 }

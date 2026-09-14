@@ -1,4 +1,5 @@
-'use client';
+import { PageSkeleton, PageHeader, Disclosure } from '../src/components/finance-ui';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { GlobalSearch } from '../src/components/global-search';
 import { storageFailure } from '../src/services/storage-quota';
 import { PageBoundary } from '../src/components/page-boundary';
@@ -56,7 +57,6 @@ import {
   labels,
   validateRow,
   today,
-  brDate,
   emptyRow,
   id,
   type Data,
@@ -100,25 +100,21 @@ const navigation = [
   ['Configurações', Settings],
 ] as const;
 const navGroups = [
-  { title: 'VISÃO GERAL', pages: ['Dashboard'] },
-  {
-    title: 'FINANÇAS',
-    pages: ['Dívidas', 'Gastos', 'Investimentos', 'Planos'],
-  },
-  { title: 'TRABALHO', pages: ['Trabalho'] },
-  { title: 'MOTO', pages: ['Moto', 'Manutenção'] },
-  { title: 'ANÁLISES', pages: ['Análises'] },
-  { title: 'SISTEMA', pages: ['Configurações'] },
+  { title: 'Principal', pages: ['Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
+  { title: 'Planejamento', pages: ['Planos'] },
+  { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
+  { title: 'Insights', pages: ['Análises'] },
+  { title: 'Sistema', pages: ['Configurações'] },
 ];
 function Nav({ page, go }: { page: string; go: (page: string) => void }) {
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, isMobile } = useSidebar();
   return (
     <>
       {navGroups.map((group) => (
         <div className="nav-group" key={group.title}>
           <p>{group.title}</p>
           <SidebarMenu>
-            {group.pages.map((name) => {
+            {group.pages.filter((name) => !isMobile || !['Dashboard', 'Trabalho', 'Gastos', 'Investimentos'].includes(name)).map((name) => {
               const entry = navigation.find(([n]) => n === name)!;
               const Icon = entry[1];
               return (
@@ -131,7 +127,7 @@ function Nav({ page, go }: { page: string; go: (page: string) => void }) {
                     }}
                   >
                     <Icon />
-                    <span>{name}</span>
+                    <span>{name === 'Dashboard' ? 'Início' : name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
@@ -181,7 +177,6 @@ export default function Home() {
     [error, setError] = useState(''),
     [blocked, setBlocked] = useState(false),
     [message, setMessage] = useState(''),
-    [quickOpen, setQuickOpen] = useState(false),
     [undo, setUndo] = useState<Data | null>(null);
   const [editor, setEditor] = useState<{
       kind: Collection | 'settings' | 'bike';
@@ -459,30 +454,16 @@ export default function Home() {
     del: (kind: Collection, row: Row) => setDeletion({ kind, row }),
     go,
   };
-  const titles: Record<string, string> = {
-    Dashboard: 'Visão geral',
-    Moto: 'Sua Honda XRE 190',
-    Manutenção: 'Manutenção da XRE 190 2025',
-  };
-  const primary: Partial<Record<string, Collection>> = {
-    Dashboard: 'work',
-    Trabalho: 'work',
-    Dívidas: 'debts',
-    Manutenção: 'services',
-    Gastos: 'expenses',
-    Investimentos: 'movements',
-    Planos: 'plans',
-  };
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
           <div className="brand">
-            <span>R</span> Rota <b>financeira</b>
+            <span>RF</span><div>Rota<b>Financeira</b></div>
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <p className="nav-label">SEU CENTRO DE CONTROLE</p>
+
           <Nav page={page} go={go} />
         </SidebarContent>
         <SidebarFooter>
@@ -499,11 +480,17 @@ export default function Home() {
           <div>
             <SidebarTrigger aria-label="Abrir menu" />
             <GlobalSearch data={data} go={go} />
-            <span>Pessoal / {page}</span>
+            <span className="topbar-context">{page === 'Dashboard' ? 'Início' : page}</span>
           </div>
           <div>
-            <span className="header-date">{brDate(today())}</span>
-            <div className="quick-add"><button className="quick-add-trigger" aria-expanded={quickOpen} onClick={() => setQuickOpen((open) => !open)}><Plus size={16} /> Novo</button>{quickOpen && <div className="quick-add-menu" role="menu"><button role="menuitem" onClick={() => { setQuickOpen(false); edit('work'); }}>Trabalho</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('expenses'); }}>Gasto</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('movements'); }}>Aporte</button><button role="menuitem" onClick={() => { setQuickOpen(false); edit('services'); }}>Manutenção</button><button role="menuitem" onClick={() => { setQuickOpen(false); if (data.debts.length) edit('payments', { ...emptyRow('payments'), id: id(), debtId: data.debts[0].id, date: today(), amount: 0, installments: 0, kind: 'normal' }); else go('Dívidas'); }}>Pagamento</button></div>}</div>
+
+            <DropdownMenu><DropdownMenuTrigger className="primary quick-add-trigger"><Plus size={16} /> Novo</DropdownMenuTrigger><DropdownMenuContent align="end">
+  <DropdownMenuItem onClick={() => edit('work')}>Trabalho</DropdownMenuItem>
+  <DropdownMenuItem onClick={() => edit('expenses')}>Gasto</DropdownMenuItem>
+  <DropdownMenuItem onClick={() => { if (data.debts.length) edit('payments', { ...emptyRow('payments'), id: id(), debtId: data.debts[0].id, date: today(), amount: 0, installments: 0, kind: 'normal' }); else go('Dívidas'); }}>Pagamento</DropdownMenuItem>
+  <DropdownMenuItem onClick={() => edit('movements')}>Aporte</DropdownMenuItem>
+  <DropdownMenuItem onClick={() => edit('services')}>Manutenção</DropdownMenuItem>
+</DropdownMenuContent></DropdownMenu>
             <button
               aria-label="Alternar tema"
               onClick={() =>
@@ -537,25 +524,6 @@ export default function Home() {
           </div>
         </header>
         <main className="workspace">
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">SUAS FINANÇAS, NA DIREÇÃO CERTA</p>
-              <h1>{titles[page] || page}</h1>
-              <p>
-                {page === 'Dashboard'
-                  ? 'Seu dinheiro e sua XRE, no mesmo lugar.'
-                  : 'Organize, acompanhe e ajuste seus registros.'}
-              </p>
-            </div>
-            {primary[page] && (
-              <button className="primary" onClick={() => edit(primary[page]!)}>
-                <Plus size={18} />
-                {page === 'Dashboard' || page === 'Trabalho'
-                  ? 'Registrar trabalho'
-                  : 'Adicionar registro'}
-              </button>
-            )}
-          </div>
           {error && (
             <div className="notice error" role="alert">
               {error}
@@ -618,7 +586,7 @@ export default function Home() {
           ) : (
             <>
               {page === 'Configurações' && (
-                <AccountPanel
+                <><PageHeader title="Configurações" description="Seu aplicativo, do seu jeito." /><Disclosure title="Conta e sincronização" description={cloud.status}><AccountPanel
                   status={cloud.status}
                   lastSync={cloud.lastSync}
                   login={() => setShowLogin(true)}
@@ -629,9 +597,9 @@ export default function Home() {
                     void cloud.synchronize(choice);
                   }}
                   syncError={cloud.error}
-                />
+                /></Disclosure></>
               )}
-              <PageBoundary key={page}><Suspense fallback={<output className="card">Carregando página…</output>}>
+              <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}

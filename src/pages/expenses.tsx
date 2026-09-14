@@ -1,8 +1,8 @@
-import { Chart } from "../components/simple-chart";
+import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { dateRange, monthComparison } from '../insights';
 import { useState } from 'react';
-import { Card, Metrics, Records, Choice } from '../components/common';
-import { money, dec, today } from '../model';
+import { Card, Metrics, Records, Choice, Bar } from '../components/common';
+import { money, dec, today, num, brDate } from '../model';
 import { financial, targets, sum, ratio, daysBetween } from '../calculations';
 import { type ViewProps, dateCol, amountCol } from './shared';
 import { Sheet } from '../components/sheet';
@@ -31,9 +31,9 @@ export function Expenses(p: ViewProps) {
 
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">MOVIMENTAÇÕES</p><h1>Gastos</h1><p className="page-subtitle">Entenda para onde seu dinheiro está indo.</p></div></header>
-      <Card title="Gastos deste mês" className="page-hero">
-        <div className="hero-summary"><strong>{money(total)}</strong><span>{comparison.expenseChange === null ? 'Sem comparação com o mês passado' : `${dec(Math.abs(comparison.expenseChange), 1)}% ${comparison.expenseChange <= 0 ? 'abaixo' : 'acima'} do mês passado`}</span></div>
+      <PageHeader title="Gastos" description="Dê um destino consciente ao seu dinheiro." />
+      <HeroMetric label="Gastos no período selecionado" value={money(total)} context={brDate(from) + ' a ' + brDate(to)} action={<button className="primary" onClick={() => p.edit('expenses')}>+ Registrar gasto</button>} />
+      <Card title="Período">
         <div className="period-tabs">
           {['Hoje', '7 dias', '30 dias', 'Este mês'].map((period) => (
             <button
@@ -97,7 +97,11 @@ export function Expenses(p: ViewProps) {
         />
       </Card>
       <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros de gastos"><div className="list-tools"><label>De<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label>Até<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label><Choice label="Recorrência" value={kind} onChange={setKind} options={['todas', 'única', 'mensal', 'anual']} /></div><button className="primary" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button></Sheet>
-      <section className="content-section"><div className="section-heading"><div><p className="eyebrow">DISTRIBUIÇÃO</p><h2>Para onde foi seu dinheiro?</h2></div></div><Chart title="Principais categorias" items={categories.slice(0, 6)} /></section>
+      <section className="content-section"><h2>Para onde foi seu dinheiro?</h2>
+        {categories.length ? categories.slice(0,6).map((category) => <div className="category-row" key={category.label}><span>{category.label}</span><strong>{money(category.value)}</strong><Bar label={category.label} value={ratio(category.value, total) * 100}/></div>) : <EmptyState title="Comece pelo primeiro gasto" description="Suas categorias aparecem aqui conforme você registra despesas." action={<button onClick={() => p.edit('expenses')}>Registrar gasto</button>}/>}
+      </section>
+      <section className="content-section"><h2>Últimos gastos</h2>{[...rows].sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0,8).map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.category) + ' · ' + brDate(r.date)} value={money(num(r.amount))} action={<button aria-label={'Editar ' + r.name} onClick={() => p.edit('expenses', r)}>Editar</button>}/>)}</section>
+      <details className="disclosure"><summary>Orçamento e totais gerais</summary>
       <Metrics
         items={[
           ['Gastos registrados', money(sum(d.expenses, 'amount'))],
@@ -111,7 +115,7 @@ export function Expenses(p: ViewProps) {
         automaticamente. Cadastre cada pagamento realizado. Serviços registrados
         em Manutenção já entram nos totais.
       </p>
-      <details className="history-disclosure"><summary>Ver histórico completo de gastos</summary><Records
+      </details><details className="history-disclosure"><summary>Ver histórico completo de gastos</summary><Records
         {...p}
         kind="expenses"
         rows={rows}

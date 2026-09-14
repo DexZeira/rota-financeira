@@ -1,3 +1,5 @@
+import { HeroMetric, PageHeader, QuickAction } from '../components/finance-ui';
+import { BriefcaseBusiness, Receipt, TrendingUp } from 'lucide-react';
 import { SelectedGoal, DayAndMonth, Attention, TrendChart } from '../components/overview';
 import { TargetBreakdown } from '../components/target-breakdown';
 import { ArrowUpRight, Bike, Target, ShieldCheck, Wallet, Wrench } from 'lucide-react';
@@ -11,7 +13,6 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
     c = costs(d),
     t = targets(d),
     day = today(),
-    month = day.slice(0, 7),
     works = d.work.filter((r) => r.date === day),
     r = workResult(
       sum(works, 'revenue'),
@@ -44,52 +45,22 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
     : t.ideal > 0 ? `Você precisa de ${money(t.ideal)} por dia para atingir sua meta.` : 'Registre seus movimentos para receber insights do período.';
   return (
     <>
-      <SelectedGoal
-        data={d}
-        edit={edit}
-        onSelect={(defaultTarget) =>
-          saveSettings({ ...d.settings, defaultTarget })
-        }
-      />
-      <Attention data={d} go={go} />
-      <Metrics
-        items={[
-          [
-            'Saldo disponível',
-            money(f.available),
-            'Real · saldo menos reserva da moto',
-          ],
-          [
-            'Faturamento do mês',
-            money(
-              sum(
-                d.work.filter((r) => String(r.date).startsWith(month)),
-                'revenue',
-              ),
-            ),
-            'Real · trabalho registrado',
-          ],
-          [
-            'Despesas do mês',
-            money(
-              sum(
-                [...d.expenses, ...d.services].filter((r) =>
-                  String(r.date).startsWith(month),
-                ),
-                'amount',
-              ),
-            ),
-            'Real · inclui serviços da moto',
-          ],
-          [
-            'Patrimônio líquido',
-            money(f.netWorth),
-            'Saldo + investimentos + moto − dívidas',
-          ],
-        ]}
-      />
-      <Card title="Resumo inteligente"><p className="inline-note">{smartInsight}</p><p className="inline-note">Baseado somente nos dados registrados no aplicativo.</p></Card>
-      <nav className="quick-actions" aria-label="Ações rápidas"><button onClick={() => edit('work')}>+ Trabalho</button><button onClick={() => edit('expenses')}>+ Gasto</button><button onClick={() => edit('movements')}>+ Aporte</button></nav>
+      <PageHeader title={new Date().getHours() < 12 ? 'Bom dia.' : new Date().getHours() < 18 ? 'Boa tarde.' : 'Boa noite.'} description="Seu dinheiro, na direção que você escolhe." />
+      <HeroMetric label="Seu saldo disponível" value={money(f.available)} context={<><span>Atual · saldo menos reserva da moto</span><p>{money(comparison.current.result)} de resultado de caixa neste mês</p></>} />
+      <nav className="quick-actions" aria-label="Ações rápidas">
+        <QuickAction label="Trabalho" onClick={() => edit('work')}><BriefcaseBusiness/></QuickAction>
+        <QuickAction label="Gasto" onClick={() => edit('expenses')}><Receipt/></QuickAction>
+        <QuickAction label="Aporte" onClick={() => edit('movements')}><TrendingUp/></QuickAction>
+      </nav>
+      <section aria-label="Este mês"><h2>Este mês</h2><Metrics items={[
+        ['Receitas', money(comparison.current.revenue), 'Trabalho registrado'],
+        ['Gastos', money(comparison.current.expenses), 'Inclui serviços da moto'],
+        ['Resultado de caixa', money(comparison.current.result), 'Após pagamentos e aportes'],
+      ]}/></section>
+      <SelectedGoal data={d} edit={edit} onSelect={(defaultTarget) => saveSettings({ ...d.settings, defaultTarget })}/>
+      <Attention data={d} go={go}/>
+      <section className="content-section"><h2>Seu resumo</h2><p>{smartInsight}</p></section>
+      <TrendChart data={d}/>
       <details className="dashboard-secondary"><summary>Ver detalhes da moto</summary><div className="dashboard-grid">
         <Card
           title={`${d.bike.brand} ${d.bike.model}`}
@@ -193,11 +164,11 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
         </Card>
       </div></details>
       <details className="dashboard-secondary"><summary>Ver resumo do período</summary><DayAndMonth data={d} /></details>
-      <TrendChart data={d} />
-      <TargetBreakdown
+
+      <details className="disclosure"><summary>Composição da meta</summary><TargetBreakdown
         target={t}
         onConfigure={() => edit('settings', d.settings)}
-      />
+      /></details>
     </>
   );
 }

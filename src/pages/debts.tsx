@@ -1,3 +1,4 @@
+import { PageHeader, HeroMetric, FinancialItem } from '../components/finance-ui';
 import { DebtCards } from '../components/overview';
 import { useState } from 'react';
 import { Card, Metrics, Bar, NoData, Records, Choice } from '../components/common';
@@ -11,8 +12,10 @@ export function Debts(p: ViewProps) {
     all = d.debts.map((r) => debtState(d, r));
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">COMPROMISSOS</p><h1>Dívidas</h1><p className="page-subtitle">Veja o que falta pagar e organize suas prioridades.</p></div></header>
-      <Card title="Saldo devedor" className="page-hero"><div className="hero-summary"><strong>{money(financial(d).debt)}</strong><span>{money(targets(d).installments)} previstos neste mês</span></div></Card>
+      <PageHeader title="Dívidas" description="Um compromisso de cada vez." />
+      <HeroMetric label="Total em dívidas" value={money(financial(d).debt)} context={money(targets(d).installments) + ' previstos neste mês'} action={<button className="primary" onClick={() => edit('debts')}>+ Nova dívida</button>} />
+      <section className="content-section"><h2>Próximos compromissos</h2>{[...all].filter((r) => r.balance > 0).sort((a,b) => String(a.due || '9999').localeCompare(String(b.due || '9999'))).map((r) => <FinancialItem key={r.id} title={String(r.name)} description={'Vencimento · ' + brDate(r.due)} value={money(r.balance)} context={String(r.remaining) + ' parcelas restantes'} action={<button onClick={() => edit('payments', { id: id(), debtId: r.id, date: today(), amount: 0, installments: 0, kind: 'normal', notes: '' })}>Pagar</button>}><Bar value={num(r.progress)} label={'Quitação de ' + r.name}/><small>{dec(num(r.progress))}% quitado</small></FinancialItem>)}</section>
+      <details className="disclosure"><summary>Estratégia e previsão de quitação</summary>
       <Metrics
         items={[
           ['Dívidas restantes', money(financial(d).debt)],
@@ -60,7 +63,7 @@ export function Debts(p: ViewProps) {
           <NoData text="Nenhuma dívida ativa." />
         )}
       </Card>
-      <DebtCards data={d} edit={edit} />
+      <DebtCards data={d} edit={edit} /></details>
       <details className="history-disclosure"><summary>Ver todas as dívidas</summary><Records
         {...p}
         kind="debts"

@@ -33,7 +33,7 @@ export function AuthForm({ close }: { close: () => void }) {
         if (!open && !recovery) close();
       }}
     >
-      <DialogContent className="account-dialog">
+      <DialogContent className="account-dialog"><div className="login-layout"><aside className="login-brand-panel"><div className="brand"><span>RF</span><div>Rota<b>Financeira</b></div></div><div><h2>Sua vida financeira em um só lugar.</h2><p>Mais clareza para hoje.<br/>Mais possibilidades para amanhã.</p></div></aside><div className="login-form-panel">
         <DialogTitle>Rota Financeira</DialogTitle>
         <DialogDescription>
           {recovery
@@ -225,7 +225,7 @@ export function AuthForm({ close }: { close: () => void }) {
             <button onClick={close}>Continuar sem conta</button>
           </div>
         )}
-      </DialogContent>
+      </div></div></DialogContent>
     </Dialog>
   );
 }

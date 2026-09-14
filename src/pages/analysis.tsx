@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/finance-ui';
 import { Chart } from "../components/simple-chart";
 import { TrendChart, MonthlySimulator } from '../components/overview';
 import { useState } from 'react';
@@ -67,9 +68,7 @@ export function Analysis(p: ViewProps) {
   const activities = [...new Set(work.map((r) => String(r.activity)))];
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">INSIGHTS</p><h1>Análises</h1><p className="page-subtitle">Encontre padrões nos seus resultados.</p></div></header>
-      <TrendChart data={d} />
-      <MonthlySimulator data={d} />
+      <PageHeader title="Seu dinheiro em perspectiva" description="Perguntas simples. Decisões mais claras." />
       <div className="section-heading">
         <p>
           Período: {brDate(start)} a {brDate(at)}
@@ -82,11 +81,11 @@ export function Analysis(p: ViewProps) {
         />
       </div>
       <div className="analysis-questions">
-        {([['Lucro', 'Seu lucro está melhorando?'], ['Gastos', 'Onde você mais gasta?'], ['Faturamento', 'Como seu faturamento evoluiu?']] as const).map(([m, question]) => (
-          <section className="analysis-question" key={m}><div className="section-heading"><div><p className="eyebrow">ANÁLISE</p><h2>{question}</h2></div></div><Chart title={m === 'Lucro' ? 'Lucro estimado (R$)' : `${m} (R$)`} items={series(m)} />{!series(m).length && <p className="empty-state">Ainda não há dados suficientes para esta análise.</p>}</section>
+        {([['Lucro', 'Seu lucro está melhorando?'], ['Gastos', 'Como seus gastos evoluem?'], ['Faturamento', 'Como seu faturamento evoluiu?']] as const).map(([m, question]) => (
+          <section className="analysis-question" key={m}><div className="section-heading"><div><p className="eyebrow">{m === 'Lucro' ? '01 · RESULTADO ESTIMADO' : m === 'Gastos' ? '02 · DESPESAS' : '03 · RECEITAS'}</p><h2>{question}</h2></div></div><Chart title={m === 'Lucro' ? 'Lucro estimado (R$)' : `${m} (R$)`} items={series(m)} />{!series(m).length && <p className="empty-state">Ainda não há dados suficientes para esta análise.</p>}</section>
         ))}
       </div>
-      <div className="two-grid">
+      <details className="disclosure"><summary>Seu patrimônio e os custos de hoje</summary><div className="two-grid">
         <Chart
           title="Composição atual do custo / km (R$)"
           items={[
@@ -128,7 +127,7 @@ export function Analysis(p: ViewProps) {
         dívidas, investimentos e patrimônio mostram a posição atual; não há
         cotações históricas. Lucros estimados usam os custos atuais.
       </p>
-      <Card title="Comparação de atividades">
+      </details><Card title="Qual trabalho rende mais?">
         <div className="comparison">
           {activities.length ? (
             activities.map((a) => {
@@ -157,7 +156,7 @@ export function Analysis(p: ViewProps) {
           )}
         </div>
       </Card>
-      <Card
+      <details className="disclosure"><summary>Simular próximos cenários</summary><MonthlySimulator data={d}/><Card
         title="Simulador “E se?”"
         action={<span className="badge">PROJETADO · 1 MÊS</span>}
       >
@@ -201,6 +200,6 @@ export function Analysis(p: ViewProps) {
           {value('Patrimônio projetado', money(sim.netWorth))}
         </div>
       </Card>
-    </>
+    </details><details className="disclosure"><summary>Evolução dos últimos meses</summary><TrendChart data={d}/></details></>
   );
 }

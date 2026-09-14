@@ -1,3 +1,4 @@
+import { Disclosure } from '../components/finance-ui';
 import { useState } from 'react';
 import { StorageManager } from '../components/storage-manager';
 import { MONEY_SCHEMA_VERSION } from '../services/money-codec';
@@ -67,9 +68,9 @@ export function SettingsView({
   }
   return (
     <>
-      <StorageManager />
+
       <div className="settings-groups">
-      <Card
+<Disclosure title="Planejamento" description="Rotina de trabalho, saldo e custos essenciais">      <Card
         title="Seu planejamento"
         action={
           <button onClick={() => edit('settings', d.settings)}>
@@ -101,8 +102,8 @@ export function SettingsView({
           A base essencial pode incluir ou somar às recorrentes. Avisos:{' '}
           {d.settings.nearKm} km ou {d.settings.nearDays} dias.
         </p>
-      </Card>
-      <Card title="Aparência">
+      </Card></Disclosure>
+      <section className="settings-row"><div><h2>Aparência</h2><p>Escolha o tema do aplicativo.</p></div>
         <Fields
           data={d}
           value={d.settings}
@@ -116,8 +117,8 @@ export function SettingsView({
             },
           ]}
         />
-      </Card>
-      <Card title="Metas diárias">
+      </section>
+<Disclosure title="Metas" description="Meta principal e margens de planejamento">      <Card title="Metas diárias">
         <Fields
           data={d}
           value={settings}
@@ -148,8 +149,8 @@ export function SettingsView({
           Acelerada: percentual adicional sobre a Meta Mínima.
         </p>
         <button onClick={saveSettings}>Salvar configurações</button>
-      </Card>
-      <Card title="Dados e backup">
+      </Card></Disclosure>
+<Disclosure title="Backup e dados" description="Exportar, importar e recuperar seus registros">      <Card title="Dados e backup">
         <p>
           Versão dos dados: {MONEY_SCHEMA_VERSION} ·{' '}
           {collections.reduce((count, key) => count + d[key].length, 0)}{' '}
@@ -217,8 +218,8 @@ export function SettingsView({
           {collections.reduce((s, k) => s + d[k].length, 0)} registros. A
           importação valida os dados e pede confirmação antes de substituir.
         </p>
-      </Card>
-      </div>
+      </Card></Disclosure>
+      <Disclosure title="Diagnóstico" description="Armazenamento local e quota"><StorageManager /></Disclosure></div>
       <details className="settings-advanced"><summary>Avançado: reset e limpeza de dados</summary><Card title="Reset">
         <p className="inline-note">
           Cada ação pede confirmação. Um backup local de recuperação é salvo

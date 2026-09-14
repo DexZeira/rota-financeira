@@ -100,20 +100,7 @@ export function SelectedGoal({
       {!t.configured && (
         <output>Configure os dias de trabalho para obter a meta diária.</output>
       )}
-      <div className="button-row">
-        {(
-          [
-            ['work', 'Trabalho'],
-            ['expenses', 'Gasto'],
-            ['debts', 'Dívida'],
-            ['maintenance', 'Manutenção'],
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} onClick={() => edit(k)}>
-            + {label}
-          </button>
-        ))}
-      </div>
+      <details className="disclosure"><summary>Ajustar a meta</summary><button onClick={() => edit('settings', d.settings)}>Configurar planejamento</button></details>
     </Card>
   );
 }
@@ -182,30 +169,7 @@ export function Attention({
     health = financialHealth(d),
     events = upcoming(d).filter((e) => e.days <= Number(horizon));
   return (
-    <div className="two-grid">
-      <Card title="Saúde financeira">
-        <span
-          className={
-            'health health-' +
-            (health.level === 'Crítica'
-              ? 'bad'
-              : health.level === 'Atenção'
-                ? 'warn'
-                : 'good')
-          }
-        >
-          {health.level}
-        </span>
-        <ul className="reason-list">
-          {health.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-        <p className="inline-note">
-          Avaliação dos registros deste mês, vencimentos e reserva. Sem
-          pontuação oculta.
-        </p>
-      </Card>
+    <div className="attention-section">
       <Card
         title="Precisa da sua atenção"
         action={
@@ -248,6 +212,29 @@ export function Attention({
           Previsões não geram lançamentos.
         </p>
       </Card>
+      <details className="disclosure"><summary>Saúde financeira · {health.level}</summary>      <Card title="Saúde financeira">
+        <span
+          className={
+            'health health-' +
+            (health.level === 'Crítica'
+              ? 'bad'
+              : health.level === 'Atenção'
+                ? 'warn'
+                : 'good')
+          }
+        >
+          {health.level}
+        </span>
+        <ul className="reason-list">
+          {health.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+        <p className="inline-note">
+          Avaliação dos registros deste mês, vencimentos e reserva. Sem
+          pontuação oculta.
+        </p>
+      </Card></details>
     </div>
   );
 }

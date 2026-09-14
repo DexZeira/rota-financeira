@@ -1,3 +1,4 @@
+import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { NextBike } from '../components/overview';
 import { useState } from 'react';
 import { Metrics, Bar, Records, Choice } from '../components/common';
@@ -18,9 +19,11 @@ export function Plans(p: ViewProps) {
   }
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">OBJETIVOS</p><h1>Planos</h1><p className="page-subtitle">Transforme seus objetivos em próximos passos.</p></div></header>
-      <div className="section-heading page-section-intro"><div><p className="eyebrow">SEUS OBJETIVOS</p><h2>Metas que avançam com você</h2></div></div>
-      <NextBike data={d} />
+      <PageHeader title="Objetivos" description="O futuro se constrói aos poucos." action={<button className="primary" onClick={() => edit('plans')}>+ Novo objetivo</button>} />
+      <HeroMetric label="Já guardado para seus planos" value={money(d.plans.reduce((total, r) => total + result(r).current, 0))} context={d.plans.length + ' objetivos cadastrados'} />
+      <section aria-label="Seus objetivos">{!d.plans.length && <EmptyState title="O que você quer conquistar?" description="Defina um objetivo e acompanhe cada avanço." action={<button onClick={() => edit('plans')}>Criar objetivo</button>} />}
+      {d.plans.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.status) + ' · ' + brDate(r.deadline)} value={money(result(r).current)} context={'Faltam ' + money(result(r).remaining)} action={<button onClick={() => transaction(r, 'deposit')}>Aportar</button>}><Bar value={result(r).percent} label={'Progresso de ' + r.name}/><small>{dec(result(r).percent)}% concluído</small></FinancialItem>)}</section>
+      <details className="disclosure"><summary>Seu planejamento de aportes</summary>
       <Metrics
         items={[
           ['Objetivos', String(d.plans.length)],
@@ -52,7 +55,7 @@ export function Plans(p: ViewProps) {
         patrimônio. Registre transferências reais na aba Investimentos e gastos
         efetivos em Gastos.
       </p>
-      <Records
+      </details><details className="disclosure"><summary>Gerenciar objetivos e retiradas</summary><Records
         {...p}
         kind="plans"
         rows={d.plans}
@@ -128,7 +131,7 @@ export function Plans(p: ViewProps) {
           </>
         )}
       />
-      <div id="plan-history">
+      </details><details className="disclosure"><summary>Planejar a próxima moto</summary><NextBike data={d}/></details><div id="plan-history">
         <div className="section-heading">
           <h2>Movimentações dos objetivos</h2>
           <Choice

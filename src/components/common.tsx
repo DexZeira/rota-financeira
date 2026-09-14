@@ -4,12 +4,12 @@ import { attributionKeys } from '../expense-allocation';
 import {
   calculateWorkRevenues,
   updateCardWork,
-  maintenanceCosts,
+  maintenanceCosts, costs, workResult,
 } from '../calculations';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { useEffect } from 'react';
 import { searchB3, searchCrypto, type AssetSuggestion } from '../services/market-quotes';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Bike, CreditCard, BriefcaseBusiness } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,15 +25,8 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { activityForWorkType, workTypeForActivity, type WorkType } from '../services/work-type';
-import { Empty, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import {
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-  TableHeader,
-} from '@/components/ui/table';
+import { EmptyState, ActionsMenu } from './finance-ui';
+
 import {
   type Row,
   type Field,
@@ -118,7 +111,7 @@ export function Metrics({ items }: { items: [string, string, string?][] }) {
   return (
     <div className="metrics">
       {items.map(([label, value, note]) => (
-        <article className="card metric" key={label}>
+        <article className="metric" key={label}>
           <span>{label}</span>
           <strong>{value}</strong>
           {note && <small>{note}</small>}
@@ -144,10 +137,7 @@ export function NoData({
   description?: string;
 }) {
   return (
-    <Empty>
-      <EmptyTitle>{text}</EmptyTitle>
-      <EmptyDescription>{description}</EmptyDescription>
-    </Empty>
+    <EmptyState title={text} description={description} />
   );
 }
 export function Fields({
@@ -164,6 +154,11 @@ export function Fields({
   kind?: Collection | 'settings' | 'bike';
 }) {
   const prefix = useId();
+  if (kind === 'work') return <div className="work-form-sections">{[
+    { title: 'Quando você trabalhou?', keys: ['date', 'hours'] },
+    { title: 'Resultado da jornada', keys: ['cardQuantity', 'cardUnitValue', 'revenue', 'km'] },
+    { title: 'Detalhes', keys: ['notes'] },
+  ].map((group) => <fieldset key={group.title}><legend>{group.title}</legend><Fields fields={fields.filter((f) => group.keys.includes(f.key))} value={value} setValue={setValue} data={data}/></fieldset>)}</div>;
   return (
     <div className="form-grid">
       {fields.map((f) => {
@@ -311,6 +306,7 @@ export function Editor({
   const isCards = kind === 'work' && value.activity === 'Entrega de cartões';
   const workType: WorkType = kind === 'work' ? workTypeForActivity(String(value.activity || '')) : 'other';
   const expected = calculateWorkRevenues(value).expected;
+  const preview = kind === 'work' ? workResult(num(value.revenue), num(value.km), num(value.hours), costs(data).economic) : null;
   const title =
     kind === 'settings'
       ? 'Configurações'
@@ -351,7 +347,7 @@ export function Editor({
           {kind === 'work' && <fieldset className="work-type-choice wide">
             <legend>O que você vai registrar?</legend>
             <div className="segmented-choice" role="radiogroup" aria-label="Tipo de trabalho">
-              {([['uber', 'Uber / corrida'], ['cards', 'Entrega de cartões'], ['other', 'Outro']] as const).map(([type, label]) => <label key={type} className={workType === type ? 'selected' : ''}><input type="radio" name="work-type" value={type} checked={workType === type} onChange={() => setValue({ ...value, activity: activityForWorkType(type, String(value.activity || '')) })} /><span>{label}</span></label>)}
+              {([['uber', 'Uber', 'Corridas', Bike], ['cards', 'Cartões', 'Entregas', CreditCard], ['other', 'Outro', 'Atividade personalizada', BriefcaseBusiness]] as const).map(([type, label, description, Icon]) => <label key={type} className={workType === type ? 'selected' : ''}><input type="radio" name="work-type" value={type} checked={workType === type} onChange={() => setValue({ ...value, activity: activityForWorkType(type, String(value.activity || '')) })} /><Icon size={22}/><span>{label}</span><small>{description}</small></label>)}
             </div>
             {workType === 'other' && <label htmlFor="work-activity-name"><span>Nome da atividade *</span><input id="work-activity-name" required value={String(value.activity || '')} onChange={(e) => setValue({ ...value, activity: e.target.value })} placeholder="Ex.: Corrida particular" /></label>}
           </fieldset>}
@@ -467,6 +463,10 @@ export function Editor({
               representar este mesmo item.
             </p>
           )}
+          {preview && <section aria-label="Resumo da jornada"><h3>Resumo antes de salvar</h3><Metrics items={[
+            ['Receita', money(preview.revenue)], ['Custo econômico', money(preview.cost), 'Estimado'],
+            ['Lucro econômico', money(preview.profit), 'Estimado'], ['Receita por hora', money(preview.revenueHour)],
+          ]}/><p className="inline-note">Estimativa por km. Despesas pagas e atribuídas são exibidas separadamente no resultado de caixa.</p></section>}
           {error && (
             <p className="error" role="alert">
               {error}
@@ -620,37 +620,20 @@ export function Records({
             virtual.setFocused(row ? Number(row.dataset.recordIndex) : undefined);
           }}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) virtual.setFocused(undefined); }}>
-        <Table aria-rowcount={visible.length + 1}>
-          <TableHeader>
-            <TableRow>
-              {cols.map((c) => (
-                <TableHead key={c.label}>{c.label}</TableHead>
-              ))}
-              <TableHead className="actions-column">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {virtual.enabled && virtual.top > 0 && <TableRow aria-hidden="true"><TableCell colSpan={cols.length + 1} style={{ height: virtual.top, padding: 0, border: 0 }} /></TableRow>}
-            {virtual.rows.map((r, index) => (
-              <TableRow key={r.id} data-record-id={r.id} data-record-index={virtual.start + index} aria-rowindex={virtual.start + index + 2}>
-                {cols.map((c) => (
-                  <TableCell key={c.label}>{c.render(r)}</TableCell>
-                ))}
-                <TableCell>
-                  <details className="action-menu table-action-menu">
-                    <summary aria-label={'Ações de ' + String(r.name || r.activity || brDate(r.date))}>•••</summary>
-                    <div className="row-actions">
-                      {extra?.(r)}
-                      <button aria-label={'Editar ' + String(r.name || r.activity || brDate(r.date))} onClick={() => edit(kind, data[kind].find((x) => x.id === r.id) || r)}><Pencil size={15} /> Editar</button>
-                      <button aria-label={'Excluir ' + String(r.name || r.activity || brDate(r.date))} onClick={() => del(kind, r)}><Trash2 size={15} /> Excluir</button>
-                    </div>
-                  </details>
-                </TableCell>
-              </TableRow>
-            ))}
-            {virtual.enabled && virtual.bottom > 0 && <TableRow aria-hidden="true"><TableCell colSpan={cols.length + 1} style={{ height: virtual.bottom, padding: 0, border: 0 }} /></TableRow>}
-          </TableBody>
-        </Table>
+        <section className="financial-records" aria-label={labels[kind]}>
+          {virtual.enabled && virtual.top > 0 && <div aria-hidden="true" style={{ height: virtual.top }} />}
+          {virtual.rows.map((r, index) => <article key={r.id} className="record-item" data-record-id={r.id} data-record-index={virtual.start + index}>
+            <div className="record-heading"><h3>{String(r.name || r.activity || labels[kind])}</h3>
+              <ActionsMenu label={'Ações de ' + String(r.name || r.activity || brDate(r.date))}>
+                {extra?.(r)}
+                <button aria-label={'Editar ' + String(r.name || r.activity || brDate(r.date))} onClick={() => edit(kind, data[kind].find((x) => x.id === r.id) || r)}><Pencil size={15}/>Editar</button>
+                <button className="danger" aria-label={'Excluir ' + String(r.name || r.activity || brDate(r.date))} onClick={() => del(kind, r)}><Trash2 size={15}/>Excluir</button>
+              </ActionsMenu>
+            </div>
+            <dl className="record-values">{cols.map((c) => <div key={c.label}><dt>{c.label}</dt><dd>{c.render(r)}</dd></div>)}</dl>
+          </article>)}
+          {virtual.enabled && virtual.bottom > 0 && <div aria-hidden="true" style={{ height: virtual.bottom }} />}
+        </section>
         </div>
       ) : (
         <NoData

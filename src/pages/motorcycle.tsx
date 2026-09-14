@@ -1,6 +1,7 @@
+import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { useState } from 'react';
 import { Card, Metrics, Records } from '../components/common';
-import { num, money, dec, brDate } from '../model';
+import { num, money, dec, brDate, today } from '../model';
 import { costs, financial, maintenanceState, sum, ratio } from '../calculations';
 import { type ViewProps, value } from './shared';
 export function Motorcycle(p: ViewProps) {
@@ -17,26 +18,18 @@ export function Motorcycle(p: ViewProps) {
     )[0];
   return (
     <>
-      <header className="work-page-header"><div><p className="eyebrow">MOBILIDADE</p><h1>Moto</h1><p className="page-subtitle">Controle o uso e o custo da sua XRE.</p></div></header>
-      <Card className="page-hero"
-        title={`${d.bike.brand} ${d.bike.model} · ${d.bike.year}`}
-        action={
-          <button onClick={() => edit('bike', d.bike)}>Editar moto</button>
-        }
-      >
-        <Metrics
-          items={[
-            ['KM atual', dec(num(d.bike.km)) + ' km'],
-            ['Valor atual', money(num(d.bike.currentValue))],
-            [
-              'Próxima manutenção',
-              next
-                ? String(next.name)
-                : 'Configure km/data da última manutenção',
-            ],
-          ]}
-        />
-      </Card>
+      <PageHeader title="Sua garagem" description={String(d.bike.brand) + ' ' + String(d.bike.model) + ' · ' + String(d.bike.year)} action={<button onClick={() => edit('bike', d.bike)}>Editar moto</button>} />
+      <HeroMetric label="Quilometragem atual" value={dec(num(d.bike.km), 0) + ' km'} context={next ? 'Próximo cuidado: ' + next.name : 'Configure o próximo cuidado da sua moto'} />
+      <Metrics items={[
+        ['Custo operacional / km', money(c.operating), 'Estimado'],
+        ['Serviços neste mês', money(sum(d.services.filter((r) => String(r.date).startsWith(today().slice(0,7))), 'amount')), 'Pagamentos registrados'],
+        ['Próxima manutenção', next?.kmLeft != null ? dec(next.kmLeft) + ' km' : next ? brDate(next.nextDate) : 'Não configurada'],
+      ]}/>
+      <section className="content-section"><div className="section-heading"><h2>Serviços recentes</h2><button onClick={() => p.go('Manutenção')}>Ver manutenção</button></div>
+        {[...d.services].sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0,5).map((r) => <FinancialItem key={r.id} title={String(d.maintenance.find((m) => m.id === r.maintenanceId)?.name || 'Serviço da moto')} description={brDate(r.date)} value={money(num(r.amount))} context={dec(num(r.km)) + ' km'} />)}
+        {!d.services.length && <EmptyState title="Seu histórico começa no próximo cuidado" description="Registre os serviços para acompanhar os gastos reais da moto." action={<button onClick={() => edit('services')}>Registrar serviço</button>}/>}
+      </section>
+      <details className="disclosure"><summary>Custos, combustível e depreciação</summary>
       <Metrics
         items={[
           [
@@ -117,7 +110,7 @@ export function Motorcycle(p: ViewProps) {
             : ''}
         </p>
       </Card>
-      <Records
+      </details><details className="disclosure"><summary>Previsões e compromissos da moto</summary><Records
         {...p}
         kind="costs"
         rows={d.costs}
@@ -139,7 +132,7 @@ export function Motorcycle(p: ViewProps) {
         nesse período. Evite cadastrar a relação completa junto de corrente,
         coroa e pinhão para o mesmo ciclo.
       </p>
-      <Card title="Reserva da moto">
+      </details><details className="disclosure"><summary>Reserva da moto</summary><Card title="Reserva da moto">
         <div className="four-stats">
           {value(
             'Previsão nos km de trabalho',
@@ -161,7 +154,7 @@ export function Motorcycle(p: ViewProps) {
           única vez.
         </p>
       </Card>
-      <Records {...p} kind="fund" rows={d.fund} filterKey="kind" />
+      <Records {...p} kind="fund" rows={d.fund} filterKey="kind" /></details>
     </>
   );
 }

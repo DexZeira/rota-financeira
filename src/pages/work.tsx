@@ -1,3 +1,4 @@
+import { HeroMetric, PageHeader, ActionsMenu } from '../components/finance-ui';
 import { dateRange } from '../insights';
 import { workCashResult } from '../work-results';
 import {
@@ -9,7 +10,7 @@ import { emptyRow, id } from '../model';
 import { useState } from 'react';
 import { Card, Metrics, Choice, NoData, Records } from '../components/common';
 import { Sheet } from '../components/sheet';
-import { brDate, dec, money, num } from '../model';
+import { brDate, dec, money, num, today } from '../model';
 import {
   calculateWorkRevenues,
   cardSummary,
@@ -39,12 +40,11 @@ export function Work(p: ViewProps) {
     from,
     to,
   );
+  const todayResult = workCashResult(d, d.work.filter((r) => r.date === today()), 'todos', today(), today());
   return (
     <>
-      <header className="work-page-header">
-        <div><p className="eyebrow">DESEMPENHO</p><h1>Trabalho</h1><p className="page-subtitle">Acompanhe seus ganhos e eficiência.</p></div>
-        <button className="primary" onClick={() => edit('work')}>+ Registrar trabalho</button>
-      </header>
+      <PageHeader title="Trabalho" description="Cada jornada conta." />
+      <HeroMetric label="Hoje" value={money(todayResult.revenue)} context={money(todayResult.cashProfit) + ' de lucro de caixa · ' + dec(todayResult.hours) + ' h trabalhadas'} action={<button className="primary" onClick={() => edit('work')}>+ Registrar trabalho</button>} />
       <section className="work-filters card">
         <div className="section-heading"><h2>Período</h2><span className="supporting-text">Escolha um intervalo para analisar seus resultados</span></div>
         <div className="period-tabs">
@@ -159,7 +159,7 @@ export function Work(p: ViewProps) {
         activity={activity}
       /></details>
       <details className="work-secondary"><summary>Despesas atribuídas</summary><ExpenseBreakdown data={d} result={actual} edit={edit} /></details>
-      <Card title="Resumo de cartões no período filtrado" className="secondary-section">
+      <details className="disclosure"><summary>Desempenho das entregas de cartões</summary><Card title="Resumo de cartões no período filtrado">
         <div className="work-stats">
           {[
             ['Cartões entregues', dec(cards.quantity)],
@@ -202,7 +202,7 @@ export function Work(p: ViewProps) {
           </p>
         )}
       </Card>
-      <div className="work-list">
+      </details><section className="content-section"><h2>Suas jornadas</h2><div className="work-list">
         {rows.length ? (
           rows.map((r) => {
             const result = workResult(
@@ -217,7 +217,7 @@ export function Work(p: ViewProps) {
                 key={r.id}
                 className="work-session"
               >
-                <div className="work-session-header"><div><h2>{r.activity}</h2><p>{brDate(r.date)}</p></div><details className="action-menu"><summary aria-label={'Ações de ' + r.activity}>•••</summary><div className="row-actions">
+                <div className="work-session-header"><div><h2>{r.activity}</h2><p>{brDate(r.date)}</p></div><ActionsMenu label={'Ações de ' + r.activity}>
                     <button
                       onClick={() =>
                         edit('expenses', {
@@ -243,7 +243,7 @@ export function Work(p: ViewProps) {
                     >
                       Excluir
                     </button>
-                  </div></details></div>
+                  </ActionsMenu></div>
                 <div className="work-session-primary"><strong>{money(result.revenue)}</strong><span>{dec(result.hours)}h · {dec(result.km)} km</span></div>
                 <details><summary>Ver detalhes</summary><CashDetails
                   result={workCashResult(
@@ -345,7 +345,7 @@ export function Work(p: ViewProps) {
           <NoData text="Nenhum trabalho encontrado. Registre sua primeira atividade para acompanhar ganhos e custos." />
         )}
       </div>
-      <Records {...p} kind="activities" rows={d.activities} sortKey="name" />
+      </section><details className="disclosure"><summary>Atividades personalizadas</summary><Records {...p} kind="activities" rows={d.activities} sortKey="name" /></details>
     </>
   );
 }
