@@ -548,5 +548,7 @@ Não registrar:
 
 Quando uma decisão antiga deixar de valer, atualizá-la ou removê-la para evitar instruções conflitantes.
 
+Camada de inteligência financeira (2026-09): cálculos de poder de compra, retorno real, projeções, concentração e comparações vivem em `src/services/purchasing-power.ts` e `src/services/financial-intelligence.ts`. Indicadores públicos usam `indicator-cache.ts`, preservam data/status e não convertem indisponibilidade em zero. Metas corrigidas são sempre derivadas do valor-base; `intelligenceVersion: 1` é metadado aditivo compatível com backups anteriores.
+
 
 

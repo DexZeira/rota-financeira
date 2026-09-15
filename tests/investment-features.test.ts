@@ -19,6 +19,9 @@ void test('cotação usa fonte separada, atraso e fallback em 429', async () => 
   assert.equal(unavailable, undefined);
 });
 void test('Focus usa endpoint separado e fallback sem zero artificial', async () => {
-  const value = await loadMarketExpectations(async () => new Response(JSON.stringify({ value: [{ Selic: 12.5, IPCA: 4.2, DataReferencia: 2026 }] })));
+  const value = await loadMarketExpectations(async () => new Response(JSON.stringify({ value: [
+    { Indicador: 'Selic', Mediana: 12.5, Data: '2026-09-11', DataReferencia: String(new Date().getFullYear()), baseCalculo: 0 },
+    { Indicador: 'IPCA', Mediana: 4.2, Data: '2026-09-11', DataReferencia: String(new Date().getFullYear()), baseCalculo: 0 },
+  ] })));
   assert.equal(value.selic, 12.5); assert.equal(value.ipca, 4.2); assert.match(value.source, /Focus/);
 });

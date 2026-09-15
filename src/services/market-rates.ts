@@ -1,9 +1,13 @@
+import { FINANCIAL_SOURCES } from './financial-sources';
+import { cachedSource, type IndicatorStatus } from './indicator-cache';
 export type MarketRate = {
   value: number;
   rawValue: number;
-  unit: '% a.a.' | '% p.d.' | '% a.m.';
+  unit: '% a.a.' | '% p.d.' | '% a.m.' | '% acumulado 12m' | '% no mês';
   date: string;
   source: string;
+  fetchedAt?: string;
+  status?: IndicatorStatus;
 };
 export type MarketRates = {
   selic?: MarketRate;
@@ -17,11 +21,11 @@ export type MarketRates = {
 const CACHE_KEY = 'rota-financeira-market-rates-v1';
 const TTL = 12 * 60 * 60 * 1000;
 const endpoints = {
-  selic: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json',
-  cdi: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json',
-  ipca: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json',
-  tr: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.226/dados/ultimos/1?formato=json',
-  selicTarget: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json',
+  selic: FINANCIAL_SOURCES.BCB_SGS_SELIC,
+  cdi: FINANCIAL_SOURCES.BCB_SGS_CDI,
+  ipca: FINANCIAL_SOURCES.BCB_SGS_IPCA12,
+  tr: FINANCIAL_SOURCES.BCB_SGS_TR,
+  selicTarget: FINANCIAL_SOURCES.BCB_SGS_SELIC_TARGET,
 } as const;
 let inFlight: Promise<MarketRates> | undefined;
 
@@ -37,9 +41,12 @@ export function annualizePercentOfCdi(cdiDailyPercent: number, percentOfCdi: num
 export function parseMarketRate(raw: string, unit: MarketRate['unit'] = '% a.a.'): MarketRate | undefined {
   try {
     const row = JSON.parse(raw)?.[0];
-    const value = Number(String(row?.valor ?? '').replace(',', '.'));
-    if (!Number.isFinite(value) || !row?.data) return undefined;
+    if (typeof row?.valor !== 'string' || !/^-?\d+(?:[.,]\d+)?$/.test(row.valor.trim()) || !/^\d{2}\/\d{2}\/\d{4}$/.test(row?.data)) return undefined;
+    const value = Number(row.valor.replace(',', '.'));
+    if (!Number.isFinite(value)) return undefined;
     const [day, month, year] = String(row.data).split('/');
+    const date = `${year}-${month}-${day}`;
+    if (new Date(date + 'T12:00:00Z').toISOString().slice(0, 10) !== date) return undefined;
     return { value, rawValue: value, unit, date: `${year}-${month}-${day}`, source: 'Banco Central do Brasil · SGS' };
   } catch { return undefined; }
 }
@@ -58,25 +65,22 @@ export async function loadMarketRates(fetcher: typeof fetch = fetch): Promise<Ma
 }
 async function loadMarketRatesInternal(fetcher: typeof fetch): Promise<MarketRates> {
   const cached = readCache();
-  let rates = cached || {};
-  let changed = false;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    await Promise.all(Object.entries(endpoints).map(async ([key, endpoint]) => {
-      try {
-        const response = await fetcher(endpoint, { signal: controller.signal });
-        if (!response.ok) return;
-        const rate = parseMarketRate(await response.text(), key === 'cdi' ? '% p.d.' : key === 'tr' ? '% a.m.' : '% a.a.');
-        if (rate && key === 'cdi') rate.value = annualizeDailyRate(rate.rawValue);
-        if (rate) { rates = { ...rates, [key]: rate }; changed = true; }
-      } catch { /* mantém o último valor conhecido */ }
-    }));
-  } finally { clearTimeout(timer); }
-  if (changed) {
-    rates = { ...rates, updatedAt: new Date().toISOString() };
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), rates })); } catch { /* modo privado/offline */ }
-  }
+  const rates: MarketRates = {};
+  await Promise.all(Object.entries(endpoints).map(async ([name, source]) => {
+    const key = name as keyof typeof endpoints;
+    const result = await cachedSource(`rota-indicator-${source.id}-v1`, source.url, source.cacheTtlMs,
+      (body) => parseMarketRate(JSON.stringify(body), source.unit), fetcher);
+    if (result) {
+      const rate = { ...result.value, fetchedAt: result.fetchedAt, status: result.cached ? 'cached' as const : 'actual' as const };
+      if (key === 'cdi') rate.value = annualizeDailyRate(rate.rawValue);
+      rates[key] = rate;
+    } else {
+      const old = cached?.[key];
+      if (old && Number.isFinite(old.value) && Number.isFinite(old.rawValue) && /^\d{4}-\d{2}-\d{2}$/.test(old.date))
+        rates[key] = { ...old, unit: source.unit, fetchedAt: cached?.updatedAt, status: 'cached' };
+    }
+  }));
+  rates.updatedAt = Object.values(rates).filter((v): v is MarketRate => typeof v === 'object').map((v) => v.fetchedAt || '').sort().at(-1) || undefined;
   return rates;
 }
 

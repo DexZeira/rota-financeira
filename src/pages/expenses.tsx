@@ -7,6 +7,7 @@ import { money, dec, today, num, brDate } from '../model';
 import { financial, targets, sum, ratio, daysBetween } from '../calculations';
 import { type ViewProps, dateCol, amountCol } from './shared';
 import { Sheet } from '../components/sheet';
+import { PersonalExpenses } from '../components/personal-expenses';
 export function Expenses(p: ViewProps) {
   const d = p.data;
   const [from, setFrom] = useState(today().slice(0, 7) + '-01'),
@@ -33,6 +34,7 @@ export function Expenses(p: ViewProps) {
   return (
     <>
       <PageHeader title="Gastos" description="Dê um destino consciente ao seu dinheiro." />
+      <PersonalExpenses data={d}/>
       <HeroMetric label="Gastos no período selecionado" value={money(total)} context={brDate(from) + ' a ' + brDate(to)} action={<button className="primary" onClick={() => p.edit('expenses')}>+ Registrar gasto</button>} />
       <Card title="Período">
         <div className="period-tabs">

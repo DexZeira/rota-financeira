@@ -20,6 +20,10 @@ export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   const raw = decodeMoney(value as Record<string, unknown>);
+  // Additive metadata v1: old snapshots default to no inflation correction.
+  // The monetary encoding remains v5; original targets and balances are untouched.
+  if (raw.intelligenceVersion !== undefined && raw.intelligenceVersion !== 1)
+    throw Error('Versão da inteligência financeira incompatível.');
   if (
     raw.dataVersion !== 4 &&
     raw.dataVersion !== 3 &&
@@ -320,6 +324,13 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   const encoded = serializeData(normalized);
   const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
   const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
+  const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
+  if (previous) {
+    let extensionVersion: unknown;
+    try { extensionVersion = JSON.parse(previous).intelligenceVersion; } catch { /* preserve exact bytes */ }
+    if (extensionVersion !== 1 && !storage.getItem?.(intelligenceCopy))
+      storage.setItem(intelligenceCopy, previous);
+  }
   const migrationKey = `rota-money-before-migration:${owner}`;
   // Archive the exact previous bytes before the first v5 write. Failure aborts the write.
   let previousVersion: unknown;

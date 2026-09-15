@@ -8,6 +8,7 @@ import { num, money, dec, brDate, today } from '../model';
 import { costs, financial, targets, prioritized, investmentBalance, plan, maintenanceState, workResult, sum, progress } from '../calculations';
 import { type ViewProps, value } from './shared';
 import { monthComparison } from '../insights';
+import { MoneyIntelligence } from '../components/money-intelligence';
 export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
   const f = financial(d),
     c = costs(d),
@@ -52,6 +53,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
         <QuickAction label="Gasto" onClick={() => edit('expenses')}><Receipt/></QuickAction>
         <QuickAction label="Aporte" onClick={() => edit('movements')}><TrendingUp/></QuickAction>
       </nav>
+      <MoneyIntelligence data={d}/>
       <section aria-label="Este mês"><h2>Este mês</h2><Metrics items={[
         ['Receitas', money(comparison.current.revenue), 'Trabalho registrado'],
         ['Gastos', money(comparison.current.expenses), 'Inclui serviços da moto'],

@@ -1,3 +1,5 @@
+import { PurchasingPowerTools } from '../components/purchasing-power-tools';
+import { useEconomicIndicators } from '../hooks/use-economic-indicators';
 import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { useState } from 'react';
 import { Card, Metrics, Records } from '../components/common';
@@ -5,6 +7,7 @@ import { num, money, dec, brDate, today } from '../model';
 import { costs, financial, maintenanceState, sum, ratio } from '../calculations';
 import { type ViewProps, value } from './shared';
 export function Motorcycle(p: ViewProps) {
+  const economic = useEconomicIndicators();
   const { data: d, edit } = p,
     c = costs(d),
     f = financial(d),
@@ -29,7 +32,7 @@ export function Motorcycle(p: ViewProps) {
         {[...d.services].sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0,5).map((r) => <FinancialItem key={r.id} title={String(d.maintenance.find((m) => m.id === r.maintenanceId)?.name || 'Serviço da moto')} description={brDate(r.date)} value={money(num(r.amount))} context={dec(num(r.km)) + ' km'} />)}
         {!d.services.length && <EmptyState title="Seu histórico começa no próximo cuidado" description="Registre os serviços para acompanhar os gastos reais da moto." action={<button onClick={() => edit('services')}>Registrar serviço</button>}/>}
       </section>
-      <details className="disclosure"><summary>Custos, combustível e depreciação</summary>
+      <PurchasingPowerTools economic={economic} initialValue={num(d.bike.currentValue)} motorcycle/><details className="disclosure"><summary>Custos, combustível e depreciação</summary>
       <Metrics
         items={[
           [

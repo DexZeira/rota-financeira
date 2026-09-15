@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { Metrics, Bar, Records, Choice } from '../components/common';
 import { emptyRow, type Row, money, dec, brDate, today, id } from '../model';
 import { plan } from '../calculations';
+import { useEconomicIndicators } from '../hooks/use-economic-indicators';
+import { PlanInflation } from '../components/plan-inflation';
 import { type ViewProps, dateCol, amountCol } from './shared';
 export function Plans(p: ViewProps) {
   const { data: d, edit } = p;
+  const economic = useEconomicIndicators();
   const [history, setHistory] = useState('todos');
   const result = (r: Row) => plan(r, today(), d);
   function transaction(r: Row, kind: string) {
@@ -22,7 +25,7 @@ export function Plans(p: ViewProps) {
       <PageHeader title="Objetivos" description="O futuro se constrói aos poucos." action={<button className="primary" onClick={() => edit('plans')}>+ Novo objetivo</button>} />
       <HeroMetric label="Já guardado para seus planos" value={money(d.plans.reduce((total, r) => total + result(r).current, 0))} context={d.plans.length + ' objetivos cadastrados'} />
       <section aria-label="Seus objetivos">{!d.plans.length && <EmptyState title="O que você quer conquistar?" description="Defina um objetivo e acompanhe cada avanço." action={<button onClick={() => edit('plans')}>Criar objetivo</button>} />}
-      {d.plans.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.status) + ' · ' + brDate(r.deadline)} value={money(result(r).current)} context={'Faltam ' + money(result(r).remaining)} action={<button onClick={() => transaction(r, 'deposit')}>Aportar</button>}><Bar value={result(r).percent} label={'Progresso de ' + r.name}/><small>{dec(result(r).percent)}% concluído</small></FinancialItem>)}</section>
+      {d.plans.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.status) + ' · ' + brDate(r.deadline)} value={money(result(r).current)} context={'Faltam ' + money(result(r).remaining)} action={<button onClick={() => transaction(r, 'deposit')}>Aportar</button>}><Bar value={result(r).percent} label={'Progresso de ' + r.name}/><small>{dec(result(r).percent)}% concluído</small><PlanInflation row={r} economic={economic} current={result(r).current} monthly={result(r).monthly} edit={() => edit('plans', r)}/></FinancialItem>)}</section>
       <details className="disclosure"><summary>Seu planejamento de aportes</summary>
       <Metrics
         items={[

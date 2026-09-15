@@ -28,7 +28,7 @@ export const collections = [
   'fund',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -211,6 +211,12 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     f('quantity', 'Quantidade', 'number'),
     f('averagePrice', 'Preço médio (R$)', 'number'),
     f('objective', 'Objetivo'),
+    f('issuer', 'Emissor (opcional)'),
+    opt('liquidity', 'Liquidez informada', ['não informado', 'imediata', 'D+1', 'D+n', 'com carência', 'somente no vencimento', 'negociável com marcação a mercado']),
+    opt('fgcStatus', 'Cobertura FGC confirmada no produto', ['não informado', 'sim', 'não']),
+    f('riskNotes', 'Risco / rating informado pelo emissor (opcional)'),
+    f('currency', 'Moeda de exposição (opcional, ex.: BRL)'),
+    f('annualFeePercent', 'Taxas anuais (%; vazio = não informado)', 'number', { nullable: true }),
     notes,
   ],
   movements: [
@@ -238,6 +244,10 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     f('deadline', 'Prazo', 'date', { required: true }),
     opt('priority', 'Prioridade', ['alta', 'média', 'baixa']),
     opt('status', 'Status do plano', ['ativo', 'concluído']),
+    opt('inflationMode', 'Corrigir meta pela inflação', ['Sem correção', 'IPCA observado', 'IPCA esperado', 'Taxa personalizada']),
+    f('inflationBaseDate', 'Data-base do valor objetivo', 'date'),
+    f('inflationRate', 'Inflação personalizada (% a.a.)', 'number', { nullable: true, signed: true }),
+    opt('adjustContributions', 'Projetar correção anual dos aportes', ['não', 'sim']),
     notes,
   ],
   checklists: [
@@ -357,6 +367,7 @@ export function emptyRow(key: Collection | 'settings' | 'bike'): Row {
 export function defaults(): Data {
   const d = {
     dataVersion: 4,
+    intelligenceVersion: 1,
     settings: { ...emptyRow('settings'), id: 'settings', theme: 'claro' },
     bike: {
       ...emptyRow('bike'),
@@ -456,6 +467,13 @@ export function validateRow(key: Collection | 'settings' | 'bike', r: Row) {
   }
   if (key === 'debts' && num(r.paidInstallments) > num(r.totalInstallments))
     throw Error('Parcelas pagas não podem superar o total.');
+  if (key === 'plans' && r.inflationMode !== 'Sem correção' && r.inflationMode !== undefined) {
+    if (!validDate(String(r.inflationBaseDate)) || String(r.inflationBaseDate) > today() || String(r.inflationBaseDate) > String(r.deadline))
+      throw Error('Informe uma data-base válida, até hoje e anterior ao prazo.');
+    if (r.inflationMode === 'Taxa personalizada' && (typeof r.inflationRate !== 'number' || r.inflationRate <= -100 || r.inflationRate > 100))
+      throw Error('Inflação personalizada deve ser maior que -100% e até 100% a.a.');
+  }
+  if (key === 'investments' && num(r.annualFeePercent) > 100) throw Error('Taxas anuais devem ficar entre 0% e 100%.');
   if (key === 'expenses' || key === 'services') validateAttribution(r);
   if (key === 'bike' && num(r.km) < num(r.purchaseKm))
     throw Error('KM atual não pode ser menor que KM na compra.');

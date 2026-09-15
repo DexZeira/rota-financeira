@@ -1,5 +1,6 @@
 export type FinancialSource = { id: string; name: string; authority: string; type: 'official' | 'third-party'; url: string; unit: string; frequency: string; cacheTtlMs: number };
 export const FINANCIAL_SOURCES = {
+  BCB_SGS_IPCA_MONTH: { id: 'BCB_SGS_IPCA_MONTH', name: 'SGS 433', authority: 'Banco Central do Brasil · IBGE', type: 'official', url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/120?formato=json', unit: '% no mês', frequency: 'mensal', cacheTtlMs: 24 * 60 * 60 * 1000 },
   BCB_SGS_SELIC: { id: 'BCB_SGS_SELIC', name: 'SGS 1178', authority: 'Banco Central do Brasil', type: 'official', url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json', unit: '% a.a.', frequency: 'diária', cacheTtlMs: 12 * 60 * 60 * 1000 },
   BCB_SGS_CDI: { id: 'BCB_SGS_CDI', name: 'SGS 12', authority: 'Banco Central do Brasil', type: 'official', url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json', unit: '% p.d.', frequency: 'diária', cacheTtlMs: 12 * 60 * 60 * 1000 },
   BCB_SGS_IPCA12: { id: 'BCB_SGS_IPCA12', name: 'SGS 13522', authority: 'Banco Central do Brasil', type: 'official', url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', unit: '% acumulado 12m', frequency: 'mensal', cacheTtlMs: 24 * 60 * 60 * 1000 },
@@ -8,4 +9,4 @@ export const FINANCIAL_SOURCES = {
   BCB_FOCUS: { id: 'BCB_FOCUS', name: 'Expectativas de Mercado', authority: 'Banco Central do Brasil', type: 'official', url: 'https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais', unit: '% a.a.', frequency: 'diária', cacheTtlMs: 24 * 60 * 60 * 1000 },
   BRAPI: { id: 'BRAPI', name: 'brapi.dev', authority: 'Provedor técnico terceiro', type: 'third-party', url: 'https://brapi.dev/api/quote', unit: 'BRL por ativo', frequency: 'atrasada', cacheTtlMs: 10 * 60 * 1000 },
   COINGECKO: { id: 'COINGECKO', name: 'CoinGecko', authority: 'Provedor terceiro', type: 'third-party', url: 'https://api.coingecko.com/api/v3/simple/price', unit: 'BRL por ativo', frequency: 'atrasada', cacheTtlMs: 10 * 60 * 1000 },
-} satisfies Record<string, FinancialSource>;
+} as const satisfies Record<string, FinancialSource>;
