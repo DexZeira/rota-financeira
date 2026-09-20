@@ -26,9 +26,11 @@ export const collections = [
   'checklists',
   'activities',
   'fund',
+  'recurrences',
+  'forecastResolutions',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -92,6 +94,32 @@ export const attributionFields = (scope: string): Field[] => [
   f('workAmount', 'Parcela paga atribuída ao trabalho (R$)', 'number'),
 ];
 export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
+  recurrences: [
+    name,
+    opt('kind', 'Tipo de previsão', ['despesa', 'receita', 'aporte', 'plano', 'manutenção', 'dívida']),
+    f('amount', 'Valor previsto (R$; vazio = desconhecido)', 'number', { nullable: true }),
+    f('category', 'Categoria'),
+    opt('frequency', 'Frequência', ['única', 'diário', 'semanal', 'quinzenal', 'mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado']),
+    f('intervalDays', 'Intervalo personalizado (dias)', 'number', { integer: true }),
+    f('startDate', 'Data inicial', 'date', { required: true }),
+    f('endDate', 'Data final (opcional)', 'date'),
+    f('dueDay', 'Dia do vencimento (mensal/anual; vazio = dia inicial)', 'number', { integer: true, nullable: true }),
+    f('account', 'Conta / carteira (identificação)'),
+    opt('status', 'Status', ['ativa', 'pausada', 'finalizada']),
+    opt('sourceKind', 'Substitui previsão automática de', ['nenhum', 'expenses', 'debts', 'maintenance', 'plans', 'investments']),
+    f('sourceId', 'Registro de origem', 'select'),
+    f('effectiveFrom', 'Vigência da regra atual', 'date'),
+    f('scheduleHistory', 'Histórico de vigências'),
+    f('archived', 'Regra arquivada', 'number', { integer: true }),
+    notes,
+  ],
+  forecastResolutions: [
+    f('recurrenceId', 'Recorrência', undefined, { required: true }),
+    f('occurrenceDate', 'Data da ocorrência', 'date', { required: true }),
+    opt('action', 'Conferência', ['vincular', 'ignorar']),
+    opt('recordKind', 'Tipo do registro realizado', ['expenses', 'work', 'payments', 'movements', 'planTransactions', 'services']),
+    f('recordId', 'Registro realizado'),
+  ],
   work: [
     date,
     f('activity', 'Atividade', undefined, { required: true }),
@@ -320,6 +348,8 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
   ],
 };
 export const labels: Record<Collection, string> = {
+  recurrences: 'Recorrências',
+  forecastResolutions: 'Conferências das previsões',
   work: 'Trabalho',
   expenses: 'Gastos',
   debts: 'Dívidas',
@@ -362,12 +392,14 @@ export function emptyRow(key: Collection | 'settings' | 'bike'): Row {
       acceleratedTargetPercent: 40,
       defaultTarget: 'ideal',
     });
+  if (key === 'recurrences') Object.assign(result, { startDate: today(), intervalDays: 1 });
   return result;
 }
 export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
+    planningVersion: 2,
     settings: { ...emptyRow('settings'), id: 'settings', theme: 'claro' },
     bike: {
       ...emptyRow('bike'),
@@ -464,6 +496,15 @@ export function validateRow(key: Collection | 'settings' | 'bike', r: Row) {
       throw Error(`${f.label}: opção inválida.`);
     if (f.type !== 'number' && typeof v !== 'string')
       throw Error(`${f.label}: texto inválido.`);
+  }
+  if (key === 'recurrences') {
+    if (r.archived !== 0 && r.archived !== 1) throw Error('Estado de arquivamento inválido.');
+    if (r.archived === 1 && r.status !== 'finalizada') throw Error('Recorrência arquivada não pode gerar novas ocorrências.');
+    if (r.amount !== null && num(r.amount) <= 0) throw Error('Informe valor maior que zero ou deixe o valor desconhecido.');
+    if (r.endDate && String(r.endDate) < String(r.startDate)) throw Error('Data final anterior à data inicial.');
+    if (r.dueDay !== null && (num(r.dueDay) < 1 || num(r.dueDay) > 31)) throw Error('Dia de vencimento deve ficar entre 1 e 31.');
+    if (r.frequency === 'personalizado' && (num(r.intervalDays) < 1 || num(r.intervalDays) > 3660)) throw Error('Intervalo deve ficar entre 1 e 3660 dias.');
+    if (r.sourceKind === 'nenhum' && r.sourceId) throw Error('Remova o vínculo de origem ou selecione seu tipo.');
   }
   if (key === 'debts' && num(r.paidInstallments) > num(r.totalInstallments))
     throw Error('Parcelas pagas não podem superar o total.');

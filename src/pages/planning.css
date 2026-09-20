@@ -1,0 +1,59 @@
+.planning-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+.planning-tabs button {
+  min-width: 0;
+  min-height: 44px;
+}
+.planning-tabs button[aria-pressed='true'],
+.planning-calendar button[aria-pressed='true'] {
+  background: var(--foreground);
+  color: var(--background);
+}
+.planning-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block: 1.25rem;
+}
+.planning-month h2 {
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.planning-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 1rem;
+}
+.planning-calendar > span {
+  text-align: center;
+  font-size: 0.75rem;
+  min-width: 0;
+}
+.planning-calendar button {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.planning-calendar button small {
+  font-size: 0.65rem;
+}
+@media (min-width: 768px) {
+  .planning-calendar {
+    gap: 0.5rem;
+  }
+  .planning-calendar button {
+    min-height: 64px;
+  }
+}

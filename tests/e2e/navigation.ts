@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 export async function navigate(page: Page, name: string) {
-  const label = name === 'Dashboard' ? 'Início' : name;
+  const label = name;
   const candidates = [
     page.locator('[data-slot=sidebar-menu-button]').filter({ hasText: label }),
     page.locator('.mobile-nav button').filter({ hasText: label }),

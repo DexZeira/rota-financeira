@@ -191,6 +191,17 @@ export function Fields({
                 ? `${r.activity} · ${brDate(r.date)} · ${r.id.slice(0, 6)}`
                 : String(r.name),
           }));
+        if (kind === 'recurrences' && f.key === 'sourceKind') {
+          const titles: Record<string, string> = { nenhum: 'Nenhuma (nova previsão)', expenses: 'Gasto recorrente', debts: 'Dívida', maintenance: 'Manutenção', plans: 'Plano', investments: 'Investimento' };
+          options = options.map((option) => {
+            const value = typeof option === 'string' ? option : option.value;
+            return { value, label: titles[value] || value };
+          });
+        }
+        if (kind === 'recurrences' && f.key === 'sourceId') {
+          const source = ['expenses', 'debts', 'maintenance', 'plans', 'investments'].find((key) => key === value.sourceKind) as 'expenses' | 'debts' | 'maintenance' | 'plans' | 'investments' | undefined;
+          options = [{ value: '', label: 'Selecione a origem' }, ...(source ? data[source].map((r) => ({ value: r.id, label: `${r.name} · ${r.date ? brDate(r.date) : r.id.slice(0, 6)}` })) : [])];
+        }
         if (['costId', 'workSessionId', 'componentId'].includes(f.key))
           options = [{ value: '', label: 'Nenhuma' }, ...options];
         return (
@@ -208,7 +219,7 @@ export function Fields({
                 label={f.label}
                 options={options}
                 value={String(value[f.key] ?? '')}
-                onChange={(v) => setValue({ ...value, [f.key]: v })}
+                onChange={(v) => setValue({ ...value, [f.key]: v, ...(kind === 'recurrences' && f.key === 'sourceKind' ? { sourceId: '' } : {}) })}
               />
             ) : f.type === 'textarea' ? (
               <textarea
@@ -388,6 +399,12 @@ export function Editor({
                         value.matchMode !== 'manual'
                       ),
                   ).filter((f) => {
+                      if (kind === 'recurrences') {
+                        if (['effectiveFrom', 'scheduleHistory', 'archived'].includes(f.key)) return false;
+                      if (f.key === 'intervalDays') return value.frequency === 'personalizado';
+                      if (f.key === 'dueDay') return ['mensal', 'bimestral', 'trimestral', 'semestral', 'anual'].includes(String(value.frequency));
+                      if (f.key === 'sourceId') return value.sourceKind !== 'nenhum';
+                    }
                     if (kind !== 'investments') return true;
                     const type = String(value.category || '');
                     if (f.key === 'indexer' || f.key === 'indexerPercent') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type) && String(value.rateType || 'Pós-fixado') === 'Pós-fixado';

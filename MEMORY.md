@@ -550,5 +550,7 @@ Quando uma decisão antiga deixar de valer, atualizá-la ou removê-la para evit
 
 Camada de inteligência financeira (2026-09): cálculos de poder de compra, retorno real, projeções, concentração e comparações vivem em `src/services/purchasing-power.ts` e `src/services/financial-intelligence.ts`. Indicadores públicos usam `indicator-cache.ts`, preservam data/status e não convertem indisponibilidade em zero. Metas corrigidas são sempre derivadas do valor-base; `intelligenceVersion: 1` é metadado aditivo compatível com backups anteriores.
 
+Planejamento financeiro: Hoje e Planejamento consultam `FinancialQueryService`. Recorrências geram somente previsões; conferências explícitas vinculam realizados ou ignoram ocorrências sem lançar pagamentos. Alocações de planos não são novas saídas de caixa. Envelope v6, runtime v4, `planningVersion: 2`; vigências preservam o passado em edições/pausas e a retomada não repõe dias pausados. Dias inexistentes usam o último dia do mês, preservando a âncora. Migrações guardam cópia protegida; clientes incompatíveis devem rejeitar o snapshot. Não há alteração de tabela/RLS/RPC. Saldo-base do forecast é o caixa realizado, não o disponível após reserva.
+
 
 

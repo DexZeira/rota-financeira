@@ -11,8 +11,9 @@ export const moneyFields = {
   services: ['amount', 'workAmount'], costs: ['amount'],
   investments: ['balance'], movements: ['amount'],
   plans: ['target', 'current', 'bikeValue'], planTransactions: ['amount'], fund: ['amount'],
+  recurrences: ['amount'],
 } as const;
-export const MONEY_SCHEMA_VERSION = 5;
+export const MONEY_SCHEMA_VERSION = 6;
 
 // Parse the decimal representation; ties round away from zero without IEEE-754 drift.
 export function toCents(value: number): number {
@@ -53,7 +54,7 @@ export function encodeMoney(data: Data): Record<string, unknown> & { dataVersion
   return { ...convert(source, false), dataVersion: MONEY_SCHEMA_VERSION, moneyUnit: 'centavos' };
 }
 export function decodeMoney(raw: Record<string, unknown>) {
-  if (raw.dataVersion !== MONEY_SCHEMA_VERSION) return raw;
+  if (raw.dataVersion !== MONEY_SCHEMA_VERSION && raw.dataVersion !== 5) return raw;
   if (raw.moneyUnit !== 'centavos') throw Error('Unidade monetária ausente ou incompatível.');
   const result = convert(raw, true);
   delete result.moneyUnit;

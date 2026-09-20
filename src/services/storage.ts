@@ -2,6 +2,7 @@ import { defaultAliases } from '../component-matching';
 import { decodeMoney, encodeMoney, serializeData, MONEY_SCHEMA_VERSION } from './money-codec';
 import { validateAttribution, detachWorkExpense } from '../expense-allocation';
 import { calculateWorkRevenues } from '../calculations';
+import { recurrenceSources, realizedCollections, hasOccurrence, recurrenceAt, recurrenceHistory, reviseRecurrence, recurrenceSignature, occurrenceId } from './recurrences';
 import {
   debtTerms,
   collections,
@@ -16,12 +17,24 @@ import {
   type Row,
 } from '../model';
 export const STORAGE_KEY = 'rota-financeira-v1';
+export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão mais recente do Rota Financeira. Formato incompatível com esta versão; atualize o aplicativo.';
+export function assertSupportedVersion(value: unknown) {
+  if (!value || typeof value !== 'object') return;
+  const raw = value as Record<string, unknown>;
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 2)) throw Error(FUTURE_VERSION_ERROR);
+  if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
+}
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
+  assertSupportedVersion(value);
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2].includes(Number((value as Record<string, unknown>).planningVersion)))
+    throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
+  if (raw.planningVersion !== undefined && raw.planningVersion !== 1 && raw.planningVersion !== 2)
+    throw Error('Versão do planejamento incompatível.');
   // Additive metadata v1: old snapshots default to no inflation correction.
-  // The monetary encoding remains v5; original targets and balances are untouched.
+  // Original targets and balances are untouched; the v6 envelope adds planning.
   if (raw.intelligenceVersion !== undefined && raw.intelligenceVersion !== 1)
     throw Error('Versão da inteligência financeira incompatível.');
   if (
@@ -36,6 +49,7 @@ export function validateData(value: unknown): Data {
   const result = defaults();
   for (const key of ['settings', 'bike', ...collections] as const) {
     const source = raw[key];
+    if ((key === 'recurrences' || key === 'forecastResolutions') && source === undefined && raw.planningVersion === undefined) continue;
     if (
       key === 'planTransactions' &&
       source === undefined &&
@@ -108,6 +122,50 @@ export function validateData(value: unknown): Data {
   return result;
 }
 export function validateRelations(d: Data) {
+  const signatures = new Set<string>();
+  const sources = new Set<string>();
+  for (const rule of d.recurrences) {
+    const history = recurrenceHistory(rule);
+    if (history.length && (!rule.effectiveFrom || history.at(-1)!.until >= String(rule.effectiveFrom))) throw Error('Histórico de vigências sobreposto.');
+    if (rule.status === 'ativa') {
+      const signature = recurrenceSignature(rule);
+      if (signatures.has(signature)) throw Error('Já existe uma recorrência ativa igual.');
+      signatures.add(signature);
+    }
+    if (rule.sourceKind !== 'nenhum') {
+      const key = recurrenceSources.find((k) => k === rule.sourceKind);
+      if (!key || !d[key].some((r) => r.id === rule.sourceId)) throw Error('Origem da recorrência não encontrada.');
+      const expected: Record<string, string> = { expenses: 'despesa', debts: 'dívida', maintenance: 'manutenção', plans: 'plano', investments: 'aporte' };
+      if (rule.kind !== expected[key]) throw Error('Tipo de previsão incompatível com a origem.');
+      const source = key + ':' + rule.sourceId;
+      if (!rule.archived) {
+        if (sources.has(source)) throw Error('Uma origem só pode ter uma regra de recorrência.');
+        sources.add(source);
+      }
+    }
+  }
+  const occurrences = new Set<string>(), records = new Set<string>();
+  for (const resolution of d.forecastResolutions) {
+    const currentRule = d.recurrences.find((r) => r.id === resolution.recurrenceId);
+    const date = String(resolution.occurrenceDate);
+    if (!currentRule || !hasOccurrence(currentRule, date)) throw Error('Conferência sem ocorrência correspondente.');
+    const rule = recurrenceAt(currentRule, date);
+    const id = occurrenceId(rule.id, date);
+    if (occurrences.has(id)) throw Error('Ocorrência já conferida.');
+    occurrences.add(id);
+    if (resolution.action === 'vincular') {
+      const key = realizedCollections.find((k) => k === resolution.recordKind);
+      const record = key && d[key].find((r) => r.id === resolution.recordId);
+      const expected: Record<string, string> = { despesa: 'expenses', receita: 'work', dívida: 'payments', aporte: 'movements', plano: 'planTransactions', manutenção: 'services' };
+      if (!key || !record || key !== expected[String(rule.kind)]) throw Error('Registro realizado incompatível com a previsão.');
+      if ((key === 'movements' && record.kind !== 'aporte') || (key === 'planTransactions' && record.kind !== 'deposit')) throw Error('Vincule um aporte realizado.');
+      const ref: Record<string, string> = { debts: 'debtId', investments: 'investmentId', maintenance: 'maintenanceId', plans: 'planId' };
+      if (ref[String(rule.sourceKind)] && record[ref[String(rule.sourceKind)]] !== rule.sourceId) throw Error('O lançamento pertence a outra origem.');
+      const recordKey = `${key}:${record.id}`;
+      if (records.has(recordKey)) throw Error('Registro realizado já relacionado a outra ocorrência.');
+      records.add(recordKey);
+    } else if (resolution.recordId) throw Error('Ocorrência ignorada não deve ter lançamento vinculado.');
+  }
   for (const r of [...d.expenses, ...d.services]) validateAttribution(r, d);
   for (const c of d.costs)
     if (c.matchMode === 'manual') {
@@ -202,7 +260,14 @@ export function validateRelations(d: Data) {
     if (fund < -0.001) throw Error('Uso da reserva supera o valor reservado.');
   }
 }
-export function upsert(d: Data, key: Collection, row: Row) {
+export function upsert(d: Data, key: Collection, row: Row, at = today()) {
+  if (key === 'recurrences') {
+    const previous = d.recurrences.find((r) => r.id === row.id);
+    const protectedChange = previous && schemas.recurrences.some((f) => !['status', 'effectiveFrom', 'scheduleHistory'].includes(f.key) && previous[f.key] !== row[f.key]);
+    if (protectedChange && d.forecastResolutions.some((r) => r.recurrenceId === row.id && String(r.occurrenceDate) >= at))
+      throw Error('Há ocorrências conferidas hoje ou no futuro. Desfaça essas conferências antes de alterar a regra; os lançamentos realizados serão preservados.');
+    row = reviseRecurrence(previous, row, at);
+  }
   if (key === 'work')
     row = { ...row, expectedRevenue: calculateWorkRevenues(row).expected };
   validateRow(key, row);
@@ -215,7 +280,15 @@ export function upsert(d: Data, key: Collection, row: Row) {
   validateRelations(next);
   return next;
 }
-export function remove(d: Data, key: Collection, id: string) {
+export function remove(d: Data, key: Collection, id: string, at = today()) {
+  if (key === 'recurrences') {
+    const row = d.recurrences.find((r) => r.id === id);
+    if (!row || row.archived) return d;
+    const archived = { ...reviseRecurrence(row, { ...row, status: 'finalizada' }, at), archived: 1 };
+    const next = { ...d, recurrences: d.recurrences.map((r) => r.id === id ? archived : r) };
+    validateRelations(next);
+    return next;
+  }
   const next = { ...d, [key]: d[key].filter((r) => r.id !== id) };
   if (key === 'costs')
     next.maintenance = d.maintenance.map((r) =>
@@ -249,6 +322,8 @@ export function remove(d: Data, key: Collection, id: string) {
     next.services = d.services.filter((r) => r.maintenanceId !== id);
   if (key === 'plans')
     next.planTransactions = d.planTransactions.filter((r) => r.planId !== id);
+  next.recurrences = next.recurrences.map((r) => r.sourceKind === key && r.sourceId === id ? { ...r, sourceKind: 'nenhum', sourceId: '', status: r.archived ? 'finalizada' : 'pausada' } : r);
+  next.forecastResolutions = next.forecastResolutions.filter((r) => r.action === 'ignorar' || realizedCollections.some((k) => k === r.recordKind && next[k].some((item) => item.id === r.recordId)));
   validateRelations(next);
   return next;
 }
@@ -261,7 +336,8 @@ export function resetData(d: Data, kind: ResetKind): Data {
       ...d,
       settings: { ...fresh.settings, openingCash: d.settings.openingCash },
     };
-  if (kind === 'finance')
+  if (kind === 'finance') {
+    const recurrences = d.recurrences.filter((r) => ['plans', 'maintenance'].includes(String(r.sourceKind)));
     return {
       ...d,
       work: [],
@@ -271,8 +347,11 @@ export function resetData(d: Data, kind: ResetKind): Data {
       payments: [],
       investments: [],
       movements: [],
+      recurrences,
+      forecastResolutions: d.forecastResolutions.filter((r) => recurrences.some((rule) => rule.id === r.recurrenceId) && (r.action === 'ignorar' || ['services', 'planTransactions'].includes(String(r.recordKind)))),
       settings: { ...d.settings, openingCash: 0 },
     };
+  }
   if (kind === 'bike')
     return {
       ...d,
@@ -282,8 +361,11 @@ export function resetData(d: Data, kind: ResetKind): Data {
       costs: [],
       checklists: [],
       fund: [],
+      recurrences: d.recurrences.filter((r) => r.sourceKind !== 'maintenance'),
+      forecastResolutions: d.forecastResolutions.filter((r) => r.recordKind !== 'services' && !d.recurrences.some((rule) => rule.id === r.recurrenceId && rule.sourceKind === 'maintenance')),
     };
-  return { ...d, plans: [], planTransactions: [] };
+  const recurrences = d.recurrences.filter((r) => r.sourceKind !== 'plans');
+  return { ...d, plans: [], planTransactions: [], recurrences, forecastResolutions: d.forecastResolutions.filter((r) => r.recordKind !== 'planTransactions' && recurrences.some((rule) => rule.id === r.recurrenceId)) };
 }
 export const backup = (d: Data) =>
   JSON.stringify(
@@ -294,10 +376,12 @@ export const backup = (d: Data) =>
 export function parseBackup(text: string) {
   if (text.length > 20_000_000) throw Error('Arquivo maior que 20 MB.');
   const b = JSON.parse(text);
+  assertSupportedVersion(b);
   // Exact pre-migration snapshots are deliberately kept in their original raw format.
   if (b && b.version === undefined && b.dataVersion !== undefined) return validateData(b);
   if (
     b.version !== MONEY_SCHEMA_VERSION &&
+    b.version !== 5 &&
     b.version !== 4 &&
     b.version !== 3 &&
     b.version !== 2 &&
@@ -319,11 +403,23 @@ export function load(storage: Pick<Storage, 'getItem'>): Data {
     : defaults();
 }
 export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>, d: Data) {
+  const current = storage.getItem?.(STORAGE_KEY);
+  if (current) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(current); } catch { /* exact corrupt bytes are archived below */ }
+    assertSupportedVersion(parsed);
+  }
   const normalized = validateData(JSON.parse(serializeData(d)));
   // Recompute derived fields after rounding their source records, before publishing bytes.
   const encoded = serializeData(normalized);
   const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
   const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
+  if (previous) {
+    let version: unknown;
+    try { version = JSON.parse(previous).planningVersion; } catch { /* preserve previous bytes */ }
+    const key = `rota-money-before-migration:${version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
+    if (version !== 2 && !storage.getItem?.(key)) storage.setItem(key, previous);
+  }
   const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
   if (previous) {
     let extensionVersion: unknown;
@@ -332,7 +428,7 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
       storage.setItem(intelligenceCopy, previous);
   }
   const migrationKey = `rota-money-before-migration:${owner}`;
-  // Archive the exact previous bytes before the first v5 write. Failure aborts the write.
+  // Archive exact previous bytes before upgrading the snapshot. Failure aborts the write.
   let previousVersion: unknown;
   try { previousVersion = previous ? JSON.parse(previous).dataVersion : undefined; } catch { /* Preserve corrupt bytes too. */ }
   if (previousVersion !== MONEY_SCHEMA_VERSION && !storage.getItem?.(migrationKey)) {

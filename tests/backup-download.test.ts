@@ -44,7 +44,7 @@ void test('download gera Blob JSON válido com payload completo e libera recurso
   assert.equal(browser.blob?.type,'application/json;charset=utf-8');
   const text=await browser.blob!.text(), payload=JSON.parse(text);
   assert.deepEqual(Object.keys(payload),['version','exportDate','data']);
-  assert.equal(payload.version,5);assert.ok(Number.isFinite(Date.parse(payload.exportDate)));
+  assert.equal(payload.version,6);assert.ok(Number.isFinite(Date.parse(payload.exportDate)));
   assert.equal(payload.data.moneyUnit,'centavos');
   assert.equal(payload.data.settings.openingCash,12345);
   for(const key of collections) assert.deepEqual(parseBackup(text)[key],data[key]);

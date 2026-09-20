@@ -18,7 +18,7 @@ export function StorageManager() {
       <p>Uso aproximado do localStorage: {(inventory.bytes / 1024 / 1024).toFixed(2)} MB. A quota varia conforme o navegador.</p>
       {inventory.copies.length === 0 && <p>Nenhuma cópia adicional encontrada.</p>}
       {inventory.copies.map((copy, index) => <div className="detail" key={copy.key}>
-        <span>Cópia {index + 1} · {copy.key.startsWith('rota-money-before-migration:intelligence-v1:') ? 'Antes da inteligência financeira' : copy.key.startsWith('rota-money-before-migration:') ? 'Antes da migração monetária' : copy.key.startsWith('rota-money-rounding:') ? 'Antes de arredondamento' : copy.key.includes('account:') ? 'Cópia de conta' : 'Recuperação'} · {(copy.bytes / 1024).toFixed(1)} KB {copy.protected ? '· protegida' : ''}</span>
+        <span>Cópia {index + 1} · {copy.key.startsWith('rota-money-before-migration:planning-v2:') ? 'Antes das vigências de recorrência' : copy.key.startsWith('rota-money-before-migration:planning-v1:') ? 'Antes do planejamento financeiro' : copy.key.startsWith('rota-money-before-migration:intelligence-v1:') ? 'Antes da inteligência financeira' : copy.key.startsWith('rota-money-before-migration:') ? 'Antes da migração monetária' : copy.key.startsWith('rota-money-rounding:') ? 'Antes de arredondamento' : copy.key.includes('account:') ? 'Cópia de conta' : 'Recuperação'} · {(copy.bytes / 1024).toFixed(1)} KB {copy.protected ? '· protegida' : ''}</span>
         <button onClick={() => { setSelected(copy); setConfirmed(false); setMessage(''); }}>Gerenciar cópia {index + 1}</button>
       </div>)}
     </>}

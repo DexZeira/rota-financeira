@@ -64,6 +64,8 @@ import {
   type Row,
 } from '../src/model';
 import { Dashboard } from '../src/pages/dashboard';
+const Today = lazy(() => import('../src/pages/today').then((m) => ({ default: m.Today })));
+const Planning = lazy(() => import('../src/pages/planning').then((m) => ({ default: m.Planning })));
 const Work = lazy(() => import('../src/pages/work').then((m) => ({ default: m.Work })));
 const Debts = lazy(() => import('../src/pages/debts').then((m) => ({ default: m.Debts })));
 const Expenses = lazy(() => import('../src/pages/expenses').then((m) => ({ default: m.Expenses })));
@@ -88,6 +90,8 @@ import {
 } from '../src/services/storage';
 import { financial, targets, costs } from '../src/calculations';
 const navigation = [
+  ['Hoje', LayoutDashboard],
+  ['Planejamento', Wallet],
   ['Dashboard', LayoutDashboard],
   ['Dívidas', Wallet],
   ['Trabalho', BriefcaseBusiness],
@@ -100,8 +104,8 @@ const navigation = [
   ['Configurações', Settings],
 ] as const;
 const navGroups = [
-  { title: 'Principal', pages: ['Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
-  { title: 'Planejamento', pages: ['Planos'] },
+  { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
+  { title: 'Planejamento', pages: ['Planejamento', 'Planos'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
   { title: 'Insights', pages: ['Análises'] },
   { title: 'Sistema', pages: ['Configurações'] },
@@ -114,7 +118,7 @@ function Nav({ page, go }: { page: string; go: (page: string) => void }) {
         <div className="nav-group" key={group.title}>
           <p>{group.title}</p>
           <SidebarMenu>
-            {group.pages.filter((name) => !isMobile || !['Dashboard', 'Trabalho', 'Gastos', 'Investimentos'].includes(name)).map((name) => {
+            {group.pages.filter((name) => !isMobile || !['Hoje', 'Trabalho', 'Gastos', 'Investimentos'].includes(name)).map((name) => {
               const entry = navigation.find(([n]) => n === name)!;
               const Icon = entry[1];
               return (
@@ -127,7 +131,7 @@ function Nav({ page, go }: { page: string; go: (page: string) => void }) {
                     }}
                   >
                     <Icon />
-                    <span>{name === 'Dashboard' ? 'Início' : name}</span>
+                    <span>{name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
@@ -143,7 +147,7 @@ function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
   return (
     <nav className="mobile-nav" aria-label="Navegação móvel">
       {[
-        ['Dashboard', 'Início'],
+        ['Hoje', 'Hoje'],
         ['Trabalho', 'Trabalho'],
         ['Gastos', 'Gastos'],
         ['Investimentos', 'Investimentos'],
@@ -172,7 +176,7 @@ export default function Home() {
   const auth = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [data, setData] = useState<Data>(defaults),
-    [page, setPage] = useState('Dashboard'),
+    [page, setPage] = useState('Hoje'),
     [ready, setReady] = useState(false),
     [error, setError] = useState(''),
     [blocked, setBlocked] = useState(false),
@@ -480,7 +484,7 @@ export default function Home() {
           <div>
             <SidebarTrigger aria-label="Abrir menu" />
             <GlobalSearch data={data} go={go} />
-            <span className="topbar-context">{page === 'Dashboard' ? 'Início' : page}</span>
+            <span className="topbar-context">{page}</span>
           </div>
           <div>
 
@@ -600,6 +604,8 @@ export default function Home() {
                 /></Disclosure></>
               )}
               <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
+              {page === 'Hoje' && <Today {...props} />}
+              {page === 'Planejamento' && <Planning {...props} />}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}

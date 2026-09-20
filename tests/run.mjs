@@ -3,6 +3,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 for (const file of [
+  'src/services/recurrences.ts',
+  'src/services/cash-flow.ts',
+  'src/services/financial-query.ts',
+  'tests/planning.test.ts',
   'src/services/personal-expenses.ts',
   'src/services/financial-intelligence.ts',
   'tests/financial-intelligence.test.ts',
@@ -74,6 +78,7 @@ const result = spawnSync(
   process.execPath,
   [
     '--test',
+    '.test-output/tests/planning.test.js',
     '.test-output/tests/financial-intelligence.test.js',
     '.test-output/tests/indicators.test.js',
     '.test-output/tests/purchasing-power.test.js',

@@ -1,4 +1,4 @@
-import { parseBackup } from './storage';
+import { parseBackup, assertSupportedVersion } from './storage';
 import type { CloudState, SyncErrorDetails } from './sync-core';
 type RemoteRow = {
   data: unknown;
@@ -51,6 +51,7 @@ export function syncError(error: unknown, status?: number): CloudSyncError {
   return wrapped;
 }
 export function decode(row: RemoteRow): CloudState {
+  assertSupportedVersion(row);
   const envelope = row.data && typeof row.data === 'object'
     ? row.data as { version?: unknown; data?: { dataVersion?: unknown } }
     : undefined;
