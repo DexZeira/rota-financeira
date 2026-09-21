@@ -1,6 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { navigate } from './navigation';
 
+test('editor de orçamento cabe na visual viewport e mantém ações acessíveis', async ({ page }) => {
+  await page.goto('/');
+  await navigate(page, 'Gastos');
+  await page.getByText('Quanto posso gastar? · Orçamento do mês', { exact: true }).click();
+  await page.getByRole('button', { name: 'Criar orçamento', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => dialog.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length)).toBe(0);
+  const box = await dialog.evaluate((el) => {
+    const r = el.getBoundingClientRect(), v = visualViewport;
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: v?.width ?? innerWidth, height: v?.height ?? innerHeight, offset: v?.offsetTop ?? 0 };
+  });
+  expect(box.left).toBeGreaterThanOrEqual(-1); expect(box.right).toBeLessThanOrEqual(box.width + 1);
+  expect(box.top).toBeGreaterThanOrEqual(box.offset - 1); expect(box.bottom).toBeLessThanOrEqual(box.height + box.offset + 1);
+  await dialog.getByLabel('Categoria', { exact: false }).fill('Categoria comprida com espaços');
+  const last = dialog.getByLabel('Próximo do limite a partir de (%)', { exact: true });
+  await last.scrollIntoViewIfNeeded(); await last.fill('95');
+  await expect(dialog.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: 'Cancelar', exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 test('editor de recorrência mantém campos e ações acessíveis na visual viewport', async ({
   page,
 }) => {

@@ -1,4 +1,5 @@
 import { openDatePicker } from './native-input';
+import { toCents } from '../services/money-codec';
 import { AttributionFields } from './attribution-fields';
 import { useVirtualRecords } from '../hooks/use-virtual-records';
 import { attributionKeys } from '../expense-allocation';
@@ -242,9 +243,9 @@ export function Fields({
                   onClick={openDatePicker}
                   min={f.type === 'number' && !f.signed ? 0 : undefined}
                   step={
-                    f.type === 'number' ? (f.integer ? '1' : 'any') : undefined
+                    f.type === 'number' ? (f.key.endsWith('Cents') ? '0.01' : f.integer ? '1' : 'any') : undefined
                   }
-                  value={value[f.key] ?? ''}
+                  value={f.key.endsWith('Cents') && typeof value[f.key] === 'number' ? Number(value[f.key]) / 100 : value[f.key] ?? ''}
                   list={f.key === 'activity' ? 'activity-options' : undefined}
                   onChange={(e) =>
                     setValue({
@@ -253,7 +254,7 @@ export function Fields({
                         f.type === 'number'
                           ? e.target.value === ''
                             ? ''
-                            : Number(e.target.value)
+                            : f.key.endsWith('Cents') ? (Math.abs(Number(e.target.value)) <= Number.MAX_SAFE_INTEGER / 100 ? toCents(Number(e.target.value)) : e.target.value) : Number(e.target.value)
                           : e.target.value,
                     })
                   }
@@ -399,6 +400,7 @@ export function Editor({
                         value.matchMode !== 'manual'
                       ),
                   ).filter((f) => {
+                      if (kind === 'budgets' && ['createdAt', 'updatedAt'].includes(f.key)) return false;
                       if (kind === 'recurrences') {
                         if (['effectiveFrom', 'scheduleHistory', 'archived'].includes(f.key)) return false;
                       if (f.key === 'intervalDays') return value.frequency === 'personalizado';

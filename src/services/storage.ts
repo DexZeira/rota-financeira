@@ -21,17 +21,17 @@ export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão m
 export function assertSupportedVersion(value: unknown) {
   if (!value || typeof value !== 'object') return;
   const raw = value as Record<string, unknown>;
-  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 2)) throw Error(FUTURE_VERSION_ERROR);
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 3)) throw Error(FUTURE_VERSION_ERROR);
   if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
 }
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   assertSupportedVersion(value);
-  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2].includes(Number((value as Record<string, unknown>).planningVersion)))
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3].includes(Number((value as Record<string, unknown>).planningVersion)))
     throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
-  if (raw.planningVersion !== undefined && raw.planningVersion !== 1 && raw.planningVersion !== 2)
+  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3].includes(raw.planningVersion)))
     throw Error('Versão do planejamento incompatível.');
   // Additive metadata v1: old snapshots default to no inflation correction.
   // Original targets and balances are untouched; the v6 envelope adds planning.
@@ -49,6 +49,7 @@ export function validateData(value: unknown): Data {
   const result = defaults();
   for (const key of ['settings', 'bike', ...collections] as const) {
     const source = raw[key];
+    if (['budgets', 'categoryPolicies', 'planningSettings', 'reserveAllocations'].includes(key) && source === undefined && Number(raw.planningVersion || 0) < 3) continue;
     if ((key === 'recurrences' || key === 'forecastResolutions') && source === undefined && raw.planningVersion === undefined) continue;
     if (
       key === 'planTransactions' &&
@@ -122,6 +123,12 @@ export function validateData(value: unknown): Data {
   return result;
 }
 export function validateRelations(d: Data) {
+  for (const [rows, field] of [[d.budgets, 'category'], [d.categoryPolicies, 'category'], [d.reserveAllocations, 'investmentId']] as const) {
+    const keys = rows.map((r) => String(r[field]).trim().toLocaleLowerCase('pt-BR'));
+    if (new Set(keys).size !== keys.length) throw Error('Já existe configuração para esta categoria ou investimento.');
+  }
+  if (d.planningSettings.length > 1) throw Error('Use uma única configuração de planejamento.');
+  for (const row of d.reserveAllocations) if (!d.investments.some((i) => i.id === row.investmentId)) throw Error('Investimento da reserva não encontrado.');
   const signatures = new Set<string>();
   const sources = new Set<string>();
   for (const rule of d.recurrences) {
@@ -261,6 +268,7 @@ export function validateRelations(d: Data) {
   }
 }
 export function upsert(d: Data, key: Collection, row: Row, at = today()) {
+  if (key === 'budgets') row = { ...row, createdAt: d.budgets.find((r) => r.id === row.id)?.createdAt || at, updatedAt: at };
   if (key === 'recurrences') {
     const previous = d.recurrences.find((r) => r.id === row.id);
     const protectedChange = previous && schemas.recurrences.some((f) => !['status', 'effectiveFrom', 'scheduleHistory'].includes(f.key) && previous[f.key] !== row[f.key]);
@@ -316,8 +324,10 @@ export function remove(d: Data, key: Collection, id: string, at = today()) {
     );
   if (key === 'debts')
     next.payments = d.payments.filter((r) => r.debtId !== id);
-  if (key === 'investments')
+  if (key === 'investments') {
     next.movements = d.movements.filter((r) => r.investmentId !== id);
+    next.reserveAllocations = d.reserveAllocations.filter((r) => r.investmentId !== id);
+  }
   if (key === 'maintenance')
     next.services = d.services.filter((r) => r.maintenanceId !== id);
   if (key === 'plans')
@@ -334,6 +344,7 @@ export function resetData(d: Data, kind: ResetKind): Data {
   if (kind === 'settings')
     return {
       ...d,
+      planningSettings: [],
       settings: { ...fresh.settings, openingCash: d.settings.openingCash },
     };
   if (kind === 'finance') {
@@ -346,6 +357,7 @@ export function resetData(d: Data, kind: ResetKind): Data {
       debts: [],
       payments: [],
       investments: [],
+      budgets: [], categoryPolicies: [], reserveAllocations: [], planningSettings: [],
       movements: [],
       recurrences,
       forecastResolutions: d.forecastResolutions.filter((r) => recurrences.some((rule) => rule.id === r.recurrenceId) && (r.action === 'ignorar' || ['services', 'planTransactions'].includes(String(r.recordKind)))),
@@ -417,8 +429,8 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   if (previous) {
     let version: unknown;
     try { version = JSON.parse(previous).planningVersion; } catch { /* preserve previous bytes */ }
-    const key = `rota-money-before-migration:${version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
-    if (version !== 2 && !storage.getItem?.(key)) storage.setItem(key, previous);
+    const key = `rota-money-before-migration:${version === 2 ? 'planning-v3' : version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
+    if (version !== 3 && !storage.getItem?.(key)) storage.setItem(key, previous);
   }
   const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
   if (previous) {

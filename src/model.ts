@@ -28,6 +28,10 @@ export const collections = [
   'fund',
   'recurrences',
   'forecastResolutions',
+  'budgets',
+  'categoryPolicies',
+  'planningSettings',
+  'reserveAllocations',
 ] as const;
 export type Collection = (typeof collections)[number];
 export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; settings: Row; bike: Row } & Record<
@@ -94,6 +98,34 @@ export const attributionFields = (scope: string): Field[] => [
   f('workAmount', 'Parcela paga atribuída ao trabalho (R$)', 'number'),
 ];
 export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
+  budgets: [
+    f('category', 'Categoria', undefined, { required: true }),
+    opt('period', 'Período', ['mensal']),
+    f('limitCents', 'Orçamento mensal (R$)', 'number', { integer: true }),
+    opt('enabled', 'Controlar orçamento', ['sim', 'não']),
+    f('alertThresholdPercent', 'Atenção a partir de (%)', 'number'),
+    f('nearThresholdPercent', 'Próximo do limite a partir de (%)', 'number'),
+    f('createdAt', 'Criado em', 'date'), f('updatedAt', 'Atualizado em', 'date'),
+  ],
+  categoryPolicies: [
+    f('category', 'Categoria', undefined, { required: true }),
+    opt('level', 'Classificação', ['normal', 'essencial', 'discricionária']),
+  ],
+  planningSettings: [
+    opt('scheduleEnabled', 'Usar meta dinâmica', ['não', 'sim']),
+    f('workWeekdays', 'Dias trabalhados (seg, ter, qua, qui, sex, sab, dom)'),
+    f('daysOff', 'Folgas e indisponibilidades (AAAA-MM-DD, separadas por vírgula)', 'textarea'),
+    f('maxDailyCents', 'Limite diário confortável (R$; opcional)', 'number', { integer: true, nullable: true }),
+    opt('historyMonths', 'Histórico do custo de vida (meses)', ['6', '3', '12']),
+    f('emergencyMonths', 'Meta de reserva (meses; opcional)', 'number', { nullable: true }),
+    f('emergencyContributionCents', 'Contribuição mensal à reserva (R$)', 'number', { integer: true }),
+    f('comfortExtraCents', 'Extras do custo confortável (R$/mês)', 'number', { integer: true }),
+  ],
+  reserveAllocations: [
+    f('investmentId', 'Investimento da reserva', 'select', { required: true }),
+    opt('enabled', 'Compor reserva', ['sim', 'não']),
+    opt('liquidity', 'Disponibilidade', ['não informada', 'imediata', 'não imediata']),
+  ],
   recurrences: [
     name,
     opt('kind', 'Tipo de previsão', ['despesa', 'receita', 'aporte', 'plano', 'manutenção', 'dívida']),
@@ -348,6 +380,8 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
   ],
 };
 export const labels: Record<Collection, string> = {
+  budgets: 'Orçamentos', categoryPolicies: 'Classificação de categorias',
+  planningSettings: 'Preferências de planejamento', reserveAllocations: 'Composição da reserva',
   recurrences: 'Recorrências',
   forecastResolutions: 'Conferências das previsões',
   work: 'Trabalho',
@@ -393,13 +427,14 @@ export function emptyRow(key: Collection | 'settings' | 'bike'): Row {
       defaultTarget: 'ideal',
     });
   if (key === 'recurrences') Object.assign(result, { startDate: today(), intervalDays: 1 });
+  if (key === 'budgets') Object.assign(result, { alertThresholdPercent: 70, nearThresholdPercent: 90, createdAt: today(), updatedAt: today() });
   return result;
 }
 export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 2,
+    planningVersion: 3,
     settings: { ...emptyRow('settings'), id: 'settings', theme: 'claro' },
     bike: {
       ...emptyRow('bike'),
@@ -474,6 +509,17 @@ export function debtTerms(r: Row) {
   return { installment, remaining, original, balance };
 }
 export function validateRow(key: Collection | 'settings' | 'bike', r: Row) {
+  for (const [field, value] of Object.entries(r)) {
+    if (field.endsWith('Cents') && value !== null && (!Number.isSafeInteger(value) || Number(value) < 0)) throw Error('Valor monetário fora do intervalo seguro.');
+  }
+  if (key === 'budgets' && (num(r.alertThresholdPercent) > num(r.nearThresholdPercent) || num(r.nearThresholdPercent) > 100)) throw Error('Limiares devem estar em ordem entre 0% e 100%.');
+  if (key === 'planningSettings') {
+    const weekdays = String(r.workWeekdays).split(/[,\s]+/).filter(Boolean);
+    if (weekdays.some((day) => !['seg','ter','qua','qui','sex','sab','dom'].includes(day))) throw Error('Use seg, ter, qua, qui, sex, sab, dom.');
+    if (r.scheduleEnabled === 'sim' && !weekdays.length) throw Error('Escolha pelo menos um dia de trabalho.');
+    if (String(r.daysOff).split(/[,\s]+/).filter(Boolean).some((day) => !validDate(day))) throw Error('Informe folgas no formato AAAA-MM-DD.');
+    if (num(r.emergencyMonths) > 120) throw Error('Meta de reserva deve ser até 120 meses.');
+  }
   for (const f of schemas[key]) {
     const v = r[f.key];
     if (f.nullable && v === null) continue;

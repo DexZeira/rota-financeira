@@ -8,6 +8,7 @@ import { financial, targets, sum, ratio, daysBetween } from '../calculations';
 import { type ViewProps, dateCol, amountCol } from './shared';
 import { Sheet } from '../components/sheet';
 import { PersonalExpenses } from '../components/personal-expenses';
+import { BudgetSection } from '../components/planning-phase-two';
 export function Expenses(p: ViewProps) {
   const d = p.data;
   const [from, setFrom] = useState(today().slice(0, 7) + '-01'),
@@ -34,6 +35,7 @@ export function Expenses(p: ViewProps) {
   return (
     <>
       <PageHeader title="Gastos" description="Dê um destino consciente ao seu dinheiro." />
+      <BudgetSection {...p}/>
       <PersonalExpenses data={d}/>
       <HeroMetric label="Gastos no período selecionado" value={money(total)} context={brDate(from) + ' a ' + brDate(to)} action={<button className="primary" onClick={() => p.edit('expenses')}>+ Registrar gasto</button>} />
       <Card title="Período">
@@ -104,7 +106,7 @@ export function Expenses(p: ViewProps) {
         {categories.length ? categories.slice(0,6).map((category) => <div className="category-row" key={category.label}><span>{category.label}</span><strong>{money(category.value)}</strong><Bar label={category.label} value={ratio(category.value, total) * 100}/></div>) : <EmptyState title="Comece pelo primeiro gasto" description="Suas categorias aparecem aqui conforme você registra despesas." action={<button onClick={() => p.edit('expenses')}>Registrar gasto</button>}/>}
       </section>
       <section className="content-section"><h2>Últimos gastos</h2>{[...rows].sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0,8).map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.category) + ' · ' + brDate(r.date)} value={money(num(r.amount))} action={<button aria-label={'Editar ' + r.name} onClick={() => p.edit('expenses', r)}>Editar</button>}/>)}</section>
-      <details className="disclosure"><summary>Orçamento e totais gerais</summary>
+      <details className="disclosure"><summary>Referência de despesas e totais gerais</summary>
       <Metrics
         items={[
           ['Gastos registrados', money(sum(d.expenses, 'amount'))],

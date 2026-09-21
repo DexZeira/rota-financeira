@@ -12,6 +12,7 @@ import { addMonths } from '../calculations';
 import { realizedCollections, recurrenceAt } from '../services/recurrences';
 import { type ViewProps, value } from './shared';
 import './planning.css';
+import { LivingReserveSection } from '../components/planning-phase-two';
 
 const sources: Record<string, string> = {
   recurrences: 'Regra cadastrada',
@@ -174,6 +175,7 @@ export function Planning(p: ViewProps) {
           </button>
         }
       />
+      <LivingReserveSection {...p}/>
       <nav className="planning-tabs" aria-label="Seções do planejamento">
         {['Fluxo', 'Calendário', 'Recorrências'].map((s) => (
           <button

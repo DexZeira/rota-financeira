@@ -5,11 +5,13 @@ import { TargetBreakdown } from '../components/target-breakdown';
 import { ArrowUpRight, Bike, Target, ShieldCheck, Wallet, Wrench } from 'lucide-react';
 import { Card, Metrics, Bar } from '../components/common';
 import { num, money, dec, brDate, today } from '../model';
-import { costs, financial, targets, prioritized, investmentBalance, plan, maintenanceState, workResult, sum, progress } from '../calculations';
+import { costs, financial, targets, prioritized, plan, maintenanceState, workResult, sum, progress } from '../calculations';
 import { type ViewProps, value } from './shared';
 import { monthComparison } from '../insights';
 import { MoneyIntelligence } from '../components/money-intelligence';
+import { PhaseTwoSummary, usePhaseTwo } from '../components/planning-phase-two';
 export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
+  const phase = usePhaseTwo(d);
   const f = financial(d),
     c = costs(d),
     t = targets(d),
@@ -36,11 +38,8 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
           ['alta', 'média', 'baixa'].indexOf(String(a.priority)) -
           ['alta', 'média', 'baixa'].indexOf(String(b.priority)),
       )[0];
-  const emergency = d.investments
-      .filter((r) => r.category === 'reserva de emergência')
-      .reduce((a, r) => a + investmentBalance(d, r), 0),
-    emergencyTarget =
-      num(d.settings.essential) * num(d.settings.emergencyMonths);
+  const emergency = phase.reserve.totalCents / 100,
+    emergencyTarget = (phase.reserve.targetCents ?? 0) / 100;
   const comparison = monthComparison(d), smartInsight = comparison.expenseChange !== null
     ? `Seus gastos variaram ${dec(Math.abs(comparison.expenseChange), 1)}% ${comparison.expenseChange <= 0 ? 'para baixo' : 'para cima'} em relação ao mês passado.`
     : t.ideal > 0 ? `Você precisa de ${money(t.ideal)} por dia para atingir sua meta.` : 'Registre seus movimentos para receber insights do período.';
@@ -48,6 +47,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
     <>
       <PageHeader title={new Date().getHours() < 12 ? 'Bom dia.' : new Date().getHours() < 18 ? 'Boa tarde.' : 'Boa noite.'} description="Seu dinheiro, na direção que você escolhe." />
       <HeroMetric label="Seu saldo disponível" value={money(f.available)} context={<><span>Atual · saldo menos reserva da moto</span><p>{money(comparison.current.result)} de resultado de caixa neste mês</p></>} />
+      <PhaseTwoSummary data={d} go={go}/>
       <nav className="quick-actions" aria-label="Ações rápidas">
         <QuickAction label="Trabalho" onClick={() => edit('work')}><BriefcaseBusiness/></QuickAction>
         <QuickAction label="Gasto" onClick={() => edit('expenses')}><Receipt/></QuickAction>
@@ -139,7 +139,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
             label="Reserva de emergência"
           />
           <p className="inline-note">
-            Emergência: {money(emergency)} de {money(emergencyTarget)} ·
+            Emergência: {money(emergency)} de {phase.reserve.targetCents === null ? 'meta não definida' : money(emergencyTarget)} ·
             Aportes: {money(f.contributions)}
           </p>
           <button onClick={() => go('Investimentos')}>

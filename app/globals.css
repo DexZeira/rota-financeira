@@ -293,6 +293,7 @@ button.event-row { border:0; border-bottom:1px solid var(--border); background:t
 .account-dialog input { width:100%; }
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:100; display:flex; align-items:center; gap:12px; padding:14px 18px; background:var(--primary); color:var(--primary-foreground); border-radius:12px; max-width:calc(100vw - 32px); box-shadow:var(--shadow-overlay); font-size:13px; }
 .toast button { background:transparent; color:inherit; border:0; }
+.toast[aria-hidden="true"] { visibility:hidden; pointer-events:none; }
 .page-footer { display:flex; justify-content:space-between; gap:20px; border-top:1px solid var(--border); margin-top:48px; padding-top:24px; font-size:11px; color:var(--muted-foreground); }
 .page-skeleton { display:grid; gap:24px; padding:12px 0; }
 .page-skeleton i { display:block; height:36px; width:40%; border-radius:8px; background:var(--muted); animation:pulse 1.5s ease infinite; }

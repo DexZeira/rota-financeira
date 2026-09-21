@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { DynamicTargetSection, PhaseTwoSummary } from '../components/planning-phase-two';
 import { FinancialQueryService } from '../services/financial-query';
 import {
   PageHeader,
@@ -46,7 +47,8 @@ export function Today(p: ViewProps) {
           conferidas. Não representam pagamentos realizados.
         </p>
       </section>
-      <section className="content-section" aria-label="Seu trabalho hoje">
+      <DynamicTargetSection {...p}/>
+      {p.data.planningSettings[0]?.scheduleEnabled !== 'sim' && <section className="content-section" aria-label="Seu trabalho hoje">
         <div className="section-heading">
           <h2>Seu trabalho hoje</h2>
           <button onClick={() => p.go('Trabalho')}>Ver trabalho</button>
@@ -69,6 +71,8 @@ export function Today(p: ViewProps) {
           </p>
         )}
       </section>
+      }
+      <PhaseTwoSummary data={p.data} go={p.go}/>
       <section className="content-section" aria-label="Próximo compromisso">
         <h2>Próximo compromisso</h2>
         {summary.next ? (
@@ -104,20 +108,7 @@ export function Today(p: ViewProps) {
         <button onClick={() => p.edit('expenses')}>Registrar gasto</button>
       </div>
       <details className="disclosure">
-        <summary>Reserva e objetivos</summary>
-        <div className="inline-stats">
-          {value('Reserva registrada', money(summary.reserve))}
-          {value(
-            'Cobertura da base essencial',
-            summary.reserveMonths === null
-              ? 'Informe seu custo essencial'
-              : `${dec(summary.reserveMonths, 1)} meses · aproximadamente ${dec(summary.reserveDays!, 0)} dias`,
-          )}
-        </div>
-        <p className="inline-note">
-          A cobertura usa a base essencial configurada; dias equivalem a meses
-          de 30 dias. Não confirma liquidez dos investimentos.
-        </p>
+        <summary>Objetivos</summary>
         {summary.goals.slice(0, 5).map((g) => (
           <FinancialItem
             key={g.id}
