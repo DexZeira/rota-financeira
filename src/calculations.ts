@@ -1,4 +1,5 @@
 import { debtTerms } from './model';
+import { assetCashDelta, assetValues } from './services/assets';
 import { calculateTargets } from './target-sources';
 import { componentMatches } from './component-matching';
 import { type Data, type Row, num, today } from './model';
@@ -246,7 +247,7 @@ export function financial(d: Data, at = today()) {
         spent -
         paid -
         contributions +
-        withdrawals;
+        withdrawals + assetCashDelta(d, at) / 100;
     const investments = d.investments.reduce((s, r) => s + investmentBalance(d, r, at), 0), debt = d.debts.reduce((s, r) => s + debtState(d, r, at).balance, 0);
     const fund = d.fund
         .filter(before)
@@ -258,7 +259,7 @@ export function financial(d: Data, at = today()) {
         paid,
         investments,
         debt,
-        netWorth: cash + investments + num(d.bike.currentValue) - debt,
+        netWorth: cash + investments + assetValues(d, at).filter((r) => r.current).reduce((sum, r) => sum + (r.valueCents ?? 0)/100, 0) - debt,
         contributions,
         withdrawals,
         fund,

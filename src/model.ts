@@ -32,9 +32,10 @@ export const collections = [
   'categoryPolicies',
   'planningSettings',
   'reserveAllocations',
+  'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -98,6 +99,39 @@ export const attributionFields = (scope: string): Field[] => [
   f('workAmount', 'Parcela paga atribuída ao trabalho (R$)', 'number'),
 ];
 export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
+  assets: [name,
+    opt('type', 'Tipo de bem', ['motorcycle', 'car', 'property', 'electronics', 'equipment', 'other']),
+    f('linkedBike', 'Vínculo com a moto'),
+    f('purchaseDate', 'Data de aquisição', 'date'),
+    f('purchasePriceCents', 'Preço de compra (R$; opcional)', 'number', { integer: true, nullable: true }),
+    opt('liquidity', 'Liquidez do bem', ['illiquid', 'immediate', 'short_term', 'restricted', 'unknown']),
+    f('financingDebtId', 'Dívida do financiamento (opcional)', 'select'),
+    f('purchaseKm', 'KM na aquisição (opcional)', 'number', { nullable: true }),
+    f('currentKm', 'KM atual (opcional)', 'number', { nullable: true }),
+    opt('cashPurchase', 'Registrar saída da compra no caixa?', ['não', 'sim']),
+    f('cashPurchaseCents', 'Parte da compra paga com caixa (R$)', 'number', { integer: true, nullable: true }),
+    opt('active', 'Bem ativo', ['sim', 'não']),
+    f('soldAt', 'Data da venda (opcional)', 'date'),
+    f('saleValueCents', 'Valor de venda (R$; opcional)', 'number', { integer: true, nullable: true }),
+    opt('cashSale', 'Registrar entrada da venda no caixa?', ['não', 'sim']), notes,
+  ],
+  assetValuations: [
+    f('assetId', 'Bem avaliado', 'select', { required: true }), date,
+    f('valueCents', 'Valor avaliado (R$)', 'number', { integer: true, required: true }),
+    opt('source', 'Fonte da avaliação', ['manual', 'market', 'estimated', 'unknown']),
+    f('sequence', 'Ordem do registro', 'number', { integer: true }), notes,
+  ],
+  assetCostLinks: [
+    f('assetId', 'Bem do custo', 'select', { required: true }),
+    opt('recordKind', 'Origem do custo', ['expenses', 'services', 'payments']),
+    f('recordId', 'Lançamento existente', 'select', { required: true }),
+    opt('category', 'Natureza do custo', ['combustível', 'manutenção', 'pneus', 'peças', 'seguro', 'IPVA', 'licenciamento', 'documentação', 'juros', 'outros', 'aquisição']),
+    f('interestCents', 'Juros pagos (R$; apenas para pagamento de dívida)', 'number', { integer: true, nullable: true }), notes,
+  ],
+  netWorthSnapshots: [date,
+    ...['cashCents', 'investmentsCents', 'assetsCents', 'liabilitiesCents', 'netCents'].map((key) => f(key, key, 'number', { integer: true, signed: true })),
+    f('positions', 'Posições registradas'), f('partial', 'Base parcial', 'number', { integer: true }), notes,
+  ],
   budgets: [
     f('category', 'Categoria', undefined, { required: true }),
     opt('period', 'Período', ['mensal']),
@@ -380,6 +414,7 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
   ],
 };
 export const labels: Record<Collection, string> = {
+  assets: 'Bens', assetValuations: 'Avaliações patrimoniais', assetCostLinks: 'Custos vinculados', netWorthSnapshots: 'Posições patrimoniais',
   budgets: 'Orçamentos', categoryPolicies: 'Classificação de categorias',
   planningSettings: 'Preferências de planejamento', reserveAllocations: 'Composição da reserva',
   recurrences: 'Recorrências',
@@ -434,7 +469,8 @@ export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 3,
+    planningVersion: 4,
+    assetVersion: 1,
     settings: { ...emptyRow('settings'), id: 'settings', theme: 'claro' },
     bike: {
       ...emptyRow('bike'),
@@ -510,8 +546,17 @@ export function debtTerms(r: Row) {
 }
 export function validateRow(key: Collection | 'settings' | 'bike', r: Row) {
   for (const [field, value] of Object.entries(r)) {
-    if (field.endsWith('Cents') && value !== null && (!Number.isSafeInteger(value) || Number(value) < 0)) throw Error('Valor monetário fora do intervalo seguro.');
+    if (field.endsWith('Cents') && value !== null && (!Number.isSafeInteger(value) || (key !== 'netWorthSnapshots' && Number(value) < 0))) throw Error('Valor monetário fora do intervalo seguro.');
   }
+  if (key === 'assets') {
+    if (r.purchaseKm !== null && r.currentKm !== null && num(r.currentKm) < num(r.purchaseKm)) throw Error('KM atual anterior à aquisição.');
+    for (const dateKey of ['purchaseDate', 'soldAt']) if (r[dateKey] && String(r[dateKey]) > today()) throw Error('Data patrimonial futura não é realizada.');
+    if (r.soldAt && (r.active !== 'não' || (r.purchaseDate && String(r.soldAt) < String(r.purchaseDate)))) throw Error('Venda requer bem inativo e data posterior à compra.');
+    if (r.cashPurchase === 'sim' && (!r.purchaseDate || r.cashPurchaseCents === null || (r.purchasePriceCents !== null && num(r.cashPurchaseCents) > num(r.purchasePriceCents)))) throw Error('Informe a parte paga com caixa, sem exceder o preço de compra.');
+    if (r.cashSale === 'sim' && (!r.soldAt || r.saleValueCents === null)) throw Error('Entrada de caixa requer data e valor da venda.');
+  }
+  if (key === 'assetValuations' && String(r.date) > today()) throw Error('Avaliação futura não é realizada.');
+  if (key === 'netWorthSnapshots' && (String(r.date) > today() || ![0, 1].includes(num(r.partial)))) throw Error('Posição patrimonial inválida.');
   if (key === 'budgets' && (num(r.alertThresholdPercent) > num(r.nearThresholdPercent) || num(r.nearThresholdPercent) > 100)) throw Error('Limiares devem estar em ordem entre 0% e 100%.');
   if (key === 'planningSettings') {
     const weekdays = String(r.workWeekdays).split(/[,\s]+/).filter(Boolean);

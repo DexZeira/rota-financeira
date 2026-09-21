@@ -240,13 +240,14 @@ export function SettingsView({
             [
               'bike',
               'Resetar moto',
-              'Remove cadastro, manutenção, serviços, previsões, checklists e reserva da moto.',
+              'Remove cadastro operacional, manutenção, serviços, previsões, checklists e reserva da moto. Preserva o bem e suas avaliações no Patrimônio, sem vínculo com a nova moto.',
             ],
-            [
-              'plans',
+              [
+                'plans',
               'Resetar planos',
-              'Remove planos e seus históricos de aportes e retiradas.',
-            ],
+                'Remove planos e seus históricos de aportes e retiradas.',
+              ],
+              ['wealth', 'Resetar patrimônio', 'Arquiva bens e limpa avaliações/vínculos/posições. Preserva Moto e transferências de caixa já registradas.'],
             [
               'total',
               'RESET TOTAL',

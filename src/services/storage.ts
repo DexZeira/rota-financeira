@@ -1,4 +1,6 @@
 import { defaultAliases } from '../component-matching';
+import { assetRows, assetValues, BIKE_ASSET_ID } from './assets';
+import { toCents } from './money-codec';
 import { decodeMoney, encodeMoney, serializeData, MONEY_SCHEMA_VERSION } from './money-codec';
 import { validateAttribution, detachWorkExpense } from '../expense-allocation';
 import { calculateWorkRevenues } from '../calculations';
@@ -21,18 +23,19 @@ export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão m
 export function assertSupportedVersion(value: unknown) {
   if (!value || typeof value !== 'object') return;
   const raw = value as Record<string, unknown>;
-  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 3)) throw Error(FUTURE_VERSION_ERROR);
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 4) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
   if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
 }
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   assertSupportedVersion(value);
-  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3].includes(Number((value as Record<string, unknown>).planningVersion)))
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4].includes(Number((value as Record<string, unknown>).planningVersion)))
     throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
-  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3].includes(raw.planningVersion)))
+  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4].includes(raw.planningVersion)))
     throw Error('Versão do planejamento incompatível.');
+  if ((raw.assetVersion !== undefined && raw.assetVersion !== 1) || (raw.planningVersion === 4 && raw.assetVersion !== 1)) throw Error('Versão patrimonial ausente ou incompatível.');
   // Additive metadata v1: old snapshots default to no inflation correction.
   // Original targets and balances are untouched; the v6 envelope adds planning.
   if (raw.intelligenceVersion !== undefined && raw.intelligenceVersion !== 1)
@@ -49,6 +52,7 @@ export function validateData(value: unknown): Data {
   const result = defaults();
   for (const key of ['settings', 'bike', ...collections] as const) {
     const source = raw[key];
+    if (['assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots'].includes(key) && source === undefined && raw.assetVersion === undefined) continue;
     if (['budgets', 'categoryPolicies', 'planningSettings', 'reserveAllocations'].includes(key) && source === undefined && Number(raw.planningVersion || 0) < 3) continue;
     if ((key === 'recurrences' || key === 'forecastResolutions') && source === undefined && raw.planningVersion === undefined) continue;
     if (
@@ -123,6 +127,44 @@ export function validateData(value: unknown): Data {
   return result;
 }
 export function validateRelations(d: Data) {
+  const assets = new Map(assetRows(d).map((r) => [r.id, r]));
+  const loans = new Set<string>();
+  for (const row of d.assets) {
+    if (row.linkedBike && (row.id !== BIKE_ASSET_ID || row.linkedBike !== d.bike.id)) throw Error('Vínculo da moto inválido.');
+    if (row.id === BIKE_ASSET_ID && row.linkedBike !== d.bike.id) throw Error('ID reservado à moto principal.');
+    if (row.financingDebtId) {
+      if (!d.debts.some((r) => r.id === row.financingDebtId) || loans.has(String(row.financingDebtId))) throw Error('Financiamento ausente ou já vinculado.');
+      loans.add(String(row.financingDebtId));
+    }
+  }
+  for (const row of d.assetValuations) {
+    const asset = assets.get(String(row.assetId));
+    if (!asset || (asset.purchaseDate && String(row.date) < String(asset.purchaseDate)) || (asset.soldAt && String(row.date) > String(asset.soldAt))) throw Error('Avaliação fora do período de posse ou bem inexistente.');
+  }
+  const sourcesForCosts = new Set<string>();
+  for (const row of d.assetCostLinks) {
+    const asset = assets.get(String(row.assetId)), key = `${row.recordKind}:${row.recordId}`;
+    const source = (d[row.recordKind as 'expenses' | 'services' | 'payments'] || []).find((r) => r.id === row.recordId);
+    if (!asset || !source || sourcesForCosts.has(key)) throw Error('Custo inexistente ou já vinculado.');
+    sourcesForCosts.add(key);
+    if (row.recordKind === 'payments' && (row.category !== 'juros' || row.interestCents === null || num(row.interestCents) > Math.round(num(source.amount)*100) || (asset.financingDebtId && source.debtId !== asset.financingDebtId))) throw Error('Informe somente juros pagos do financiamento correto, até o valor do pagamento.');
+    if (row.category === 'aquisição' && asset.cashPurchase === 'sim') throw Error('Compra já movimenta caixa; não vincule a mesma aquisição como gasto.');
+  }
+  const snapshotDates = new Set<string>();
+  for (const row of d.netWorthSnapshots) {
+    if (snapshotDates.has(String(row.date))) throw Error('Já existe posição nesta data.');
+    snapshotDates.add(String(row.date));
+    let positions: unknown; try { positions = JSON.parse(String(row.positions)); } catch { throw Error('Posições patrimoniais inválidas.'); }
+    if (!positions || typeof positions !== 'object' || Array.isArray(positions)) throw Error('Posições patrimoniais inválidas.');
+    for (const key of ['assets','investments','debts']) {
+      const group = (positions as Record<string, unknown>)[key];
+      if (!group || typeof group !== 'object' || Array.isArray(group) || Object.values(group).some((v) => !Number.isSafeInteger(v))) throw Error('Posição monetária inválida.');
+      const sum = Object.values(group).reduce((total: number, value) => total + Number(value), 0);
+      const expected = key === 'debts' ? num(row.liabilitiesCents) - Math.max(0, -num(row.cashCents)) : num(row[key === 'assets' ? 'assetsCents' : 'investmentsCents']);
+      if (sum !== expected) throw Error('Detalhamento da posição patrimonial inconsistente.');
+    }
+    if (num(row.cashCents)+num(row.investmentsCents)+num(row.assetsCents)-num(row.liabilitiesCents)+Math.max(0,-num(row.cashCents)) !== row.netCents) throw Error('Totais da posição patrimonial inconsistentes.');
+  }
   for (const [rows, field] of [[d.budgets, 'category'], [d.categoryPolicies, 'category'], [d.reserveAllocations, 'investmentId']] as const) {
     const keys = rows.map((r) => String(r[field]).trim().toLocaleLowerCase('pt-BR'));
     if (new Set(keys).size !== keys.length) throw Error('Já existe configuração para esta categoria ou investimento.');
@@ -268,6 +310,8 @@ export function validateRelations(d: Data) {
   }
 }
 export function upsert(d: Data, key: Collection, row: Row, at = today()) {
+  if (key === 'netWorthSnapshots' && d.netWorthSnapshots.some((r) => r.id === row.id)) throw Error('Posição registrada é imutável; remova-a explicitamente antes de registrar outra.');
+  if (key === 'assetValuations') row = { ...row, sequence: d.assetValuations.find((r) => r.id === row.id)?.sequence ?? d.assetValuations.reduce((n, r) => Math.max(n, num(r.sequence)), 0)+1 };
   if (key === 'budgets') row = { ...row, createdAt: d.budgets.find((r) => r.id === row.id)?.createdAt || at, updatedAt: at };
   if (key === 'recurrences') {
     const previous = d.recurrences.find((r) => r.id === row.id);
@@ -286,9 +330,14 @@ export function upsert(d: Data, key: Collection, row: Row, at = today()) {
       : [...d[key], row],
   };
   validateRelations(next);
+  if (key === 'assetValuations' && row.assetId === BIKE_ASSET_ID) {
+    const current = assetValues(next, at).find((r) => r.asset.id === BIKE_ASSET_ID);
+    next.bike = { ...next.bike, currentValue: (current?.valueCents ?? 0)/100 };
+  }
   return next;
 }
 export function remove(d: Data, key: Collection, id: string, at = today()) {
+  if (key === 'assets') return { ...d, assets: assetRows(d).map((r) => r.id === id ? { ...r, active: 'não' } : r) };
   if (key === 'recurrences') {
     const row = d.recurrences.find((r) => r.id === id);
     if (!row || row.archived) return d;
@@ -322,8 +371,10 @@ export function remove(d: Data, key: Collection, id: string, at = today()) {
         ? { ...c, componentId: '', matchMode: 'automático' }
         : c,
     );
-  if (key === 'debts')
+  if (key === 'debts') {
     next.payments = d.payments.filter((r) => r.debtId !== id);
+    next.assets = d.assets.map((r) => r.financingDebtId === id ? { ...r, financingDebtId: '' } : r);
+  }
   if (key === 'investments') {
     next.movements = d.movements.filter((r) => r.investmentId !== id);
     next.reserveAllocations = d.reserveAllocations.filter((r) => r.investmentId !== id);
@@ -334,13 +385,19 @@ export function remove(d: Data, key: Collection, id: string, at = today()) {
     next.planTransactions = d.planTransactions.filter((r) => r.planId !== id);
   next.recurrences = next.recurrences.map((r) => r.sourceKind === key && r.sourceId === id ? { ...r, sourceKind: 'nenhum', sourceId: '', status: r.archived ? 'finalizada' : 'pausada' } : r);
   next.forecastResolutions = next.forecastResolutions.filter((r) => r.action === 'ignorar' || realizedCollections.some((k) => k === r.recordKind && next[k].some((item) => item.id === r.recordId)));
+  next.assetCostLinks = next.assetCostLinks.filter((r) => next[r.recordKind as 'expenses'|'services'|'payments'].some((source) => source.id === r.recordId));
+  if (key === 'assetValuations' && d.assetValuations.find((r) => r.id === id)?.assetId === BIKE_ASSET_ID) {
+    const withoutLegacy = { ...next, bike: { ...next.bike, currentValue: 0 } };
+    next.bike = { ...next.bike, currentValue: (assetValues(withoutLegacy, at).find((r) => r.asset.id === BIKE_ASSET_ID)?.valueCents ?? 0)/100 };
+  }
   validateRelations(next);
   return next;
 }
-export type ResetKind = 'settings' | 'finance' | 'bike' | 'plans' | 'total';
+export type ResetKind = 'settings' | 'finance' | 'bike' | 'plans' | 'wealth' | 'total';
 export function resetData(d: Data, kind: ResetKind): Data {
   const fresh = defaults();
   if (kind === 'total') return fresh;
+  if (kind === 'wealth') return { ...d, assets: d.assets.map((r) => r.id === BIKE_ASSET_ID ? r : { ...r, active: 'não' }), assetValuations: d.assetValuations.filter((r) => r.assetId === BIKE_ASSET_ID), assetCostLinks: [], netWorthSnapshots: [] };
   if (kind === 'settings')
     return {
       ...d,
@@ -358,16 +415,27 @@ export function resetData(d: Data, kind: ResetKind): Data {
       payments: [],
       investments: [],
       budgets: [], categoryPolicies: [], reserveAllocations: [], planningSettings: [],
+      assets: d.assets.map((r) => ({ ...r, financingDebtId: '', cashPurchase: 'não', cashSale: 'não' })),
+      assetCostLinks: d.assetCostLinks.filter((r) => r.recordKind === 'services'),
       movements: [],
       recurrences,
       forecastResolutions: d.forecastResolutions.filter((r) => recurrences.some((rule) => rule.id === r.recurrenceId) && (r.action === 'ignorar' || ['services', 'planTransactions'].includes(String(r.recordKind)))),
       settings: { ...d.settings, openingCash: 0 },
     };
   }
-  if (kind === 'bike')
+  if (kind === 'bike') {
+    let detachedId = 'detached:' + BIKE_ASSET_ID;
+    while (d.assets.some((r) => r.id === detachedId)) detachedId += ':next';
+    const bikeAsset = assetRows(d).find((r) => r.id === BIKE_ASSET_ID);
+    const legacyValuations = bikeAsset && num(d.bike.currentValue) > 0 && !d.assetValuations.some((r) => r.assetId === BIKE_ASSET_ID)
+      ? [{ ...emptyRow('assetValuations'), id: detachedId + ':legacy', assetId: BIKE_ASSET_ID, date: String(bikeAsset.soldAt || today()), valueCents: toCents(num(d.bike.currentValue)), source: 'unknown', sequence: 1, notes: 'Valor legado preservado ao desvincular a moto; data original desconhecida.' }]
+      : [];
     return {
       ...d,
       bike: fresh.bike,
+      assets: assetRows(d).map((r) => r.id === BIKE_ASSET_ID ? { ...r, id: detachedId, linkedBike: '' } : r),
+      assetValuations: [...d.assetValuations, ...legacyValuations].map((r) => r.assetId === BIKE_ASSET_ID ? { ...r, assetId: detachedId } : r),
+      assetCostLinks: d.assetCostLinks.filter((r) => r.recordKind !== 'services').map((r) => r.assetId === BIKE_ASSET_ID ? { ...r, assetId: detachedId } : r),
       maintenance: [],
       services: [],
       costs: [],
@@ -376,6 +444,7 @@ export function resetData(d: Data, kind: ResetKind): Data {
       recurrences: d.recurrences.filter((r) => r.sourceKind !== 'maintenance'),
       forecastResolutions: d.forecastResolutions.filter((r) => r.recordKind !== 'services' && !d.recurrences.some((rule) => rule.id === r.recurrenceId && rule.sourceKind === 'maintenance')),
     };
+  }
   const recurrences = d.recurrences.filter((r) => r.sourceKind !== 'plans');
   return { ...d, plans: [], planTransactions: [], recurrences, forecastResolutions: d.forecastResolutions.filter((r) => r.recordKind !== 'planTransactions' && recurrences.some((rule) => rule.id === r.recurrenceId)) };
 }
@@ -429,8 +498,8 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   if (previous) {
     let version: unknown;
     try { version = JSON.parse(previous).planningVersion; } catch { /* preserve previous bytes */ }
-    const key = `rota-money-before-migration:${version === 2 ? 'planning-v3' : version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
-    if (version !== 3 && !storage.getItem?.(key)) storage.setItem(key, previous);
+    const key = `rota-money-before-migration:${version === 3 ? 'assets-v1' : version === 2 ? 'planning-v3' : version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
+    if (version !== 4 && !storage.getItem?.(key)) storage.setItem(key, previous);
   }
   const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
   if (previous) {

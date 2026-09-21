@@ -1,5 +1,6 @@
 import { openDatePicker } from './native-input';
 import { toCents } from '../services/money-codec';
+import { assetRows } from '../services/assets';
 import { AttributionFields } from './attribution-fields';
 import { useVirtualRecords } from '../hooks/use-virtual-records';
 import { attributionKeys } from '../expense-allocation';
@@ -169,7 +170,7 @@ export function Fields({
         let options: (string | { value: string; label: string })[] =
           f.options || [];
         const ref =
-          f.key === 'debtId'
+          f.key === 'debtId' || f.key === 'financingDebtId'
             ? 'debts'
             : f.key === 'investmentId'
               ? 'investments'
@@ -192,6 +193,11 @@ export function Fields({
                 ? `${r.activity} · ${brDate(r.date)} · ${r.id.slice(0, 6)}`
                 : String(r.name),
           }));
+        if (f.key === 'financingDebtId') options = [{ value: '', label: 'Sem financiamento vinculado' }, ...options];
+        if (f.key === 'assetId') options = assetRows(data).map((r) => ({ value: r.id, label: String(r.name) }));
+        if (kind === 'assetCostLinks' && f.key === 'recordId') options = (data[value.recordKind as 'expenses'|'services'|'payments'] || []).map((r) => ({ value: r.id, label: `${r.name || (r.debtId ? 'Pagamento' : 'Serviço')} · ${brDate(r.date)} · ${money(num(r.amount))}` }));
+        const translations: Record<string,string> = { motorcycle:'Moto', car:'Carro', property:'Imóvel', electronics:'Eletrônico', equipment:'Equipamento', other:'Outro', immediate:'Imediata', short_term:'Curto prazo', restricted:'Restrita', illiquid:'Ilíquida', unknown:'Não informada', manual:'Informado pelo usuário', market:'Referência de mercado informada', estimated:'Estimado', expenses:'Gastos', services:'Serviços realizados', payments:'Pagamentos de dívidas' };
+        if (['assets','assetValuations','assetCostLinks'].includes(String(kind)) && f.options) options = f.options.map((value) => ({ value, label: translations[value] || value }));
         if (kind === 'recurrences' && f.key === 'sourceKind') {
           const titles: Record<string, string> = { nenhum: 'Nenhuma (nova previsão)', expenses: 'Gasto recorrente', debts: 'Dívida', maintenance: 'Manutenção', plans: 'Plano', investments: 'Investimento' };
           options = options.map((option) => {
@@ -220,7 +226,7 @@ export function Fields({
                 label={f.label}
                 options={options}
                 value={String(value[f.key] ?? '')}
-                onChange={(v) => setValue({ ...value, [f.key]: v, ...(kind === 'recurrences' && f.key === 'sourceKind' ? { sourceId: '' } : {}) })}
+                onChange={(v) => setValue({ ...value, [f.key]: v, ...(kind === 'recurrences' && f.key === 'sourceKind' ? { sourceId: '' } : {}), ...(kind === 'assetCostLinks' && f.key === 'recordKind' ? { recordId: '', interestCents: null } : {}) })}
               />
             ) : f.type === 'textarea' ? (
               <textarea
@@ -400,6 +406,15 @@ export function Editor({
                         value.matchMode !== 'manual'
                       ),
                   ).filter((f) => {
+                      if (kind === 'assetValuations' && f.key === 'sequence') return false;
+                      if (kind === 'assetCostLinks' && f.key === 'interestCents') return value.recordKind === 'payments';
+                      if (kind === 'assets') {
+                        if (f.key === 'linkedBike') return false;
+                        if (value.linkedBike && ['name','type','purchaseDate','purchasePriceCents','purchaseKm','currentKm'].includes(f.key)) return false;
+                        if (['purchaseKm','currentKm'].includes(f.key)) return ['motorcycle','car'].includes(String(value.type));
+                        if (f.key === 'cashPurchaseCents') return value.cashPurchase === 'sim';
+                        if (['soldAt','saleValueCents','cashSale'].includes(f.key)) return value.active === 'não';
+                      }
                       if (kind === 'budgets' && ['createdAt', 'updatedAt'].includes(f.key)) return false;
                       if (kind === 'recurrences') {
                         if (['effectiveFrom', 'scheduleHistory', 'archived'].includes(f.key)) return false;

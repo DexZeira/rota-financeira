@@ -118,7 +118,7 @@ export function Analysis(p: ViewProps) {
             { label: 'Investimentos', value: f.investments },
             { label: 'Moto', value: num(d.bike.currentValue) },
             { label: 'Dívidas', value: -f.debt },
-            { label: 'Líquido', value: f.netWorth },
+            { label: 'Líquido conhecido', value: f.netWorth },
           ]}
         />
       </div>

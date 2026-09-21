@@ -64,6 +64,8 @@ import {
   type Row,
 } from '../src/model';
 import { Dashboard } from '../src/pages/dashboard';
+import { updateBikeAsset } from '../src/services/assets';
+const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
 const Today = lazy(() => import('../src/pages/today').then((m) => ({ default: m.Today })));
 const Planning = lazy(() => import('../src/pages/planning').then((m) => ({ default: m.Planning })));
 const Work = lazy(() => import('../src/pages/work').then((m) => ({ default: m.Work })));
@@ -92,6 +94,7 @@ import { financial, targets, costs } from '../src/calculations';
 const navigation = [
   ['Hoje', LayoutDashboard],
   ['Planejamento', Wallet],
+  ['Patrimônio', Wallet],
   ['Dashboard', LayoutDashboard],
   ['Dívidas', Wallet],
   ['Trabalho', BriefcaseBusiness],
@@ -105,7 +108,7 @@ const navigation = [
 ] as const;
 const navGroups = [
   { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
-  { title: 'Planejamento', pages: ['Planejamento', 'Planos'] },
+  { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
   { title: 'Insights', pages: ['Análises'] },
   { title: 'Sistema', pages: ['Configurações'] },
@@ -606,6 +609,7 @@ export default function Home() {
               <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
               {page === 'Hoje' && <Today {...props} />}
               {page === 'Planejamento' && <Planning {...props} />}
+              {page === 'Patrimônio' && <NetWorth {...props} />}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}
@@ -677,7 +681,7 @@ export default function Home() {
             validateRow(kind, row);
             commit(
               kind === 'settings' || kind === 'bike'
-                ? { ...data, [kind]: row }
+                ? kind === 'bike' ? updateBikeAsset(data, row, today()) : { ...data, [kind]: row }
                 : upsert(data, kind, row),
             );
             setEditor(null);

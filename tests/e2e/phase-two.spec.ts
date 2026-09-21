@@ -122,7 +122,7 @@ test('fase 2: orçamento, gasto, meta, custo, reserva e recarga', async ({
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('rota-financeira-v1')!),
   );
-  expect(stored.planningVersion).toBe(3);
+  expect(stored.planningVersion).toBe(defaults().planningVersion);
   expect(stored.dataVersion).toBe(6);
   expect(stored.budgets[0].limitCents).toBe(70025);
   expect(stored.reserveAllocations[0].liquidity).toBe('imediata');

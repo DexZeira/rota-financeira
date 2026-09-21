@@ -1,4 +1,5 @@
 import { PurchasingPowerTools } from '../components/purchasing-power-tools';
+import { OwnershipPanel } from '../components/net-worth';
 import { useEconomicIndicators } from '../hooks/use-economic-indicators';
 import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { useState } from 'react';
@@ -23,6 +24,7 @@ export function Motorcycle(p: ViewProps) {
     <>
       <PageHeader title="Sua garagem" description={String(d.bike.brand) + ' ' + String(d.bike.model) + ' · ' + String(d.bike.year)} action={<button onClick={() => edit('bike', d.bike)}>Editar moto</button>} />
       <HeroMetric label="Quilometragem atual" value={dec(num(d.bike.km), 0) + ' km'} context={next ? 'Próximo cuidado: ' + next.name : 'Configure o próximo cuidado da sua moto'} />
+      <OwnershipPanel {...p}/>
       <Metrics items={[
         ['Custo operacional / km', money(c.operating), 'Estimado'],
         ['Serviços neste mês', money(sum(d.services.filter((r) => String(r.date).startsWith(today().slice(0,7))), 'amount')), 'Pagamentos registrados'],

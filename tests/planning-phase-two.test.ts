@@ -448,7 +448,7 @@ void test('v6/p3 roundtrip local/nuvem, migração idempotente com bytes protegi
     },
   };
   const migrated = parseBackup(raw);
-  assert.equal(migrated.planningVersion, 3);
+  assert.equal(migrated.planningVersion, defaults().planningVersion);
   assert.deepEqual(migrated.budgets, []);
   save(store, migrated);
   save(store, migrated);
@@ -468,7 +468,7 @@ void test('v6/p3 roundtrip local/nuvem, migração idempotente com bytes protegi
     }).data,
     d,
   );
-  encoded.data.planningVersion = 4;
+  encoded.data.planningVersion = defaults().planningVersion! + 1;
   entries.set(STORAGE_KEY, JSON.stringify(encoded.data));
   assert.throws(() => save(store, d), /versão mais recente/);
   assert.throws(
