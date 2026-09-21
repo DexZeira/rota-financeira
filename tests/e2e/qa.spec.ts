@@ -1,7 +1,7 @@
 import { navigate } from './navigation';
 import { test, expect } from '@playwright/test';
 
-const pages = ['Hoje', 'Planejamento', 'Patrimônio', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
+const pages = ['Hoje', 'Planejamento', 'Patrimônio', 'Simulações', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
 
 let runtimeErrors: string[] = [];
 test.beforeEach(async ({ page }) => {
@@ -54,6 +54,22 @@ test('todas as páginas carregam sem overflow horizontal no tema claro e escuro'
       await expect(page.locator('main')).toBeVisible();
       const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: window.innerWidth }));
       expect(overflow.scroll, `${name} ${theme} overflow`).toBeLessThanOrEqual(overflow.width);
+      const active = page.locator('[data-slot=sidebar-menu-button][data-active]').filter({ hasText: name }).first();
+      if (await active.isVisible()) {
+        await active.hover();
+        await expect.poll(() => active.evaluate((element) => {
+          const style = getComputedStyle(element);
+          const luminance = (color: string) => {
+            const channels = (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => {
+              const s = v / 255;
+              return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+            });
+            return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+          };
+          const a = luminance(style.color), b = luminance(style.backgroundColor);
+          return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        }), { message: `${name} ${theme}: contraste do item ativo sob hover` }).toBeGreaterThanOrEqual(4.5);
+      }
     }
   }
   if (['390', '1366'].includes(testInfo.project.name)) {

@@ -1,6 +1,38 @@
 import { test, expect } from '@playwright/test';
 import { navigate } from './navigation';
 
+test('simulações mantêm campos e comparação dentro das alturas móveis', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await navigate(page, 'Simulações');
+  await page.getByLabel('Preço do bem (R$)', { exact: true }).fill('20000');
+  await page
+    .getByLabel('Forma de pagamento', { exact: true })
+    .selectOption('finance');
+  await page.getByLabel('Entrada (R$)', { exact: true }).fill('5000');
+  const rate = page.getByLabel('CET anual efetivo (%; prevalece sobre juros)', {
+    exact: true,
+  });
+  await rate.scrollIntoViewIfNeeded();
+  await rate.fill('15');
+  await rate.press('Tab');
+  await expect(
+    page.getByRole('table', { name: 'Antes e depois' }),
+  ).toBeVisible();
+  const button = page.getByRole('button', {
+    name: 'Duplicar cenário na sessão',
+    exact: true,
+  });
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test('bem patrimonial mantém primeiro e último campos e ações dentro da viewport', async ({
   page,
 }) => {
