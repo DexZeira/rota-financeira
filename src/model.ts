@@ -1,5 +1,6 @@
 import { defaultAliases } from './component-matching';
 import { validateAttribution } from './expense-allocation';
+import { emptyImports, type ImportState } from './services/import/types';
 export type Row = { id: string; [key: string]: string | number | null };
 export type Field = {
   key: string;
@@ -13,6 +14,7 @@ export type Field = {
 };
 export const collections = [
   'work',
+  'bankReceipts',
   'expenses',
   'debts',
   'payments',
@@ -35,7 +37,7 @@ export const collections = [
   'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; imports: ImportState; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -60,6 +62,8 @@ export const categories = [
   'lazer',
   'saúde',
   'outras',
+  'combustível',
+  'assinaturas',
 ];
 export const costCategories = [
   'óleo',
@@ -99,6 +103,7 @@ export const attributionFields = (scope: string): Field[] => [
   f('workAmount', 'Parcela paga atribuída ao trabalho (R$)', 'number'),
 ];
 export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
+  bankReceipts: [name,date,f('amountCents','Receita em centavos','number',{integer:true,required:true}),f('account','Conta'),notes],
   assets: [name,
     opt('type', 'Tipo de bem', ['motorcycle', 'car', 'property', 'electronics', 'equipment', 'other']),
     f('linkedBike', 'Vínculo com a moto'),
@@ -183,7 +188,7 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     f('recurrenceId', 'Recorrência', undefined, { required: true }),
     f('occurrenceDate', 'Data da ocorrência', 'date', { required: true }),
     opt('action', 'Conferência', ['vincular', 'ignorar']),
-    opt('recordKind', 'Tipo do registro realizado', ['expenses', 'work', 'payments', 'movements', 'planTransactions', 'services']),
+    opt('recordKind', 'Tipo do registro realizado', ['expenses', 'work', 'bankReceipts', 'payments', 'movements', 'planTransactions', 'services']),
     f('recordId', 'Registro realizado'),
   ],
   work: [
@@ -414,6 +419,7 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
   ],
 };
 export const labels: Record<Collection, string> = {
+  bankReceipts: 'Receitas bancárias',
   assets: 'Bens', assetValuations: 'Avaliações patrimoniais', assetCostLinks: 'Custos vinculados', netWorthSnapshots: 'Posições patrimoniais',
   budgets: 'Orçamentos', categoryPolicies: 'Classificação de categorias',
   planningSettings: 'Preferências de planejamento', reserveAllocations: 'Composição da reserva',
@@ -469,8 +475,10 @@ export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 4,
+    planningVersion: 5,
     assetVersion: 1,
+    importVersion: 1,
+    imports: emptyImports(),
     settings: { ...emptyRow('settings'), id: 'settings', theme: 'claro' },
     bike: {
       ...emptyRow('bike'),

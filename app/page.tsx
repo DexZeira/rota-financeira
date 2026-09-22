@@ -67,6 +67,7 @@ import { Dashboard } from '../src/pages/dashboard';
 import { updateBikeAsset } from '../src/services/assets';
 const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
 const Simulations = lazy(() => import('../src/pages/simulations').then((m) => ({ default: m.Simulations })));
+const Imports = lazy(() => import('../src/pages/imports').then((m) => ({ default: m.Imports })));
 const Today = lazy(() => import('../src/pages/today').then((m) => ({ default: m.Today })));
 const Planning = lazy(() => import('../src/pages/planning').then((m) => ({ default: m.Planning })));
 const Work = lazy(() => import('../src/pages/work').then((m) => ({ default: m.Work })));
@@ -97,6 +98,7 @@ const navigation = [
   ['Planejamento', Wallet],
   ['Patrimônio', Wallet],
   ['Simulações', Wallet],
+  ['Importar', Wallet],
   ['Dashboard', LayoutDashboard],
   ['Dívidas', Wallet],
   ['Trabalho', BriefcaseBusiness],
@@ -113,7 +115,7 @@ const navGroups = [
   { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio', 'Simulações'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
   { title: 'Insights', pages: ['Análises'] },
-  { title: 'Sistema', pages: ['Configurações'] },
+  { title: 'Sistema', pages: ['Importar', 'Configurações'] },
 ];
 function Nav({ page, go }: { page: string; go: (page: string) => void }) {
   const { setOpenMobile, isMobile } = useSidebar();
@@ -613,6 +615,7 @@ export default function Home() {
               {page === 'Planejamento' && <Planning {...props} />}
               {page === 'Patrimônio' && <NetWorth {...props} />}
               {page === 'Simulações' && <Simulations {...props} />}
+              {page === 'Importar' && <Imports {...props} commitImport={(next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise novamente.'); commit(next); }} />}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}

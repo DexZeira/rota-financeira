@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { navigate } from './navigation';
 
+test('importação mantém preview e revisão acessíveis nas alturas móveis', async ({ page }) => {
+  await page.goto('/'); await navigate(page, 'Importar');
+  await page.getByLabel('Arquivo CSV ou OFX').setInputFiles({name:'ficticio.csv',mimeType:'text/csv',buffer:Buffer.from('Data;Descrição;Valor;Conta\n10/09/2026;Loja fictícia com descrição longa que deve caber no celular;-12,00;Conta fictícia')});
+  await page.getByRole('button',{name:'Gerar preview',exact:true}).click();
+  const review=page.getByRole('button',{name:'Revisar linha 2',exact:true});await review.click();
+  const action=page.getByLabel('Ação da linha');await action.selectOption('create');await action.press('Tab');
+  const confirm=page.getByLabel('Revisei as decisões e confirmo a gravação');await confirm.scrollIntoViewIfNeeded();await expect(confirm).toBeInViewport();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
 test('simulações mantêm campos e comparação dentro das alturas móveis', async ({
   page,
 }) => {

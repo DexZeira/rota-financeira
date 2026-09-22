@@ -1,0 +1,96 @@
+.imports-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.imports-page section {
+  margin-block: 1.5rem;
+}
+.imports-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-block: 0.8rem;
+  min-width: 0;
+}
+.imports-page input,
+.imports-page select {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+.imports-page input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.import-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.import-window {
+  height: 448px;
+  max-height: 65dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.import-preview-row {
+  height: 112px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.import-preview-row strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.import-preview-row > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+.import-preview-row button {
+  flex-shrink: 0;
+}
+.import-preview-row > span {
+  font-size: 0.8rem;
+}
+.import-review {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.imports-page article,
+.imports-page p {
+  overflow-wrap: anywhere;
+}
+.imports-page details {
+  margin-block: 1.5rem;
+}
+.imports-page input[type='file'] {
+  padding: 8px;
+}
+.imports-page :focus-visible {
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .import-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .imports-page select {
+    font-size: 16px;
+  }
+}

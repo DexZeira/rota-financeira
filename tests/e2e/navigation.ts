@@ -15,11 +15,14 @@ export async function navigate(page: Page, name: string) {
     }
     return undefined;
   };
+  const more = page.getByRole('button', { name: 'Mais', exact: true });
+  // goto waits for the document, not necessarily for React's first commit.
+  await expect.poll(async () => Boolean(await visible()) || await more.first().isVisible(), { message: 'Navegação pronta após montagem do React' }).toBe(true);
   let button = await visible();
   if (!button) {
-    const more = page.getByRole('button', { name: 'Mais', exact: true });
     if (await more.count() && await more.first().isVisible()) {
       await more.first().click();
+      await expect.poll(async () => Boolean(await visible()), { message: `Destino visível no menu: ${name}` }).toBe(true);
       button = await visible();
     }
   }

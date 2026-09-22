@@ -89,6 +89,7 @@ export const recurrenceSources = [
   'investments',
 ] as const;
 export const realizedCollections = [
+  'bankReceipts',
   'expenses',
   'work',
   'payments',

@@ -1,7 +1,7 @@
 import { navigate } from './navigation';
 import { test, expect } from '@playwright/test';
 
-const pages = ['Hoje', 'Planejamento', 'Patrimônio', 'Simulações', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
+const pages = ['Hoje', 'Planejamento', 'Patrimônio', 'Simulações', 'Importar', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
 
 let runtimeErrors: string[] = [];
 test.beforeEach(async ({ page }) => {

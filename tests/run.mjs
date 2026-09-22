@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 for (const file of [
+  'tests/imports.test.ts',
+  'src/services/import/categorization-rules.ts', 'src/services/import/csv-import.ts', 'src/services/import/duplicate-detection.ts', 'src/services/import/import-session.ts', 'src/services/import/import-state.ts', 'src/services/import/ofx-import.ts', 'src/services/import/reconciliation.ts', 'src/services/import/subscription-detection.ts', 'src/services/import/transaction-normalizer.ts', 'src/services/import/types.ts',
   'src/services/decision-types.ts', 'src/services/decision-simulator.ts', 'src/services/financing-simulator.ts', 'src/services/opportunity-cost.ts', 'src/services/buy-now-or-wait.ts', 'tests/decisions.test.ts',
   'src/services/assets.ts', 'src/services/depreciation.ts', 'src/services/net-worth.ts', 'src/services/ownership-cost.ts',
   'tests/wealth.test.ts',
@@ -82,6 +84,7 @@ const result = spawnSync(
   process.execPath,
   [
     '--test',
+    '.test-output/tests/imports.test.js',
     '.test-output/tests/wealth.test.js',
     '.test-output/tests/decisions.test.js',
     '.test-output/tests/planning-phase-two.test.js',

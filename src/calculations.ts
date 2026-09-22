@@ -243,6 +243,7 @@ export function financial(d: Data, at = today()) {
     const revenue = sum(work, 'revenue'), spent = sum(expenses, 'amount') + sum(services, 'amount'), paid = sum(payments, 'amount');
     const contributions = sum(movements.filter((m) => m.kind === 'aporte'), 'amount'), withdrawals = sum(movements.filter((m) => m.kind === 'retirada'), 'amount');
     const cash = num(d.settings.openingCash) +
+        sum(d.bankReceipts.filter(before), 'amountCents') / 100 +
         revenue -
         spent -
         paid -

@@ -1,4 +1,6 @@
 import { defaultAliases } from '../component-matching';
+import { validateImports } from './import/import-state';
+import { emptyImports } from './import/types';
 import { assetRows, assetValues, BIKE_ASSET_ID } from './assets';
 import { toCents } from './money-codec';
 import { decodeMoney, encodeMoney, serializeData, MONEY_SCHEMA_VERSION } from './money-codec';
@@ -23,19 +25,20 @@ export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão m
 export function assertSupportedVersion(value: unknown) {
   if (!value || typeof value !== 'object') return;
   const raw = value as Record<string, unknown>;
-  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 4) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 5) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1) || (typeof raw.importVersion === 'number' && raw.importVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
   if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
 }
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   assertSupportedVersion(value);
-  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4].includes(Number((value as Record<string, unknown>).planningVersion)))
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4, 5].includes(Number((value as Record<string, unknown>).planningVersion)))
     throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
-  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4].includes(raw.planningVersion)))
+  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4, 5].includes(raw.planningVersion)))
     throw Error('Versão do planejamento incompatível.');
-  if ((raw.assetVersion !== undefined && raw.assetVersion !== 1) || (raw.planningVersion === 4 && raw.assetVersion !== 1)) throw Error('Versão patrimonial ausente ou incompatível.');
+  if ((raw.assetVersion !== undefined && raw.assetVersion !== 1) || (Number(raw.planningVersion) >= 4 && raw.assetVersion !== 1)) throw Error('Versão patrimonial ausente ou incompatível.');
+  if ((raw.importVersion !== undefined && raw.importVersion !== 1) || (raw.planningVersion === 5 && raw.importVersion !== 1)) throw Error('Versão de importação ausente ou incompatível.');
   // Additive metadata v1: old snapshots default to no inflation correction.
   // Original targets and balances are untouched; the v6 envelope adds planning.
   if (raw.intelligenceVersion !== undefined && raw.intelligenceVersion !== 1)
@@ -50,8 +53,10 @@ export function validateData(value: unknown): Data {
     throw Error('Versão de dados incompatível.');
   const migrated = raw.dataVersion === 0;
   const result = defaults();
+  if (raw.importVersion === 1) result.imports = validateImports(raw.imports);
   for (const key of ['settings', 'bike', ...collections] as const) {
     const source = raw[key];
+    if (key === 'bankReceipts' && source === undefined && raw.importVersion === undefined) continue;
     if (['assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots'].includes(key) && source === undefined && raw.assetVersion === undefined) continue;
     if (['budgets', 'categoryPolicies', 'planningSettings', 'reserveAllocations'].includes(key) && source === undefined && Number(raw.planningVersion || 0) < 3) continue;
     if ((key === 'recurrences' || key === 'forecastResolutions') && source === undefined && raw.planningVersion === undefined) continue;
@@ -127,6 +132,7 @@ export function validateData(value: unknown): Data {
   return result;
 }
 export function validateRelations(d: Data) {
+  validateImports(d.imports);
   const assets = new Map(assetRows(d).map((r) => [r.id, r]));
   const loans = new Set<string>();
   for (const row of d.assets) {
@@ -206,7 +212,7 @@ export function validateRelations(d: Data) {
       const key = realizedCollections.find((k) => k === resolution.recordKind);
       const record = key && d[key].find((r) => r.id === resolution.recordId);
       const expected: Record<string, string> = { despesa: 'expenses', receita: 'work', dívida: 'payments', aporte: 'movements', plano: 'planTransactions', manutenção: 'services' };
-      if (!key || !record || key !== expected[String(rule.kind)]) throw Error('Registro realizado incompatível com a previsão.');
+      if (!key || !record || (key !== expected[String(rule.kind)] && !(rule.kind === 'receita' && key === 'bankReceipts'))) throw Error('Registro realizado incompatível com a previsão.');
       if ((key === 'movements' && record.kind !== 'aporte') || (key === 'planTransactions' && record.kind !== 'deposit')) throw Error('Vincule um aporte realizado.');
       const ref: Record<string, string> = { debts: 'debtId', investments: 'investmentId', maintenance: 'maintenanceId', plans: 'planId' };
       if (ref[String(rule.sourceKind)] && record[ref[String(rule.sourceKind)]] !== rule.sourceId) throw Error('O lançamento pertence a outra origem.');
@@ -409,6 +415,8 @@ export function resetData(d: Data, kind: ResetKind): Data {
     return {
       ...d,
       work: [],
+      bankReceipts: [],
+      imports: emptyImports(),
       services: d.services.map((r) => detachWorkExpense(r, d.work)),
       expenses: [],
       debts: [],
@@ -496,10 +504,16 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
   const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
   if (previous) {
+    let importVersion: unknown;
+    try { importVersion = JSON.parse(previous).importVersion; } catch { /* preserve bytes */ }
+    const key = `rota-money-before-migration:imports-v1:${owner}`;
+    if (importVersion !== 1 && !storage.getItem?.(key)) storage.setItem(key, previous);
+  }
+  if (previous) {
     let version: unknown;
     try { version = JSON.parse(previous).planningVersion; } catch { /* preserve previous bytes */ }
     const key = `rota-money-before-migration:${version === 3 ? 'assets-v1' : version === 2 ? 'planning-v3' : version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
-    if (version !== 4 && !storage.getItem?.(key)) storage.setItem(key, previous);
+    if (version !== 4 && version !== 5 && !storage.getItem?.(key)) storage.setItem(key, previous);
   }
   const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
   if (previous) {
