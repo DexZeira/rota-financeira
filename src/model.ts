@@ -1,3 +1,4 @@
+import { emptyReporting, type ReportingState } from './services/reporting-state';
 import { defaultAliases } from './component-matching';
 import { validateAttribution } from './expense-allocation';
 import { emptyImports, type ImportState } from './services/import/types';
@@ -37,7 +38,7 @@ export const collections = [
   'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; imports: ImportState; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -475,7 +476,9 @@ export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 5,
+    planningVersion: 6,
+    reportingVersion: 1,
+    reporting: emptyReporting(),
     assetVersion: 1,
     importVersion: 1,
     imports: emptyImports(),

@@ -325,3 +325,13 @@ test('editor respeita a visual viewport em alturas móveis', async ({
   await dialog.locator('input[type=date]').first().scrollIntoViewIfNeeded();
   await expect(dialog.locator('input[type=date]').first()).toBeVisible();
 });
+
+
+test('relatórios mantêm checklist e timeline acessíveis nas alturas móveis',async({page})=>{
+  await page.route(/api\.bcb\.gov\.br|olinda\.bcb\.gov\.br/,r=>r.fulfill({status:503,body:'{}'}));
+  await page.goto('/');await navigate(page,'Relatórios');
+  const month=page.getByLabel('Mês do relatório');await expect(month).toBeVisible();
+  const last=page.getByLabel('Conferi patrimônio',{exact:true});await last.scrollIntoViewIfNeeded();await last.check();await expect(last).toBeInViewport();
+  const search=page.getByLabel('Buscar na timeline');await search.scrollIntoViewIfNeeded();await search.fill('busca');await search.press('Tab');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

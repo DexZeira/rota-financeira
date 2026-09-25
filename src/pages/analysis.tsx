@@ -69,6 +69,7 @@ export function Analysis(p: ViewProps) {
   return (
     <>
       <PageHeader title="Seu dinheiro em perspectiva" description="Perguntas simples. Decisões mais claras." />
+      <button type="button" onClick={() => p.go('Relatórios')}>Comparar fechamentos mensais</button>
       <div className="section-heading">
         <p>
           Período: {brDate(start)} a {brDate(at)}

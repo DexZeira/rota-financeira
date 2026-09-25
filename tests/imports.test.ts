@@ -538,7 +538,7 @@ void test('migração aditiva protegida e falha de quota deixam snapshot anterio
     raw,
   );
   assert.deepEqual(validateData(migrated), migrated);
-  assert.equal(migrated.planningVersion, 5);
+  assert.equal(migrated.planningVersion, 6);
   const before = entries.get(STORAGE_KEY);
   assert.throws(() =>
     save(
@@ -553,7 +553,7 @@ void test('migração aditiva protegida e falha de quota deixam snapshot anterio
   );
   assert.equal(entries.get(STORAGE_KEY), before);
   assert.throws(() => validateData({ ...migrated, importVersion: 2 }));
-  assert.throws(() => validateData({ ...migrated, planningVersion: 6 }));
+  assert.throws(() => validateData({ ...migrated, planningVersion: 7 }));
 });
 void test('reset limpa metadados, exclusão preserva histórico de reimportação', () => {
   const d = prepareImport(defaults(), lines(), { 2: review() }, meta);

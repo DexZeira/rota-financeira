@@ -67,6 +67,7 @@ import { Dashboard } from '../src/pages/dashboard';
 import { updateBikeAsset } from '../src/services/assets';
 const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
 const Simulations = lazy(() => import('../src/pages/simulations').then((m) => ({ default: m.Simulations })));
+const Reports = lazy(() => import('../src/pages/reports').then(m => ({default:m.Reports})));
 const Imports = lazy(() => import('../src/pages/imports').then((m) => ({ default: m.Imports })));
 const Today = lazy(() => import('../src/pages/today').then((m) => ({ default: m.Today })));
 const Planning = lazy(() => import('../src/pages/planning').then((m) => ({ default: m.Planning })));
@@ -107,6 +108,7 @@ const navigation = [
   ['Gastos', Receipt],
   ['Investimentos', TrendingUp],
   ['Planos', Flag],
+  ['Relatórios', ChartNoAxesCombined],
   ['Análises', ChartNoAxesCombined],
   ['Configurações', Settings],
 ] as const;
@@ -114,7 +116,7 @@ const navGroups = [
   { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
   { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio', 'Simulações'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
-  { title: 'Insights', pages: ['Análises'] },
+  { title: 'Insights', pages: ['Análises', 'Relatórios'] },
   { title: 'Sistema', pages: ['Importar', 'Configurações'] },
 ];
 function Nav({ page, go }: { page: string; go: (page: string) => void }) {
@@ -624,6 +626,7 @@ export default function Home() {
               {page === 'Gastos' && <Expenses {...props} />}{' '}
               {page === 'Investimentos' && <Investments {...props} />}{' '}
               {page === 'Planos' && <Plans {...props} />}{' '}
+              {page === 'Relatórios' && <Reports data={data} go={go} commitReport={(next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise o fechamento novamente.'); commit(next); }} />}
               {page === 'Análises' && <Analysis {...props} />}{' '}
               {page === 'Configurações' && (
                 <SettingsView

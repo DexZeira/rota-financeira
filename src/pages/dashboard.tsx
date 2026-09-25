@@ -12,6 +12,7 @@ import { MoneyIntelligence } from '../components/money-intelligence';
 import { PhaseTwoSummary, usePhaseTwo } from '../components/planning-phase-two';
 import { NetWorthSummary } from '../components/net-worth';
 export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
+  const lastClosed = [...d.reporting.closures].filter(c => c.status === 'closed').sort((a,b) => b.period.localeCompare(a.period))[0]?.revisions.at(-1);
   const phase = usePhaseTwo(d);
   const f = financial(d),
     c = costs(d),
@@ -48,6 +49,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
     <>
       <PageHeader title={new Date().getHours() < 12 ? 'Bom dia.' : new Date().getHours() < 18 ? 'Boa tarde.' : 'Boa noite.'} description="Seu dinheiro, na direção que você escolhe." />
       <HeroMetric label="Seu saldo disponível" value={money(f.available)} context={<><span>Atual · saldo menos reserva da moto</span><p>{money(comparison.current.result)} de resultado de caixa neste mês</p></>} />
+      {lastClosed && <button type="button" className="report-last-closed" onClick={() => go('Relatórios')}>Último fechamento · {lastClosed.period} · variação de caixa {money(lastClosed.netCashFlowCents/100)} · ver relatório salvo</button>}
       <PhaseTwoSummary data={d} go={go}/>
       <NetWorthSummary data={d} go={go}/>
       <nav className="quick-actions" aria-label="Ações rápidas">

@@ -1,0 +1,133 @@
+.reports-page {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.reports-page section,
+.reports-page fieldset,
+.reports-page label {
+  min-width: 0;
+}
+.reports-page h2,
+.reports-page h3,
+.reports-page h4 {
+  margin-block: 0.75rem;
+}
+.report-summary {
+  padding-block: 0.5rem;
+}
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.report-controls label {
+  flex: 1 1 180px;
+  display: grid;
+  gap: 0.4rem;
+}
+.reports-page input:not([type='checkbox']),
+.reports-page select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.report-line {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+.report-line > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reports-page p,
+.reports-page li {
+  overflow-wrap: anywhere;
+}
+.report-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-block: 1rem;
+}
+.reports-page button {
+  max-width: 100%;
+  white-space: normal;
+}
+.reports-page .report-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding-block: 0.5rem;
+}
+.report-check input {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.reports-page fieldset {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+.timeline-event {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0;
+}
+.timeline-event summary {
+  cursor: pointer;
+  display: grid;
+  gap: 0.3rem;
+  overflow-wrap: anywhere;
+}
+.reports-page summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+@media print {
+  body:has(.reports-page) [data-slot='sidebar'],
+  body:has(.reports-page) .mobile-nav,
+  body:has(.reports-page) header:not(.page-header),
+  body:has(.reports-page) nav,
+  .report-no-print {
+    display: none !important;
+  }
+  body:has(.reports-page) {
+    --background: #fff;
+    --foreground: #111;
+    --card: #fff;
+    --card-foreground: #111;
+    --muted-foreground: #333;
+    --border: #aaa;
+    background: white !important;
+    color: black !important;
+  }
+  .reports-page {
+    display: block;
+    color: black;
+  }
+  .reports-page .disclosure {
+    border: 0;
+    break-inside: auto;
+  }
+  .reports-page details::details-content {
+    content-visibility: visible;
+  }
+  .reports-page details > .disclosure-body {
+    display: block !important;
+  }
+  .reports-page .report-line {
+    break-inside: avoid;
+    border-color: #aaa;
+  }
+}
+
+.dark .reports-page input[type='month'],
+.dark .reports-page select {
+  color-scheme: dark;
+}
