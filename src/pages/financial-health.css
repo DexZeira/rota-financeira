@@ -1,0 +1,54 @@
+.financial-health {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.financial-health .financial-item {
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.financial-health .financial-item p {
+  margin-block: 0.5rem;
+}
+.health-filters,
+.health-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.financial-health label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.financial-health select {
+  max-width: 100%;
+  min-width: 0;
+  background: var(--card);
+  color: var(--foreground);
+}
+.health-stat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: left;
+  white-space: normal;
+}
+.health-stat strong {
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  overflow-wrap: anywhere;
+}
+.health-stat small {
+  color: var(--muted-foreground);
+}
+.financial-health section {
+  margin-block: 1.5rem;
+}
+@media (max-width: 380px) {
+  .health-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

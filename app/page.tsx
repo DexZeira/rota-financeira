@@ -67,6 +67,9 @@ import { Dashboard } from '../src/pages/dashboard';
 import { updateBikeAsset } from '../src/services/assets';
 const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
 const Simulations = lazy(() => import('../src/pages/simulations').then((m) => ({ default: m.Simulations })));
+const Alerts = lazy(() => import('../src/pages/financial-health').then(m => ({default:m.Alerts})));
+const FinancialAudit = lazy(() => import('../src/pages/financial-health').then(m => ({default:m.FinancialAudit})));
+const MySituation = lazy(() => import('../src/pages/financial-health').then(m => ({default:m.MySituation})));
 const Reports = lazy(() => import('../src/pages/reports').then(m => ({default:m.Reports})));
 const Imports = lazy(() => import('../src/pages/imports').then((m) => ({ default: m.Imports })));
 const Today = lazy(() => import('../src/pages/today').then((m) => ({ default: m.Today })));
@@ -108,6 +111,9 @@ const navigation = [
   ['Gastos', Receipt],
   ['Investimentos', TrendingUp],
   ['Planos', Flag],
+  ['Minha Situação', ChartNoAxesCombined],
+  ['Alertas', ChartNoAxesCombined],
+  ['Auditoria', ChartNoAxesCombined],
   ['Relatórios', ChartNoAxesCombined],
   ['Análises', ChartNoAxesCombined],
   ['Configurações', Settings],
@@ -116,7 +122,7 @@ const navGroups = [
   { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
   { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio', 'Simulações'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
-  { title: 'Insights', pages: ['Análises', 'Relatórios'] },
+  { title: 'Insights', pages: ['Minha Situação', 'Alertas', 'Auditoria', 'Análises', 'Relatórios'] },
   { title: 'Sistema', pages: ['Importar', 'Configurações'] },
 ];
 function Nav({ page, go }: { page: string; go: (page: string) => void }) {
@@ -613,6 +619,9 @@ export default function Home() {
                 /></Disclosure></>
               )}
               <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
+              {page === 'Alertas' && <Alerts data={data} go={go} appError={!!error} />}
+              {page === 'Auditoria' && <FinancialAudit data={data} go={go} />}
+              {page === 'Minha Situação' && <MySituation data={data} go={go} />}
               {page === 'Hoje' && <Today {...props} />}
               {page === 'Planejamento' && <Planning {...props} />}
               {page === 'Patrimônio' && <NetWorth {...props} />}

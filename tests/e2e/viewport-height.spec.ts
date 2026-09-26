@@ -335,3 +335,21 @@ test('relatórios mantêm checklist e timeline acessíveis nas alturas móveis',
   const search=page.getByLabel('Buscar na timeline');await search.scrollIntoViewIfNeeded();await search.fill('busca');await search.press('Tab');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+
+test('busca universal respeita a visual viewport e mantém saída por teclado', async ({page}) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'Abrir busca universal'}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect.poll(()=>dialog.evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a.playState==='running').length)).toBe(0);
+  const bounds=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),v=visualViewport;return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:v?.height??innerHeight,width:v?.width??innerWidth,offset:v?.offsetTop??0};});
+  expect(bounds.top).toBeGreaterThanOrEqual(bounds.offset-1);
+  expect(bounds.bottom).toBeLessThanOrEqual(bounds.offset+bounds.height+1);
+  expect(bounds.left).toBeGreaterThanOrEqual(-1);
+  expect(bounds.right).toBeLessThanOrEqual(bounds.width+1);
+  await expect(dialog.getByRole('button',{name:'Fechar',exact:true})).toBeInViewport();
+  await dialog.getByRole('combobox',{name:'Busca global'}).fill('óleo');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+});

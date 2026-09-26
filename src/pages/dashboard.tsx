@@ -1,3 +1,4 @@
+import { AlertSummary } from '../components/financial-health';
 import { HeroMetric, PageHeader, QuickAction } from '../components/finance-ui';
 import { BriefcaseBusiness, Receipt, TrendingUp } from 'lucide-react';
 import { SelectedGoal, DayAndMonth, Attention, TrendChart } from '../components/overview';
@@ -50,6 +51,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
       <PageHeader title={new Date().getHours() < 12 ? 'Bom dia.' : new Date().getHours() < 18 ? 'Boa tarde.' : 'Boa noite.'} description="Seu dinheiro, na direção que você escolhe." />
       <HeroMetric label="Seu saldo disponível" value={money(f.available)} context={<><span>Atual · saldo menos reserva da moto</span><p>{money(comparison.current.result)} de resultado de caixa neste mês</p></>} />
       {lastClosed && <button type="button" className="report-last-closed" onClick={() => go('Relatórios')}>Último fechamento · {lastClosed.period} · variação de caixa {money(lastClosed.netCashFlowCents/100)} · ver relatório salvo</button>}
+      <AlertSummary data={d} go={go}/>
       <PhaseTwoSummary data={d} go={go}/>
       <NetWorthSummary data={d} go={go}/>
       <nav className="quick-actions" aria-label="Ações rápidas">

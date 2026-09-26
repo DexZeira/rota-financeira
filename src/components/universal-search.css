@@ -1,0 +1,55 @@
+.universal-search-trigger {
+  flex-shrink: 0;
+}
+.universal-search-dialog[data-slot] {
+  width: min(640px, calc(100% - 16px));
+  max-width: calc(100% - 16px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100svh - 24px);
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+.universal-search-dialog > input,
+.universal-search-dialog select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--card);
+  color: var(--foreground);
+}
+.universal-search-dialog > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.universal-search-dialog > p {
+  margin: 0;
+}
+.universal-search-list {
+  overflow: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.universal-search-list [role='option'] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.universal-search-list [aria-selected='true'] {
+  background: var(--muted);
+  outline: 1px solid var(--foreground);
+  outline-offset: -2px;
+}
+.universal-search-list small {
+  color: var(--muted-foreground);
+}

@@ -1,3 +1,4 @@
+import { AlertSummary } from '../components/financial-health';
 import { useMemo } from 'react';
 import { DynamicTargetSection, PhaseTwoSummary } from '../components/planning-phase-two';
 import { FinancialQueryService } from '../services/financial-query';
@@ -47,6 +48,7 @@ export function Today(p: ViewProps) {
           conferidas. Não representam pagamentos realizados.
         </p>
       </section>
+      <AlertSummary data={p.data} go={p.go}/>
       <DynamicTargetSection {...p}/>
       {p.data.planningSettings[0]?.scheduleEnabled !== 'sim' && <section className="content-section" aria-label="Seu trabalho hoje">
         <div className="section-heading">
