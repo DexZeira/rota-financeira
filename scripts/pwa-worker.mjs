@@ -10,6 +10,17 @@ self.addEventListener('activate', event => {
     .filter(key => key.startsWith('rota-shell-') && key !== CACHE)
     .map(key => caches.delete(key)))));
 });
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const route = event.notification.data?.route;
+  if (!['Dívidas','Investimentos','Manutenção','Planejamento','Gastos','Relatórios','Alertas','Auditoria','Configurações'].includes(route)) return;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+    const client = windows.find(c => new URL(c.url).origin === self.location.origin);
+    if (client) { await client.focus(); client.postMessage({type:'rota-notification',route}); }
+    else await self.clients.openWindow('/#notification=' + encodeURIComponent(route));
+  })().catch(() => undefined));
+});
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.search) return;

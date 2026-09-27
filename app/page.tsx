@@ -1,3 +1,4 @@
+import { useLocalNotifications } from '../src/hooks/use-local-notifications';
 import { PageSkeleton, PageHeader, Disclosure } from '../src/components/finance-ui';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { GlobalSearch } from '../src/components/global-search';
@@ -65,6 +66,7 @@ import {
 } from '../src/model';
 import { Dashboard } from '../src/pages/dashboard';
 import { updateBikeAsset } from '../src/services/assets';
+const Assistant = lazy(() => import('../src/pages/assistant').then(m => ({default:m.Assistant})));
 const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
 const Simulations = lazy(() => import('../src/pages/simulations').then((m) => ({ default: m.Simulations })));
 const Alerts = lazy(() => import('../src/pages/financial-health').then(m => ({default:m.Alerts})));
@@ -111,6 +113,7 @@ const navigation = [
   ['Gastos', Receipt],
   ['Investimentos', TrendingUp],
   ['Planos', Flag],
+  ['Assistente', ChartNoAxesCombined],
   ['Minha Situação', ChartNoAxesCombined],
   ['Alertas', ChartNoAxesCombined],
   ['Auditoria', ChartNoAxesCombined],
@@ -122,7 +125,7 @@ const navGroups = [
   { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
   { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio', 'Simulações'] },
   { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
-  { title: 'Insights', pages: ['Minha Situação', 'Alertas', 'Auditoria', 'Análises', 'Relatórios'] },
+  { title: 'Insights', pages: ['Assistente', 'Minha Situação', 'Alertas', 'Auditoria', 'Análises', 'Relatórios'] },
   { title: 'Sistema', pages: ['Importar', 'Configurações'] },
 ];
 function Nav({ page, go }: { page: string; go: (page: string) => void }) {
@@ -318,10 +321,12 @@ export default function Home() {
       backup(data),
     );
   }
-  function go(p: string) {
+  const go = useCallback((p: string) => {
     setPage(p);
     window.scrollTo({ top: 0 });
-  }
+  }, []);
+  const notificationOwner = auth.session?.user.id || "guest";
+  const notificationDiagnostic = useLocalNotifications(data, notificationOwner, ready && !auth.loading && !blocked && !cloud.pending, go);
   function cancelAccount() {
     void auth.signOut().then(({ error: signOutError }) => {
       if (signOutError) setError('Não foi possível sair. Tente novamente.');
@@ -621,6 +626,7 @@ export default function Home() {
               <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
               {page === 'Alertas' && <Alerts data={data} go={go} appError={!!error} />}
               {page === 'Auditoria' && <FinancialAudit data={data} go={go} />}
+              {page === 'Assistente' && <Assistant data={data} />}
               {page === 'Minha Situação' && <MySituation data={data} go={go} />}
               {page === 'Hoje' && <Today {...props} />}
               {page === 'Planejamento' && <Planning {...props} />}
@@ -641,6 +647,9 @@ export default function Home() {
                 <SettingsView
                   data={data}
                   edit={edit}
+                  notificationOwner={notificationOwner}
+                  notificationDiagnostic={notificationDiagnostic}
+                  onSaveNotifications={(notificationPreferences) => { commit({ ...current.current, notificationPreferences }); setMessage('Preferências de notificações salvas.'); }}
                   onSaveSettings={(settings) =>
                     safely(() => {
                       validateRow('settings', settings);

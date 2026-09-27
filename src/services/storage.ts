@@ -1,3 +1,4 @@
+import { validateNotificationPreferences } from './notification-preferences';
 import { investmentLedger } from './investment-ledger';
 import { emptyReporting, validateReporting } from './reporting-state';
 import { defaultAliases } from '../component-matching';
@@ -27,17 +28,18 @@ export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão m
 export function assertSupportedVersion(value: unknown) {
   if (!value || typeof value !== 'object') return;
   const raw = value as Record<string, unknown>;
-  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 7) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1) || (typeof raw.importVersion === 'number' && raw.importVersion > 1) || (typeof raw.reportingVersion === 'number' && raw.reportingVersion > 1) || (typeof raw.investmentVersion === 'number' && raw.investmentVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 8) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1) || (typeof raw.importVersion === 'number' && raw.importVersion > 1) || (typeof raw.reportingVersion === 'number' && raw.reportingVersion > 1) || (typeof raw.investmentVersion === 'number' && raw.investmentVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
+  if (typeof raw.notificationVersion === 'number' && raw.notificationVersion > 1) throw Error(FUTURE_VERSION_ERROR);
   if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
 }
 export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   assertSupportedVersion(value);
-  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4, 5, 6, 7].includes(Number((value as Record<string, unknown>).planningVersion)))
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4, 5, 6, 7, 8].includes(Number((value as Record<string, unknown>).planningVersion)))
     throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
-  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4, 5, 6, 7].includes(raw.planningVersion)))
+  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(raw.planningVersion)))
     throw Error('Versão do planejamento incompatível.');
   if ((raw.assetVersion !== undefined && raw.assetVersion !== 1) || (Number(raw.planningVersion) >= 4 && raw.assetVersion !== 1)) throw Error('Versão patrimonial ausente ou incompatível.');
   if ((raw.importVersion !== undefined && raw.importVersion !== 1) || (Number(raw.planningVersion) >= 5 && raw.importVersion !== 1)) throw Error('Versão de importação ausente ou incompatível.');
@@ -55,8 +57,10 @@ export function validateData(value: unknown): Data {
     throw Error('Versão de dados incompatível.');
   if ((raw.reportingVersion !== undefined && raw.reportingVersion !== 1) || ((Number(raw.planningVersion) >= 6 || raw.reporting !== undefined) && raw.reportingVersion !== 1)) throw Error('Versão de relatórios ausente ou incompatível.');
   if ((raw.investmentVersion !== undefined && raw.investmentVersion !== 1) || (Number(raw.planningVersion)>=7 && raw.investmentVersion!==1)) throw Error('Versão de investimentos ausente ou incompatível.');
+  if ((raw.notificationVersion !== undefined && raw.notificationVersion !== 1) || (Number(raw.planningVersion)>=8 && raw.notificationVersion!==1) || (raw.notificationPreferences!==undefined && raw.notificationVersion!==1)) throw Error('Versão de notificações ausente ou incompatível.');
   const migrated = raw.dataVersion === 0;
   const result = defaults();
+  if (raw.notificationVersion === 1) result.notificationPreferences = validateNotificationPreferences(raw.notificationPreferences);
   if (raw.reportingVersion === 1) result.reporting = validateReporting(raw.reporting);
   if (raw.importVersion === 1) result.imports = validateImports(raw.imports);
   for (const key of ['settings', 'bike', ...collections] as const) {
@@ -406,6 +410,7 @@ export function resetData(d: Data, kind: ResetKind): Data {
     return {
       ...d,
       planningSettings: [],
+      notificationPreferences: fresh.notificationPreferences,
       settings: { ...fresh.settings, openingCash: d.settings.openingCash },
     };
   if (kind === 'finance') {
@@ -503,6 +508,12 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
   const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
   if (previous) {
+    let version: unknown;
+    try { version = JSON.parse(previous).notificationVersion; } catch { /* preserve exact bytes */ }
+    const key = `rota-money-before-migration:notifications-v1:${owner}`;
+    if (version !== 1 && !storage.getItem?.(key)) storage.setItem(key, previous);
+  }
+  if (previous) {
     let investmentVersion: unknown;
     try {investmentVersion=JSON.parse(previous).investmentVersion;} catch { /* archive exact previous bytes */ }
     const key=`rota-money-before-migration:investments-v1:${owner}`;
@@ -524,7 +535,7 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
     let version: unknown;
     try { version = JSON.parse(previous).planningVersion; } catch { /* preserve previous bytes */ }
     const key = `rota-money-before-migration:${version === 3 ? 'assets-v1' : version === 2 ? 'planning-v3' : version === 1 ? 'planning-v2' : 'planning-v1'}:${owner}`;
-    if (version !== 4 && version !== 5 && version !== 6 && version !== 7 && !storage.getItem?.(key)) storage.setItem(key, previous);
+    if (version !== 4 && version !== 5 && version !== 6 && version !== 7 && version !== 8 && !storage.getItem?.(key)) storage.setItem(key, previous);
   }
   const intelligenceCopy = `rota-money-before-migration:intelligence-v1:${owner}`;
   if (previous) {

@@ -353,3 +353,15 @@ test('busca universal respeita a visual viewport e mantém saída por teclado', 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
 });
+
+
+test('assistente e preferências de notificações cabem nas alturas móveis', async ({page}) => {
+  await page.goto('/'); await navigate(page,'Assistente');
+  const question=page.getByRole('combobox',{name:'Pergunta',exact:true});
+  await question.selectOption('RESERVE');await question.press('Tab');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await navigate(page,'Configurações');await page.locator('summary').filter({hasText:/^Notificações/}).click();
+  const save=page.getByRole('button',{name:'Salvar preferências de notificações',exact:true});
+  await save.scrollIntoViewIfNeeded();await expect(save).toBeInViewport();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

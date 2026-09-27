@@ -1,3 +1,4 @@
+import { defaultNotificationPreferences, type NotificationPreferences } from './services/notification-preferences';
 import { investmentOperations, incomeOperations, quantityUnits } from './services/investment-ledger';
 import { emptyReporting, type ReportingState } from './services/reporting-state';
 import { defaultAliases } from './component-matching';
@@ -39,7 +40,7 @@ export const collections = [
   'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; investmentVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
+export type Data = { notificationVersion?: number; notificationPreferences: NotificationPreferences; dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; investmentVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -495,7 +496,9 @@ export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 7,
+    planningVersion: 8,
+    notificationVersion: 1,
+    notificationPreferences: defaultNotificationPreferences(),
     investmentVersion: 1,
     reportingVersion: 1,
     reporting: emptyReporting(),

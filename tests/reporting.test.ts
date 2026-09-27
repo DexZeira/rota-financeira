@@ -163,7 +163,7 @@ void test('migração preserva bytes anteriores antes de gravar e aborta em quot
   const migrated = validateData(old);
   assert.deepEqual(migrated.reporting, { closures: [] });
   assert.equal(migrated.reportingVersion, 1);
-  assert.equal(migrated.planningVersion, 7);
+  assert.equal(migrated.planningVersion, 8);
   assert.throws(() =>
     save(
       {
@@ -179,7 +179,7 @@ void test('migração preserva bytes anteriores antes de gravar e aborta em quot
   save(storage, migrated);
   assert.equal(map.get('rota-money-before-migration:reporting-v1:guest'), raw);
   assert.throws(() => validateData({ ...migrated, reportingVersion: 2 }));
-  assert.throws(() => validateData({ ...migrated, planningVersion: 8 }));
+  assert.throws(() => validateData({ ...migrated, planningVersion: 9 }));
   assert.throws(() =>
     validateData({ ...migrated, reportingVersion: undefined }),
   );

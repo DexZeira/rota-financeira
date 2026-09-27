@@ -1,3 +1,5 @@
+import { NotificationSettings } from '../components/notification-settings';
+import type { NotificationPreferences } from '../services/notification-preferences';
 import { Disclosure } from '../components/finance-ui';
 import { useState } from 'react';
 import { StorageManager } from '../components/storage-manager';
@@ -21,9 +23,12 @@ export function SettingsView({
   onImport,
   onReset,
   onRecovery,
-  onSaveSettings,
+  onSaveSettings, onSaveNotifications, notificationOwner, notificationDiagnostic,
 }: {
   data: Data;
+  onSaveNotifications: (p: NotificationPreferences) => void;
+  notificationOwner: string;
+  notificationDiagnostic: string;
   edit: (kind: Collection | 'settings' | 'bike', row?: Row) => void;
   onSaveSettings: (settings: Row) => void;
   onExport: () => void;
@@ -70,6 +75,7 @@ export function SettingsView({
     <>
 
       <div className="settings-groups">
+<Disclosure title="Notificações" description="Opcional, com controle de privacidade"><NotificationSettings key={JSON.stringify(d.notificationPreferences)+notificationOwner} preferences={d.notificationPreferences} owner={notificationOwner} onSave={onSaveNotifications} diagnostic={notificationDiagnostic}/></Disclosure>
 <Disclosure title="Planejamento" description="Rotina de trabalho, saldo e custos essenciais">      <Card
         title="Seu planejamento"
         action={
