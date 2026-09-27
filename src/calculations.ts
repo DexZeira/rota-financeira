@@ -1,4 +1,5 @@
 import { debtTerms } from './model';
+import { investmentLedger, movementCashCents } from './services/investment-ledger';
 import { assetCashDelta, assetValues } from './services/assets';
 import { calculateTargets } from './target-sources';
 import { componentMatches } from './component-matching';
@@ -160,12 +161,7 @@ export function prioritized(d: Data, strategy = 'otimizada') {
                     : b.score - a.score);
 }
 export function investmentBalance(d: Data, r: Row, at = today()) {
-    return ((String(r.date) <= at ? num(r.balance) : 0) +
-        d.movements
-            .filter((m) => m.investmentId === r.id && String(m.date) <= at)
-            .reduce((s, m) => s +
-            num(m.amount) *
-                (['retirada', 'perda'].includes(String(m.kind)) ? -1 : 1), 0));
+    return investmentLedger(r, d.movements.filter(m => m.investmentId === r.id), at).bookCents / 100;
 }
 export function planTransactions(d: Data, planId: string) {
     return d.planTransactions.filter((t) => t.planId === planId);
@@ -246,9 +242,7 @@ export function financial(d: Data, at = today()) {
         sum(d.bankReceipts.filter(before), 'amountCents') / 100 +
         revenue -
         spent -
-        paid -
-        contributions +
-        withdrawals + assetCashDelta(d, at) / 100;
+        paid + movements.reduce((total, row) => total + movementCashCents(row), 0) / 100 + assetCashDelta(d, at) / 100;
     const investments = d.investments.reduce((s, r) => s + investmentBalance(d, r, at), 0), debt = d.debts.reduce((s, r) => s + debtState(d, r, at).balance, 0);
     const fund = d.fund
         .filter(before)

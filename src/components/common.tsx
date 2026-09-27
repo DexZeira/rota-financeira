@@ -1,4 +1,5 @@
 import { openDatePicker } from './native-input';
+import { incomeOperations } from '../services/investment-ledger';
 import { toCents } from '../services/money-codec';
 import { assetRows } from '../services/assets';
 import { AttributionFields } from './attribution-fields';
@@ -226,7 +227,10 @@ export function Fields({
                 label={f.label}
                 options={options}
                 value={String(value[f.key] ?? '')}
-                onChange={(v) => setValue({ ...value, [f.key]: v, ...(kind === 'recurrences' && f.key === 'sourceKind' ? { sourceId: '' } : {}), ...(kind === 'assetCostLinks' && f.key === 'recordKind' ? { recordId: '', interestCents: null } : {}) })}
+                onChange={(v) => setValue({ ...value, [f.key]: v,
+                  ...(kind === 'movements' && f.key === 'kind' ? { operation: 'padrão', paidOut: 'não' } : {}),
+                  ...(kind === 'movements' && f.key === 'operation' && !['padrão','ajuste'].includes(v) ? { kind: v==='compra'?'aporte':['venda','resgate','amortização'].includes(v)?'retirada':incomeOperations.includes(v)?'rendimento':'perda', paidOut: incomeOperations.includes(v)?'sim':'não' } : {}),
+                  ...(kind === 'recurrences' && f.key === 'sourceKind' ? { sourceId: '' } : {}), ...(kind === 'assetCostLinks' && f.key === 'recordKind' ? { recordId: '', interestCents: null } : {}) })}
               />
             ) : f.type === 'textarea' ? (
               <textarea
@@ -422,7 +426,13 @@ export function Editor({
                       if (f.key === 'dueDay') return ['mensal', 'bimestral', 'trimestral', 'semestral', 'anual'].includes(String(value.frequency));
                       if (f.key === 'sourceId') return value.sourceKind !== 'nenhum';
                     }
+                    if (kind === 'movements') {
+                      if (f.key === 'paidOut') return value.kind === 'rendimento';
+                      if (f.key === 'units') return ['aporte','retirada'].includes(String(value.kind)) && ['Ação','ações','ETF','FII','Criptomoeda'].includes(String(data.investments.find(r=>r.id===value.investmentId)?.category));
+                    }
                     if (kind !== 'investments') return true;
+                    if (f.key === 'fxToBRL') return value.valuationCurrency !== 'BRL';
+                    if (f.key === 'benchmarkRate') return ['IPCA + taxa','Personalizado'].includes(String(value.benchmark));
                     const type = String(value.category || '');
                     if (f.key === 'indexer' || f.key === 'indexerPercent') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type) && String(value.rateType || 'Pós-fixado') === 'Pós-fixado';
                     if (f.key === 'rateType') return ['CDB', 'LCI', 'LCA', 'Conta remunerada'].includes(type);

@@ -1,4 +1,5 @@
 import { type Data, num, validDate, money } from '../model';
+import { investmentMaturities } from './investment-maturities';
 import { debtState, maintenanceState, daysBetween } from '../calculations';
 import { planningPhaseTwo } from './planning-phase-two';
 import { getCashFlowForecast } from './cash-flow';
@@ -317,6 +318,10 @@ export function deriveAlerts(
         'Investimentos',
         String(r.maturity),
       );
+  }
+  for (const event of investmentMaturities(d, at).days30) {
+    if (event.label === 'Vencimento') continue; // Existing maturity alert retains its stable id.
+    add('investment', event.id, 'calendar', 'attention', `${event.name}: ${event.label.toLocaleLowerCase('pt-BR')}`, `Evento cadastrado em ${event.days} dias. Confira as condições do produto.`, 'Investimentos', event.date);
   }
   const issuers = new Map<string, number>();
   for (const r of d.investments)

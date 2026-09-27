@@ -1,23 +1,46 @@
 import { PurchasingPowerTools, PortfolioComparison } from '../components/purchasing-power-tools';
+import { InvestmentPortfolioDetails } from '../components/investment-portfolio-details';
 import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
 import { Card, Metrics, Bar, Records } from '../components/common';
-import { num, money, dec } from '../model';
+import { num, money, dec, today } from '../model';
+import { investmentPortfolio, type PositionQuote } from '../services/investment-portfolio';
+import { paidIncome, cashCharge } from '../services/investment-ledger';
 import { financial, investmentBalance, sum, progress } from '../calculations';
 import { type ViewProps, value, dateCol, amountCol } from './shared';
 import { annualizePercentOfCdi } from '../services/market-rates';
 import { useEconomicIndicators } from '../hooks/use-economic-indicators';
 import { EconomicIndicatorsPanel } from '../components/economic-indicators';
-import { InvestmentIntelligence, Diversification } from '../components/investment-intelligence';
+import { InvestmentIntelligence } from '../components/investment-intelligence';
 import { loadQuote, type Quote } from '../services/market-quotes';
 import { estimateSavingsYield, normalizeAnniversaryDay, reconstructSavingsMinimumBalance, savingsPeriod } from '../services/savings-yield';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 export function Investments(p: ViewProps) {
   const d = p.data;
   const economic = useEconomicIndicators();
   const { rates } = economic;
   const [simValue, setSimValue] = useState(5000), [simMonths, setSimMonths] = useState(12), [simRate, setSimRate] = useState(10), [simType, setSimType] = useState('Prefixado');
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
-  useEffect(() => { let active = true; void Promise.all(d.investments.filter((r) => ['Ação', 'ETF', 'FII', 'Criptomoeda'].includes(String(r.category))).map(async (r) => { const crypto = String(r.category) === 'Criptomoeda'; const symbol = crypto ? String(r.coinGeckoId || '') : String(r.ticker || ''); if (!symbol) return; const quote = await loadQuote(symbol, crypto ? 'crypto' : 'b3'); if (quote && active) setQuotes((old) => ({ ...old, [r.id]: quote })); })); return () => { active = false; }; }, [d.investments]);
+  const [visibleCount, setVisibleCount] = useState(30);
+  const visibleInvestments = useMemo(() => d.investments.slice(0, visibleCount), [d.investments, visibleCount]);
+  const at = today();
+  const positions = useMemo(() => {
+    const observations = new Map<string, PositionQuote>(Object.entries(quotes).map(([id,q]) => [id,{price:q.price,currency:q.currency,date:q.updatedAt.slice(0,10)}]));
+    return new Map(investmentPortfolio(d,at,observations).positions.map(position=>[position.asset.id,position]));
+  }, [d, at, quotes]);
+  useEffect(() => {
+    let active = true;
+    const requests = new Map<string, Promise<Quote | undefined>>();
+    void Promise.allSettled(visibleInvestments.filter(r => ['Ação','ETF','FII','Criptomoeda'].includes(String(r.category))).map(async r => {
+      const kind = r.category === 'Criptomoeda' ? 'crypto' : 'b3';
+      const symbol = String(kind === 'crypto' ? r.coinGeckoId || '' : r.ticker || '').trim();
+      if (!symbol) return null;
+      const key = `${kind}:${symbol.toUpperCase()}`;
+      if (!requests.has(key)) requests.set(key, loadQuote(symbol, kind));
+      const quote = await requests.get(key);
+      return quote ? [r.id, quote] as const : null;
+    })).then(results => { if (active) setQuotes(Object.fromEntries(results.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : []))); });
+    return () => { active = false; };
+  }, [visibleInvestments]);
   const f = financial(d),
     emergency = d.investments
       .filter((r) => r.category === 'reserva de emergência')
@@ -53,17 +76,18 @@ export function Investments(p: ViewProps) {
         ]}
       />
       </details><EconomicIndicatorsPanel economic={economic} />
+      <InvestmentPortfolioDetails data={d} inflation={economic.inflation?.months || []} configure={() => p.edit('settings', d.settings)}/>
       <section className="content-section"><div className="section-heading"><h2>Sua carteira</h2><button onClick={() => p.edit('movements')}>Registrar movimentação</button></div>
       {!d.investments.length && <EmptyState title="Seu patrimônio começa aqui" description="Adicione um investimento para acompanhar seu saldo e suas movimentações." action={<button onClick={() => p.edit('investments')}>Adicionar investimento</button>} />}
       {['Renda fixa', 'Renda variável', 'Cripto', 'Outros'].map((group) => {
-        const groupRows = d.investments.filter((r) => {
+        const groupRows = visibleInvestments.filter((r) => {
           const type = String(r.category);
           const bucket = type === 'Criptomoeda' ? 'Cripto' : ['Ação','ETF','FII'].includes(type) ? 'Renda variável' : ['CDB','LCI','LCA','Poupança','Conta remunerada','reserva de emergência'].includes(type) || type.startsWith('Tesouro') ? 'Renda fixa' : 'Outros';
           return bucket === group;
         });
-        return groupRows.length > 0 && <section className="portfolio-group" key={group}><h2>{group}</h2>{groupRows.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.indexer) === 'CDI' ? dec(num(r.indexerPercent)) + '% CDI' : String(r.ticker || r.category)} value={money(quotes[r.id] ? Number(r.quantity || 0) * quotes[r.id].price : investmentBalance(d, r))} context={quotes[r.id] ? 'Valor pela cotação disponível' : 'Saldo registrado'} action={<button aria-label={'Editar ' + r.name} onClick={() => p.edit('investments', r)}>Editar</button>}><InvestmentIntelligence data={d} row={r} economic={economic}/></FinancialItem>)}</section>;
-      })}</section>
-      <Diversification data={d}/><PortfolioComparison data={d} economic={economic}/><PurchasingPowerTools economic={economic}/><details className="disclosure"><summary>Poupança · rendimento e aniversário</summary>{savings.map((r) => { const day = num(r.anniversaryDay) || (r.date ? normalizeAnniversaryDay(Number(String(r.date).slice(-2))) : 0); const period = day ? savingsPeriod(day) : undefined; const linked = d.movements.filter((m) => m.investmentId === r.id); const startBalance = period ? linked.filter((m) => String(m.date) < period.start).reduce((balance, m) => balance + num(m.amount) * (['retirada', 'perda'].includes(String(m.kind)) ? -1 : 1), String(r.date) <= period.start ? num(r.balance) : 0) : undefined; const minimum = period && startBalance !== undefined && period.complete ? reconstructSavingsMinimumBalance(startBalance, linked.map((m) => ({ id: m.id, date: String(m.date), amount: num(m.amount), kind: String(m.kind) })), period.start, period.end) : undefined; const result = day && rates.tr && rates.selicTarget ? estimateSavingsYield({ balance: investmentBalance(d, r), anniversaryDay: day, trPercent: rates.tr.rawValue, targetSelicAnnualPercent: rates.selicTarget.value, actualMinimumBalance: minimum, periodComplete: period?.complete }) : undefined; return <Card key={r.id} title="Poupança"><div className="inline-stats"><div className="detail"><span>Regra atual</span><strong>{rates.selicTarget && rates.selicTarget.value > 8.5 ? 'TR + 0,5% a.m.' : 'TR + 70% da Meta Selic'}</strong></div><div className="detail"><span>Meta Selic atual</span><strong>{rates.selicTarget ? `${dec(rates.selicTarget.value)}% a.a.` : 'Indisponível'}</strong></div><div className="detail"><span>TR</span><strong>{rates.tr ? `${dec(rates.tr.rawValue, 4)}% a.m.` : 'Indisponível'}</strong></div><div className="detail"><span>Período do aniversário</span><strong>{period ? `${period.start} a ${period.end}` : 'Complete os dados'}</strong></div>{result?.minimumBalance !== undefined && <div className="detail"><span>Menor saldo do período</span><strong>{money(result.minimumBalance)}</strong><small>{result.status === 'actual' ? 'Atual' : 'Estimado'}</small></div>}</div>{result?.estimatedYieldCents !== undefined ? <p className="inline-note">Rendimento no aniversário: <strong>{money(result.estimatedYieldCents / 100)}</strong> · {result.status === 'actual' ? 'calculado pelo menor saldo realizado.' : 'estimativa baseada nos indicadores atuais.'}</p> : <p className="inline-note">Complete os dados para ativar o cálculo automático da poupança.</p>}</Card>; })}
+        return groupRows.length > 0 && <section className="portfolio-group" key={group}><h2>{group}</h2>{groupRows.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.indexer) === 'CDI' ? dec(num(r.indexerPercent)) + '% CDI' : String(r.ticker || r.category)} value={positions.get(r.id)?.valueCents == null ? 'Indisponível' : money(positions.get(r.id)!.valueCents! / 100)} context={positions.get(r.id)?.valuation === 'cotação' ? 'Cotação disponível · ' + quotes[r.id]?.updatedAt.slice(0,10) : 'Saldo registrado'} action={<button aria-label={'Editar ' + r.name} onClick={() => p.edit('investments', r)}>Editar</button>}><InvestmentIntelligence data={d} row={r} economic={economic}/></FinancialItem>)}</section>;
+      })}{visibleCount < d.investments.length && <button onClick={() => setVisibleCount(count => count + 30)}>Mostrar mais investimentos</button>}</section>
+      <PortfolioComparison data={d} economic={economic}/><PurchasingPowerTools economic={economic}/><details className="disclosure"><summary>Poupança · rendimento e aniversário</summary>{savings.map((r) => { const day = num(r.anniversaryDay) || (r.date ? normalizeAnniversaryDay(Number(String(r.date).slice(-2))) : 0); const period = day ? savingsPeriod(day) : undefined; const linked = d.movements.filter((m) => m.investmentId === r.id && !paidIncome(m) && !cashCharge(m)); const startBalance = period ? linked.filter((m) => String(m.date) < period.start).reduce((balance, m) => balance + num(m.amount) * (['retirada', 'perda'].includes(String(m.kind)) ? -1 : 1), String(r.date) <= period.start ? num(r.balance) : 0) : undefined; const minimum = period && startBalance !== undefined && period.complete && (!r.valuationDate || String(r.valuationDate) > period.end) ? reconstructSavingsMinimumBalance(startBalance, linked.map((m) => ({ id: m.id, date: String(m.date), amount: num(m.amount), kind: String(m.kind) })), period.start, period.end) : undefined; const result = day && rates.tr && rates.selicTarget ? estimateSavingsYield({ balance: investmentBalance(d, r), anniversaryDay: day, trPercent: rates.tr.rawValue, targetSelicAnnualPercent: rates.selicTarget.value, actualMinimumBalance: minimum, periodComplete: period?.complete }) : undefined; return <Card key={r.id} title="Poupança"><div className="inline-stats"><div className="detail"><span>Regra atual</span><strong>{rates.selicTarget && rates.selicTarget.value > 8.5 ? 'TR + 0,5% a.m.' : 'TR + 70% da Meta Selic'}</strong></div><div className="detail"><span>Meta Selic atual</span><strong>{rates.selicTarget ? `${dec(rates.selicTarget.value)}% a.a.` : 'Indisponível'}</strong></div><div className="detail"><span>TR</span><strong>{rates.tr ? `${dec(rates.tr.rawValue, 4)}% a.m.` : 'Indisponível'}</strong></div><div className="detail"><span>Período do aniversário</span><strong>{period ? `${period.start} a ${period.end}` : 'Complete os dados'}</strong></div>{result?.minimumBalance !== undefined && <div className="detail"><span>Menor saldo do período</span><strong>{money(result.minimumBalance)}</strong><small>{result.status === 'actual' ? 'Atual' : 'Estimado'}</small></div>}</div>{result?.estimatedYieldCents !== undefined ? <p className="inline-note">Rendimento no aniversário: <strong>{money(result.estimatedYieldCents / 100)}</strong> · {result.status === 'actual' ? 'calculado pelo menor saldo realizado.' : 'estimativa baseada nos indicadores atuais.'}</p> : <p className="inline-note">Complete os dados para ativar o cálculo automático da poupança.</p>}</Card>; })}
       </details><details className="disclosure"><summary>Simular rendimento</summary><Card title="Quanto pode render?">
         <div className="form-grid compact-form">
           <label><span>Tipo</span><select value={simType} onChange={(e) => setSimType(e.target.value)}><option>Prefixado</option><option>Poupança</option></select></label><label><span>Valor (R$)</span><input type="number" min="0" value={simValue} onChange={(e) => setSimValue(Number(e.target.value) || 0)} /></label>
@@ -114,7 +138,7 @@ export function Investments(p: ViewProps) {
           { label: 'Categoria', render: (r) => String(r.category) },
           {
             label: 'Saldo atual',
-            render: (r) => money(quotes[r.id] ? Number(r.quantity || 0) * quotes[r.id].price : investmentBalance(d, r)),
+            render: (r) => positions.get(r.id)?.valueCents == null ? 'Indisponível' : money(positions.get(r.id)!.valueCents! / 100),
           },
           {
             label: 'Rentabilidade informada',
@@ -139,7 +163,7 @@ export function Investments(p: ViewProps) {
                 d.investments.find((x) => x.id === r.investmentId)?.name || '',
               ),
           },
-          { label: 'Tipo', render: (r) => String(r.kind) },
+          { label: 'Tipo', render: (r) => String(r.operation && r.operation !== 'padrão' ? r.operation : r.kind) },
           amountCol,
         ]}
       />

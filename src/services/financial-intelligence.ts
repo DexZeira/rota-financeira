@@ -1,5 +1,7 @@
 import { type Data, type Row, num, validDate } from '../model';
 import { investmentBalance } from '../calculations';
+import { investmentPosition } from './investment-portfolio';
+import { paidIncome, cashCharge } from './investment-ledger';
 import { toCents, fromCents } from './money-codec';
 import { annualizePercentOfCdi, type MarketRates } from './market-rates';
 import { type MarketExpectations } from './market-expectations';
@@ -29,11 +31,12 @@ export function investmentProjection(r: Row, rates: MarketRates, inflation: numb
 }
 export function investmentRecordedResult(d: Data, r: Row, history: InflationHistory | undefined, at: string) {
   const movements = d.movements.filter((m) => m.investmentId === r.id && String(m.date) <= at);
-  const capital = fromCents(toCents(num(r.balance)) + movements.reduce((s, m) => s + (m.kind === 'aporte' ? toCents(num(m.amount)) : m.kind === 'retirada' ? -toCents(num(m.amount)) : 0), 0));
+  const position = investmentPosition(r, movements, at);
+  const capital = fromCents(position.contributionsCents - position.withdrawalsCents);
   const balance = investmentBalance(d, r, at);
-  const profit = fromCents(toCents(balance) - toCents(capital));
+  const profit = fromCents(position.netResultCents ?? (toCents(balance) - toCents(capital)));
   // Cash-flow timing needs a full index path; never divide all flows by an opening balance.
-  const singleLot = !movements.some((m) => m.kind === 'aporte' || m.kind === 'retirada');
+  const singleLot = !movements.some((m) => m.kind === 'aporte' || m.kind === 'retirada' || paidIncome(m) || cashCharge(m) || num(m.feesCents) || num(m.taxCents));
   const first = String(r.date).slice(0, 7), last = history?.months.at(-1)?.month;
   const referenceDate = last ? new Date(Date.UTC(Number(last.slice(0, 4)), Number(last.slice(5)), 0)).toISOString().slice(0, 10) : null;
   const observed = singleLot && validDate(String(r.date)) && last && referenceDate && at >= referenceDate && first <= last

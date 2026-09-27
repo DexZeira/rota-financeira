@@ -81,7 +81,7 @@ export function calculateNetWorth(d: Data, at: string) {
   const assets = assetValues(d, at);
   let assetsCents = 0,
     vehiclesCents = 0,
-    missingValues = 0;
+    missingValues = d.investments.filter(row => String(row.date) <= at && row.valuationDate && String(row.valuationDate) <= at && row.valuationCurrency && row.valuationCurrency !== 'BRL' && !(num(row.fxToBRL) > 0)).length;
   for (const item of assets) {
     if (!item.current) continue;
     if (item.valueCents === null) {

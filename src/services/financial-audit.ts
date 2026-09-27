@@ -1,3 +1,4 @@
+import { investmentLedger } from './investment-ledger';
 import {
   collections,
   type Collection,
@@ -296,31 +297,11 @@ export function auditFinancialData(
     movements.get(key)!.push(m);
   }
   for (const r of d.investments) {
-    let balance = num(r.balance);
-    for (const m of (movements.get(r.id) || []).sort((a, b) =>
-      String(a.date).localeCompare(String(b.date)),
-    )) {
-      if (String(m.date) < String(r.date))
-        add(
-          'movements',
-          m.id,
-          'date',
-          'Movimentação anterior ao saldo inicial',
-          'Confira a data de abertura do investimento e a movimentação.',
-        );
-      balance +=
-        num(m.amount) *
-        (['retirada', 'perda'].includes(String(m.kind)) ? -1 : 1);
-      if (balance < -0.001) {
-        add(
-          'investments',
-          r.id,
-          'negative',
-          'Retirada ou perda acima do saldo',
-          'O histórico produz saldo negativo; confira os valores e a ordem das movimentações.',
-        );
-        break;
-      }
+    try {
+      for (const issue of investmentLedger(r, movements.get(r.id) || [], '9999-12-31').issues)
+        add('investments', r.id, 'negative', 'Histórico de posição inconsistente', issue);
+    } catch {
+      add('investments', r.id, 'negative', 'Posição não verificável', 'Confira valores e quantidades do histórico.');
     }
   }
   for (const r of d.assetCostLinks)
@@ -508,7 +489,8 @@ export function auditFinancialData(
     periods.add(c.period);
   }
   if (
-    num(d.planningVersion) > 6 ||
+    num(d.planningVersion) > 7 ||
+    num(d.investmentVersion) > 1 ||
     num(d.reportingVersion) > 1 ||
     num(d.dataVersion) > 6
   )

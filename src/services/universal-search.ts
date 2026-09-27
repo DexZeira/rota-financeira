@@ -61,6 +61,7 @@ export function buildSearchIndex(d: Data, at: string): IndexedResult[] {
     });
   };
   const sources = [
+    ['movements', 'Investimentos', 'Investimentos', 'amount'],
     ['expenses', 'Gastos', 'Gastos', 'amount'],
     ['bankReceipts', 'Receitas', 'Importar', 'amountCents'],
     ['work', 'Trabalho', 'Trabalho', 'revenue'],
@@ -85,7 +86,7 @@ export function buildSearchIndex(d: Data, at: string): IndexedResult[] {
         {
           id: `${key}:${r.id}`,
           type,
-          title: String(r.name || r.activity || 'Registro'),
+          title: key === 'movements' ? String(r.operation && r.operation !== 'padrão' ? r.operation : r.kind) : String(r.name || r.activity || 'Registro'),
           subtitle: String(r.category || r.institution || r.notes || type),
           date:
             String(r.date || r.due || r.startDate || r.purchaseDate || '') ||

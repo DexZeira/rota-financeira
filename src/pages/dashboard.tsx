@@ -12,7 +12,9 @@ import { monthComparison } from '../insights';
 import { MoneyIntelligence } from '../components/money-intelligence';
 import { PhaseTwoSummary, usePhaseTwo } from '../components/planning-phase-two';
 import { NetWorthSummary } from '../components/net-worth';
+import { passiveIncome } from '../services/passive-income';
 export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
+  const receivedInvestmentIncome = passiveIncome(d, today()).thisMonthCents;
   const lastClosed = [...d.reporting.closures].filter(c => c.status === 'closed').sort((a,b) => b.period.localeCompare(a.period))[0]?.revisions.at(-1);
   const phase = usePhaseTwo(d);
   const f = financial(d),
@@ -54,6 +56,7 @@ export function Dashboard({ data: d, edit, go, saveSettings }: ViewProps) {
       <AlertSummary data={d} go={go}/>
       <PhaseTwoSummary data={d} go={go}/>
       <NetWorthSummary data={d} go={go}/>
+      {receivedInvestmentIncome > 0 && <p className="inline-note">Investimentos: {money(receivedInvestmentIncome / 100)} recebidos em caixa neste mês. <button onClick={() => go('Investimentos')}>Ver renda recebida</button></p>}
       <nav className="quick-actions" aria-label="Ações rápidas">
         <QuickAction label="Trabalho" onClick={() => edit('work')}><BriefcaseBusiness/></QuickAction>
         <QuickAction label="Gasto" onClick={() => edit('expenses')}><Receipt/></QuickAction>

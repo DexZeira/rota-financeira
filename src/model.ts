@@ -1,3 +1,4 @@
+import { investmentOperations, incomeOperations, quantityUnits } from './services/investment-ledger';
 import { emptyReporting, type ReportingState } from './services/reporting-state';
 import { defaultAliases } from './component-matching';
 import { validateAttribution } from './expense-allocation';
@@ -38,7 +39,7 @@ export const collections = [
   'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
+export type Data = { dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; investmentVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;
@@ -307,9 +308,20 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     opt('indexer', 'Indexador', ['CDI', 'Selic']),
     f('indexerPercent', 'Percentual do indexador', 'number'),
     f('maturity', 'Vencimento', 'date'),
-    f('currentValue', 'Valor atual (opcional)', 'number'),
+    f('currentValue', 'Valor atual total (moeda da avaliação)', 'number', {nullable:true}),
+    f('valuationDate', 'Data da avaliação manual', 'date'),
+    opt('valuationCurrency', 'Moeda da avaliação manual', ['BRL','USD','outra']),
+    f('fxToBRL', 'Câmbio manual para BRL (por unidade)', 'number', {nullable:true}),
+    f('openingCostCents', 'Custo de aquisição da posição inicial (R$; vazio = desconhecido)', 'number', {nullable:true,integer:true}),
+    opt('costsKnown', 'Custos e impostos do histórico conferidos', ['não','sim']),
+    opt('benchmark', 'Benchmark do ativo', ['Nenhum','CDI','Selic','IPCA','IPCA + taxa','Personalizado']),
+    f('benchmarkRate', 'Taxa do benchmark personalizado / adicional (% a.a.)', 'number', {nullable:true,signed:true}),
+    f('lockupEnd', 'Fim da carência', 'date'),
+    f('couponDate', 'Próximo cupom (data confirmada)', 'date'),
+    f('amortizationDate', 'Amortização programada', 'date'),
+    f('redemptionDate', 'Resgate programado', 'date'),
     f('quantity', 'Quantidade', 'number'),
-    f('averagePrice', 'Preço médio (R$)', 'number'),
+    f('averagePrice', 'Preço médio da posição inicial (R$)', 'number'),
     f('objective', 'Objetivo'),
     f('issuer', 'Emissor (opcional)'),
     opt('liquidity', 'Liquidez informada', ['não informado', 'imediata', 'D+1', 'D+n', 'com carência', 'somente no vencimento', 'negociável com marcação a mercado']),
@@ -323,6 +335,11 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     f('investmentId', 'Investimento', 'select', { required: true }),
     date,
     opt('kind', 'Movimentação', ['aporte', 'retirada', 'rendimento', 'perda']),
+    opt('operation', 'Detalhamento da movimentação', [...investmentOperations]),
+    f('units', 'Quantidade negociada (até 8 casas)', 'number', {nullable:true}),
+    opt('paidOut', 'Rendimento recebido no caixa', ['não','sim']),
+    f('feesCents', 'Custos pagos em caixa (R$; vazio = desconhecido)', 'number', {nullable:true,integer:true}),
+    f('taxCents', 'Impostos pagos em caixa (R$; vazio = desconhecido)', 'number', {nullable:true,integer:true}),
     amount,
     notes,
   ],
@@ -402,6 +419,8 @@ export const schemas: Record<Collection | 'settings' | 'bike', Field[]> = {
     f('nearDays', 'Avisar manutenção a quantos dias', 'number', {
       integer: true,
     }),
+    opt('portfolioBenchmark', 'Benchmark principal da carteira', ['Nenhum','CDI','Selic','IPCA','IPCA + taxa','Personalizado']),
+    f('portfolioBenchmarkRate', 'Taxa personalizada / adicional do benchmark (% a.a.)', 'number', {nullable:true,signed:true}),
     opt('theme', 'Tema', ['claro', 'escuro', 'sistema']),
   ],
   bike: [
@@ -476,7 +495,8 @@ export function defaults(): Data {
   const d = {
     dataVersion: 4,
     intelligenceVersion: 1,
-    planningVersion: 6,
+    planningVersion: 7,
+    investmentVersion: 1,
     reportingVersion: 1,
     reporting: emptyReporting(),
     assetVersion: 1,
@@ -615,6 +635,22 @@ export function validateRow(key: Collection | 'settings' | 'bike', r: Row) {
       throw Error('Informe uma data-base válida, até hoje e anterior ao prazo.');
     if (r.inflationMode === 'Taxa personalizada' && (typeof r.inflationRate !== 'number' || r.inflationRate <= -100 || r.inflationRate > 100))
       throw Error('Inflação personalizada deve ser maior que -100% e até 100% a.a.');
+  }
+  if (key === 'investments') {
+    quantityUnits(num(r.quantity));
+    if (r.valuationDate && String(r.valuationDate) < String(r.date)) throw Error('Avaliação anterior à posição inicial.');
+    if (r.maturity && String(r.maturity)<String(r.date)) throw Error('Vencimento anterior ao início.');
+    if (r.fxToBRL !== null && r.fxToBRL !== undefined && num(r.fxToBRL)<=0) throw Error('Câmbio deve ser positivo ou desconhecido.');
+    if (['Personalizado','IPCA + taxa'].includes(String(r.benchmark)) && (typeof r.benchmarkRate!=='number'||r.benchmarkRate<=-100||r.benchmarkRate>1000)) throw Error('Informe taxa válida para o benchmark.');
+  }
+  if (key === 'settings' && ['Personalizado','IPCA + taxa'].includes(String(r.portfolioBenchmark)) && (typeof r.portfolioBenchmarkRate!=='number'||r.portfolioBenchmarkRate<=-100||r.portfolioBenchmarkRate>1000)) throw Error('Informe taxa válida para o benchmark da carteira.');
+  if (key === 'movements') {
+    if (r.units !== null && r.units !== undefined) quantityUnits(num(r.units));
+    const operation=String(r.operation||'padrão');
+    const expected=operation==='compra'?'aporte':['venda','resgate','amortização'].includes(operation)?'retirada':incomeOperations.includes(operation)?'rendimento':['taxa','imposto'].includes(operation)?'perda':null;
+    if (expected && r.kind!==expected) throw Error('Detalhamento incompatível com a movimentação selecionada.');
+    if (r.paidOut==='sim' && r.kind!=='rendimento') throw Error('Somente rendimento pode ser recebido no caixa.');
+    if (incomeOperations.includes(operation) && r.paidOut!=='sim') throw Error('Provento recebido deve ser marcado como recebido no caixa. Para reinvestimento, registre um aporte separado.');
   }
   if (key === 'investments' && num(r.annualFeePercent) > 100) throw Error('Taxas anuais devem ficar entre 0% e 100%.');
   if (key === 'expenses' || key === 'services') validateAttribution(r);

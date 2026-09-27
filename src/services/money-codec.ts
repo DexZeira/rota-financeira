@@ -9,7 +9,7 @@ export const moneyFields = {
   debts: ['installmentAmount', 'installment', 'balance', 'original'],
   payments: ['amount'], maintenance: ['estimated', 'value'],
   services: ['amount', 'workAmount'], costs: ['amount'],
-  investments: ['balance'], movements: ['amount'],
+  investments: ['balance', 'currentValue'], movements: ['amount'],
   plans: ['target', 'current', 'bikeValue'], planTransactions: ['amount'], fund: ['amount'],
   recurrences: ['amount'],
 } as const;
@@ -39,6 +39,8 @@ function convert(value: Record<string, unknown>, decode: boolean) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
       const row = { ...input } as Row;
       for (const field of fields) if (row[field] !== undefined && row[field] !== null) {
+        // Older v6 snapshots stored this optional valuation in currency units.
+        if (group === 'investments' && field === 'currentValue' && value.investmentVersion !== 1) continue;
         if (typeof row[field] !== 'number') throw Error('Valor monetário inválido.');
         row[field] = decode ? fromCents(row[field]) : toCents(row[field]);
       }

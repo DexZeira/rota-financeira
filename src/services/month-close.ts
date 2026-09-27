@@ -1,4 +1,5 @@
 import { assetCashDelta } from './assets';
+import { investmentLedger } from './investment-ledger';
 import { type Data, type Row, collections, num, validDate } from '../model';
 import { calculateNetWorth } from './net-worth';
 import { toCents } from './money-codec';
@@ -104,15 +105,18 @@ export async function buildMonthlySnapshot(
       movements.filter((r) => r.kind === 'retirada'),
       'amount',
     );
-  const investmentReturnCents =
-    total(
-      movements.filter((r) => r.kind === 'rendimento'),
-      'amount',
-    ) -
-    total(
-      movements.filter((r) => r.kind === 'perda'),
-      'amount',
-    );
+  const investmentRows = new Map<string, Row[]>();
+  for (const row of d.movements) {
+    const id = String(row.investmentId);
+    if (!investmentRows.has(id)) investmentRows.set(id, []);
+    investmentRows.get(id)!.push(row);
+  }
+  // Book change plus cash effect cancels transfers; realized gains and cash
+  // income remain once, net of explicit charges. Opening positions are separate.
+  const investmentReturnCents = d.investments.reduce((sum, asset) => sum +
+    investmentLedger(asset, investmentRows.get(asset.id) || [], through).entries
+      .filter(entry => inPeriod(entry.row))
+      .reduce((subtotal, entry) => subtotal + entry.bookDeltaCents + entry.cashCents, 0), 0);
   const categories: Record<string, number> = Object.create(null),
     expenseGroups: Record<string, number> = Object.create(null);
   const policies = new Map(

@@ -1,5 +1,6 @@
 import { type Data, type Row, num, validDate } from '../model';
 import { toCents } from './money-codec';
+import { movementCashCents } from './investment-ledger';
 import { assetRows } from './assets';
 export type FinancialTimelineEvent = {
   id: string;
@@ -93,11 +94,11 @@ export function generateFinancialTimeline(
       'movements',
       r,
       'investment',
-      String(r.kind) +
+        String(r.operation && r.operation !== 'padrão' ? r.operation : r.kind) +
         ' · ' +
         (investments.get(String(r.investmentId)) || 'Investimento'),
       toCents(num(r.amount)),
-      r.kind === 'aporte' ? 'out' : r.kind === 'retirada' ? 'in' : 'neutral',
+        movementCashCents(r) < 0 ? 'out' : movementCashCents(r) > 0 ? 'in' : 'neutral',
     );
   for (const r of d.services)
     push(
