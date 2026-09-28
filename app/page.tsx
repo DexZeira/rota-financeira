@@ -1,5 +1,6 @@
 import { startupHealth, recoveryCopy } from '../src/services/recovery';
 import { withWriteLock, observeChanges, publishChange } from '../src/services/tab-coordination';
+import { restoredOpenFinance } from '../src/services/open-finance/state';
 import { inspectBackup } from '../src/services/emergency-backup';
 import { recordDiagnostic } from '../src/services/app-diagnostics';
 import { useLocalNotifications } from '../src/hooks/use-local-notifications';
@@ -683,6 +684,7 @@ export default function Home() {
                   data={data}
                   edit={edit}
                   syncStatus={cloud.status}
+                  onSaveOpenFinance={async (next, base) => { if (current.current !== base) throw Error("Os dados mudaram. Revise novamente antes de salvar."); await commit(next); }}
                   notificationOwner={notificationOwner}
                   notificationDiagnostic={notificationDiagnostic}
                   onSaveNotifications={async (notificationPreferences) => { await commit({ ...current.current, notificationPreferences }); setMessage('Preferências de notificações salvas.'); }}
@@ -865,14 +867,14 @@ export default function Home() {
                       '';
                     localStorage.setItem(`rota-corrupted-recovery:${localStorage.getItem(OWNER_KEY) || 'guest'}`, raw);
                     download(raw, 'rota-dados-preservados.json');
-                    const restored = save(localStorage, incoming);
+                    const restored = save(localStorage, incoming.openFinance ? {...incoming,openFinance:restoredOpenFinance(incoming.openFinance)} : incoming);
                     disk.current = localStorage.getItem(STORAGE_KEY) || '';
                     setData(restored);
                     setBlocked(false);
                     setError('');
                     });
                   } else {
-                    await commit(incoming, () => { recovery(); exportBackup(); });
+                    await commit(incoming.openFinance ? {...incoming,openFinance:restoredOpenFinance(incoming.openFinance)} : incoming, () => { recovery(); exportBackup(); });
                   }
                   setIncoming(null);
                   setUndo(null);

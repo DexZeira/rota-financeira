@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 for (const file of [
+  'tests/open-finance.test.ts',
+  'src/services/open-finance/types.ts', 'src/services/open-finance/errors.ts', 'src/services/open-finance/provider.ts', 'src/services/open-finance/mock-provider.ts', 'src/services/open-finance/state.ts', 'src/services/open-finance/sync.ts', 'src/services/open-finance/reconciliation.ts',
   'src/services/app-diagnostics.ts', 'src/services/storage-health.ts', 'src/services/emergency-backup.ts', 'src/services/tab-coordination.ts', 'src/services/recovery.ts', 'tests/phase-ten.test.ts',
   'src/services/financial-answer.ts', 'src/services/financial-assistant.ts', 'src/services/notification-preferences.ts', 'src/services/local-notifications.ts', 'tests/phase-nine.test.ts',
   'src/services/investment-period.ts',
@@ -108,6 +110,7 @@ const result = spawnSync(
     '.test-output/tests/money-quota.test.js',
     '.test-output/tests/virtual-records.test.js',
     '.test-output/tests/cloud-codec.test.js',
+    '.test-output/tests/open-finance.test.js',
     '.test-output/tests/phase-ten.test.js',
     '.test-output/tests/auth-session.test.js',
     '.test-output/tests/auth-config.test.js',

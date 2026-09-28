@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig(({ mode }) => ({
   // Browser fixtures never load production environment files or credentials.
   ...(mode === 'e2e' ? { envDir: false as const, define: {
+    'import.meta.env.VITE_OPEN_FINANCE_MODE': JSON.stringify('mock'),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://rota-test.supabase.co'),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify('sb_publishable_deterministic_fixture'),
   } } : {}),

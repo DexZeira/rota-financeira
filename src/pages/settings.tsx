@@ -1,3 +1,4 @@
+import { ConnectedAccounts } from '../components/connected-accounts';
 import { NotificationSettings } from '../components/notification-settings';
 import { DataSecurity } from '../components/data-security';
 import type { NotificationPreferences } from '../services/notification-preferences';
@@ -25,9 +26,10 @@ export function SettingsView({
   onImport,
   onReset,
   onRecovery,
-  onSaveSettings, onSaveNotifications, notificationOwner, notificationDiagnostic,
+  onSaveOpenFinance, onSaveSettings, onSaveNotifications, notificationOwner, notificationDiagnostic,
 }: {
   data: Data;
+  onSaveOpenFinance: (next: Data, base: Data) => Promise<void>;
   syncStatus: string;
   onSaveNotifications: (p: NotificationPreferences) => void | Promise<void>;
   notificationOwner: string;
@@ -78,6 +80,7 @@ export function SettingsView({
     <>
 
       <div className="settings-groups">
+<Disclosure title="Contas conectadas" description="Instituições, consentimento e revisão bancária"><ConnectedAccounts key={notificationOwner} data={d} owner={notificationOwner} onSave={onSaveOpenFinance}/></Disclosure>
 <Disclosure title="Dados e Segurança" description="Quota, backup de emergência e diagnóstico privado"><DataSecurity data={d} syncStatus={syncStatus}/></Disclosure>
 <Disclosure title="Notificações" description="Opcional, com controle de privacidade"><NotificationSettings key={JSON.stringify(d.notificationPreferences)+notificationOwner} preferences={d.notificationPreferences} owner={notificationOwner} onSave={onSaveNotifications} diagnostic={notificationDiagnostic}/></Disclosure>
 <Disclosure title="Planejamento" description="Rotina de trabalho, saldo e custos essenciais">      <Card

@@ -162,6 +162,9 @@ export function buildSearchIndex(d: Data, at: string): IndexedResult[] {
       route: 'Importar',
       sourceId: s.key,
     });
+  for (const c of d.openFinance?.connections || []) add({ id: `bank-connection:${c.id}`, type: 'Contas conectadas', title: c.institutionName, subtitle: c.status, route: 'Configurações', sourceId: c.id });
+  for (const a of d.openFinance?.accounts || []) add({ id: `bank-account:${a.id}`, type: 'Contas conectadas', title: a.name, subtitle: a.maskedNumber, route: 'Configurações', sourceId: a.id });
+  for (const r of d.openFinance?.transactions || []) if (!r.reviewed) add({ id: `bank-transaction:${r.id}`, type: 'Contas conectadas', title: r.transaction.description, subtitle: r.status, date: r.transaction.date, amountCents: r.transaction.amountCents, route: 'Configurações', sourceId: r.id });
   return results;
 }
 function metadata(r: Row) {

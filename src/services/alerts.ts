@@ -93,6 +93,12 @@ export function deriveAlerts(
       ...(date ? { date } : {}),
     });
   };
+  for (const c of d.openFinance?.connections || []) {
+    if (c.status==='revoked') continue;
+    if (c.errorCode) add('system',c.id,'bank-sync','attention','Sincronização bancária requer atenção','Revise a conexão em Contas conectadas.','Configurações');
+    if (c.expiresAt && c.expiresAt.slice(0,10)<=new Date(Date.parse(at+'T12:00:00Z')+7*86400000).toISOString().slice(0,10)) add('system',c.id,'bank-consent','attention','Revise o consentimento bancário','O acesso expirou ou expira nos próximos sete dias.','Configurações');
+    if (c.lastSuccessfulSyncAt && Date.parse(at+'T12:00:00Z')-Date.parse(c.lastSuccessfulSyncAt)>86400000) add('system',c.id,'bank-stale','info','Dados bancários desatualizados','Última sincronização há mais de 24 horas.','Configurações');
+  }
   for (const b of planning.budget.rows) {
     const type =
       b.status !== 'normal'

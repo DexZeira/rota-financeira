@@ -1,3 +1,4 @@
+import { validateOpenFinance } from './open-finance/state';
 import { validateNotificationPreferences } from './notification-preferences';
 import { investmentLedger } from './investment-ledger';
 import { emptyReporting, validateReporting } from './reporting-state';
@@ -28,7 +29,8 @@ export const FUTURE_VERSION_ERROR = 'Estes dados foram criados por uma versão m
 export function assertSupportedVersion(value: unknown) {
   if (!value || typeof value !== 'object') return;
   const raw = value as Record<string, unknown>;
-  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 8) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1) || (typeof raw.importVersion === 'number' && raw.importVersion > 1) || (typeof raw.reportingVersion === 'number' && raw.reportingVersion > 1) || (typeof raw.investmentVersion === 'number' && raw.investmentVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
+  if ([raw.version, raw.dataVersion, raw.schemaVersion, raw.schema_version].some((v) => typeof v === 'number' && v > MONEY_SCHEMA_VERSION) || (typeof raw.planningVersion === 'number' && raw.planningVersion > 9) || (typeof raw.assetVersion === 'number' && raw.assetVersion > 1) || (typeof raw.importVersion === 'number' && raw.importVersion > 1) || (typeof raw.reportingVersion === 'number' && raw.reportingVersion > 1) || (typeof raw.investmentVersion === 'number' && raw.investmentVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
+  if ((raw.planningVersion === 9 && raw.openFinanceVersion !== 1) || (typeof raw.openFinanceVersion === 'number' && raw.openFinanceVersion > 1)) throw Error(FUTURE_VERSION_ERROR);
   if (typeof raw.notificationVersion === 'number' && raw.notificationVersion > 1) throw Error(FUTURE_VERSION_ERROR);
   if (raw.data && typeof raw.data === 'object') assertSupportedVersion(raw.data);
 }
@@ -36,10 +38,10 @@ export function validateData(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error('Estrutura de dados inválida.');
   assertSupportedVersion(value);
-  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4, 5, 6, 7, 8].includes(Number((value as Record<string, unknown>).planningVersion)))
+  if ((value as Record<string, unknown>).dataVersion === MONEY_SCHEMA_VERSION && ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(Number((value as Record<string, unknown>).planningVersion)))
     throw Error('Backup incompleto: versão do planejamento ausente.');
   const raw = decodeMoney(value as Record<string, unknown>);
-  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(raw.planningVersion)))
+  if (raw.planningVersion !== undefined && (typeof raw.planningVersion !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(raw.planningVersion)))
     throw Error('Versão do planejamento incompatível.');
   if ((raw.assetVersion !== undefined && raw.assetVersion !== 1) || (Number(raw.planningVersion) >= 4 && raw.assetVersion !== 1)) throw Error('Versão patrimonial ausente ou incompatível.');
   if ((raw.importVersion !== undefined && raw.importVersion !== 1) || (Number(raw.planningVersion) >= 5 && raw.importVersion !== 1)) throw Error('Versão de importação ausente ou incompatível.');
@@ -58,8 +60,10 @@ export function validateData(value: unknown): Data {
   if ((raw.reportingVersion !== undefined && raw.reportingVersion !== 1) || ((Number(raw.planningVersion) >= 6 || raw.reporting !== undefined) && raw.reportingVersion !== 1)) throw Error('Versão de relatórios ausente ou incompatível.');
   if ((raw.investmentVersion !== undefined && raw.investmentVersion !== 1) || (Number(raw.planningVersion)>=7 && raw.investmentVersion!==1)) throw Error('Versão de investimentos ausente ou incompatível.');
   if ((raw.notificationVersion !== undefined && raw.notificationVersion !== 1) || (Number(raw.planningVersion)>=8 && raw.notificationVersion!==1) || (raw.notificationPreferences!==undefined && raw.notificationVersion!==1)) throw Error('Versão de notificações ausente ou incompatível.');
+  if ((raw.openFinanceVersion !== undefined && raw.openFinanceVersion !== 1) || (Number(raw.planningVersion) >= 9 && raw.openFinanceVersion !== 1) || (raw.openFinance !== undefined && raw.openFinanceVersion !== 1)) throw Error('Versão bancária ausente ou incompatível.');
   const migrated = raw.dataVersion === 0;
   const result = defaults();
+  if (raw.openFinanceVersion === 1) { result.openFinance = validateOpenFinance(raw.openFinance); result.openFinanceVersion = 1; result.planningVersion = 9; }
   if (raw.notificationVersion === 1) result.notificationPreferences = validateNotificationPreferences(raw.notificationPreferences);
   if (raw.reportingVersion === 1) result.reporting = validateReporting(raw.reporting);
   if (raw.importVersion === 1) result.imports = validateImports(raw.imports);
@@ -141,6 +145,7 @@ export function validateData(value: unknown): Data {
   return result;
 }
 export function validateRelations(d: Data) {
+  if (d.openFinance) validateOpenFinance(d.openFinance);
   validateReporting(d.reporting);
   validateImports(d.imports);
   const assets = new Map(assetRows(d).map((r) => [r.id, r]));
@@ -462,7 +467,7 @@ export function resetData(d: Data, kind: ResetKind): Data {
 }
 export const backup = (d: Data) =>
   JSON.stringify(
-    { version: MONEY_SCHEMA_VERSION, exportDate: new Date().toISOString(), data: encodeMoney(d) },
+    { version: MONEY_SCHEMA_VERSION, exportDate: new Date().toISOString(), data: encodeMoney(d.openFinance ? { ...d, openFinance: validateOpenFinance(d.openFinance) } : d) },
     null,
     2,
   );
@@ -507,6 +512,11 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
   const encoded = serializeData(normalized);
   const previous = storage.getItem?.(STORAGE_KEY) || storage.getItem?.('rota-financeira');
   const owner = storage.getItem?.('rota-cloud-owner') || 'guest';
+  if (previous && normalized.openFinanceVersion === 1) {
+    let version: unknown; try { version = JSON.parse(previous).openFinanceVersion; } catch { /* preserve bytes */ }
+    const key = `rota-money-before-migration:open-finance-v1:${owner}`;
+    if (version !== 1 && !storage.getItem?.(key)) storage.setItem(key, previous);
+  }
   if (previous) {
     let version: unknown;
     try { version = JSON.parse(previous).notificationVersion; } catch { /* preserve exact bytes */ }

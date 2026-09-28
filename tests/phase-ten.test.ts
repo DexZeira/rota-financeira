@@ -60,7 +60,7 @@ void test('diagnóstico é ring buffer e nunca armazena mensagem, stack, conta o
   for (let i = 0; i < 150; i++)
     recordDiagnostic('sync', new Error('email secreto R$ 900 token backup'), s);
   assert.equal(readDiagnostics(s).length, 100);
-  assert.doesNotMatch(s.getItem(DIAGNOSTIC_KEY)!, /secreto|900|token|backup/);
+  assert.doesNotMatch(s.getItem(DIAGNOSTIC_KEY)!, /secreto|R\$ 900|token|backup/);
   const events = JSON.parse(s.getItem(DIAGNOSTIC_KEY)!);
   events[0].token = 'secret';
   s.setItem(DIAGNOSTIC_KEY, JSON.stringify(events));

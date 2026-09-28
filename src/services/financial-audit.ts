@@ -1,3 +1,4 @@
+import { validateOpenFinance } from './open-finance/state';
 import { investmentLedger } from './investment-ledger';
 import {
   collections,
@@ -79,6 +80,12 @@ export function auditFinancialData(
       suggestedAction: { label: `Revisar em ${route}`, route },
     });
   };
+  if (d.openFinance) {
+    try { validateOpenFinance(d.openFinance); } catch { add('open-finance','state','invalid','Metadados bancários inconsistentes','Confira contas, vínculos, IDs externos e cursores.'); }
+    const linked = new Set(d.imports.links.map(l=>l.id));
+    for (const c of d.openFinance.connections) if (c.status==='connected' && !d.openFinance.accounts.some(a=>a.connectionId===c.id)) add('open-finance',c.id,'no-account','Conexão sem conta','Sincronize para consultar as contas disponíveis.','warning');
+    for (const r of d.openFinance.transactions) if (r.importLinkId && !linked.has(r.importLinkId)) add('open-finance',r.id,'missing-link','Vínculo de importação ausente','Revise o histórico de conciliação.','warning');
+  }
   const ids = new Map(
     collections.map((key) => [key, new Set(d[key].map((r) => r.id))]),
   );

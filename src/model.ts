@@ -1,3 +1,4 @@
+import type { OpenFinanceState } from './services/open-finance/types';
 import { defaultNotificationPreferences, type NotificationPreferences } from './services/notification-preferences';
 import { investmentOperations, incomeOperations, quantityUnits } from './services/investment-ledger';
 import { emptyReporting, type ReportingState } from './services/reporting-state';
@@ -40,7 +41,7 @@ export const collections = [
   'assets', 'assetValuations', 'assetCostLinks', 'netWorthSnapshots',
 ] as const;
 export type Collection = (typeof collections)[number];
-export type Data = { notificationVersion?: number; notificationPreferences: NotificationPreferences; dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; investmentVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
+export type Data = { openFinanceVersion?: number; openFinance?: OpenFinanceState; notificationVersion?: number; notificationPreferences: NotificationPreferences; dataVersion: number; intelligenceVersion?: number; planningVersion?: number; assetVersion?: number; importVersion?: number; reportingVersion?: number; investmentVersion?: number; reporting: ReportingState; imports: ImportState; settings: Row; bike: Row } & Record<
   Collection,
   Row[]
 >;

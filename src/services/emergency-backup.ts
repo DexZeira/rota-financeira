@@ -1,3 +1,4 @@
+import { restoredOpenFinance } from './open-finance/state';
 import type { Data } from '../model';
 import { backup, parseBackup } from './storage';
 async function checksum(payload: unknown) {
@@ -39,6 +40,7 @@ export async function parseEmergencyBackup(text: string): Promise<Data> {
 }
 export async function inspectBackup(text: string) {
   const data = await parseEmergencyBackup(text);
+  if (data.openFinance) data.openFinance = restoredOpenFinance(data.openFinance);
   const raw = JSON.parse(text);
   const source = raw.format === 'rota-emergency' ? raw.payload : raw;
   const stamp = raw.generatedAt ?? source.exportDate;

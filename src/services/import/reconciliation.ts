@@ -2,7 +2,7 @@ import { num, type Data } from '../../model';
 import { debtState } from '../../calculations';
 import { toCents } from '../money-codec';
 import { addDays, hasOccurrence } from '../recurrences';
-import type { Transaction, RecordKind } from './types';
+import type { Transaction, RecordKind, Source } from './types';
 import { normalizeDescription } from './transaction-normalizer';
 export type Candidate = {
   kind: RecordKind | 'debts' | 'recurrences';
@@ -14,6 +14,7 @@ export type Candidate = {
   level: 'high_confidence' | 'possible';
   reason: string;
   account?: string;
+  source?: Source;
 };
 const key = (amount: number, date: string, direction: string) =>
   `${amount}:${date}:${direction}`;
@@ -25,6 +26,7 @@ export function reconciliationIndex(d: Data) {
     linkedCosts = new Set(d.maintenance.map((r) => r.costId));
   const planned = new Map<string, Candidate[]>(),
     rules = new Map(d.recurrences.map((r) => [r.id, r]));
+  const sources = new Map(d.imports.links.filter(l=>l.recordId).map(l=>[l.recordKind+':'+l.recordId,l.transaction.source]));
   const accounts = new Map(
     d.imports.links
       .filter((l) => l.recordId)
@@ -91,6 +93,7 @@ export function reconciliationIndex(d: Data) {
       if (amount > 0)
         add({
           kind,
+          source: sources.get(kind+':'+r.id),
           account: String(r.account || accounts.get(kind + ':' + r.id) || ''),
           id: r.id,
           name: String(
@@ -168,7 +171,7 @@ export function reconcileTransaction(
       ...(index.descriptions.get(k + ':' + t.normalizedDescription) ?? []),
       ...(index.days.get(k) ?? []),
     ]) {
-      if (c.account && t.accountLabel && c.account !== t.accountLabel) continue;
+      if (c.account && t.accountLabel && c.account !== t.accountLabel && !(t.source==='open_finance' && (c.source==='csv' || c.source==='ofx'))) continue;
       const identical =
         c.date === t.date &&
         normalizeDescription(c.name) === t.normalizedDescription;
@@ -206,7 +209,7 @@ export function transferSuggestions(transactions: Transaction[]) {
           t.direction === 'debit' ? 'credit' : 'debit',
         ),
       ) ?? [])
-        if (other.accountLabel && other.accountLabel !== t.accountLabel)
+        if (other.accountLabel && (other.source === 'open_finance' && t.source === 'open_finance' ? other.accountId !== t.accountId : other.accountLabel !== t.accountLabel))
           matches.push(other.line);
     if (matches.length) result.set(t.line, matches);
   }

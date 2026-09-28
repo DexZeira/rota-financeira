@@ -365,3 +365,16 @@ test('assistente e preferências de notificações cabem nas alturas móveis', a
   await save.scrollIntoViewIfNeeded();await expect(save).toBeInViewport();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+
+test('Contas conectadas mantém autorização e controles dentro da viewport', async ({page}) => {
+  await page.goto('/'); await navigate(page,'Configurações');
+  await page.locator('summary').filter({hasText:'Contas conectadas'}).click();
+  await page.getByRole('button',{name:'Conectar instituição',exact:true}).click();
+  await page.getByRole('button',{name:'Instituição demonstração',exact:true}).click();
+  const authorize=page.getByRole('button',{name:'Autorizar demonstração'});
+  await authorize.scrollIntoViewIfNeeded(); await expect(authorize).toBeInViewport();
+  const bounds=await authorize.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
