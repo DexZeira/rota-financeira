@@ -413,3 +413,7 @@ button.event-row { border:0; border-bottom:1px solid var(--border); background:t
 .notification-settings button { justify-self: start; max-width: 100%; white-space: normal; }
 
 .dark .notification-settings input[type="time"] { color-scheme: dark; }
+/* Keep PWA actions reachable above the fixed mobile navigation. */
+.pwa-status { box-sizing: border-box; max-width: 100%; padding: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; overflow-wrap: anywhere; }
+.pwa-status output { min-width: 0; }
+@media (max-width: 767px) { .pwa-status { padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); } }

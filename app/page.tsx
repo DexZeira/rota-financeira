@@ -1,3 +1,7 @@
+import { startupHealth, recoveryCopy } from '../src/services/recovery';
+import { withWriteLock, observeChanges, publishChange } from '../src/services/tab-coordination';
+import { inspectBackup } from '../src/services/emergency-backup';
+import { recordDiagnostic } from '../src/services/app-diagnostics';
 import { useLocalNotifications } from '../src/hooks/use-local-notifications';
 import { PageSkeleton, PageHeader, Disclosure } from '../src/components/finance-ui';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -96,6 +100,7 @@ import {
   parseBackup,
   resetData,
   validateRelations,
+  assertSupportedVersion,
   type ResetKind,
 } from '../src/services/storage';
 import { financial, targets, costs } from '../src/calculations';
@@ -192,6 +197,12 @@ function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
 }
 export default function Home() {
   const auth = useAuth();
+  const pendingWrites = useRef(0);
+  const [saving, setSaving] = useState(false);
+  const protectPendingWrite = useCallback((event: BeforeUnloadEvent) => { if (pendingWrites.current) event.preventDefault(); }, []);
+  useEffect(() => () => window.removeEventListener('beforeunload', protectPendingWrite), [protectPendingWrite]);
+  const [incomingInfo, setIncomingInfo] = useState<Awaited<ReturnType<typeof inspectBackup>>>();
+  const [stale, setStale] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [data, setData] = useState<Data>(defaults),
     [page, setPage] = useState('Hoje'),
@@ -210,10 +221,13 @@ export default function Home() {
     [reset, setReset] = useState<ResetKind | null>(null),
     [resetText, setResetText] = useState(''),
     [incoming, setIncoming] = useState<Data | null>(null);
+  const diskOwner = useRef<string | null>(null);
   const disk = useRef<string | null>(null),
     current = useRef(data);
   const applyCloud = useCallback((next: Data) => {
+    setStale(false);
     disk.current = localStorage.getItem(STORAGE_KEY);
+    diskOwner.current = localStorage.getItem(OWNER_KEY);
     current.current = next;
     setData(next);
     setEditor(null);
@@ -227,48 +241,53 @@ export default function Home() {
     ready && !auth.loading && !blocked,
     data,
     applyCloud,
+    !!editor || stale,
   );
   useEffect(() => {
     current.current = data;
   }, [data]);
   useEffect(() => {
+    let active = true;
     queueMicrotask(() => {
+      void withWriteLock(() => {
+      if (!active) return;
       try {
-        let d = load(localStorage);
+        let d = startupHealth(localStorage);
         const storedData = localStorage.getItem(STORAGE_KEY);
         if ((storedData && JSON.parse(storedData).dataVersion !== MONEY_SCHEMA_VERSION) || (!storedData && localStorage.getItem('rota-financeira'))) {
           d = save(localStorage, d);
+          publishChange('migrationdone');
         }
         disk.current = localStorage.getItem(STORAGE_KEY);
+        diskOwner.current = localStorage.getItem(OWNER_KEY);
         setData(d);
       } catch (e) {
         setError(
           'Não foi possível carregar os dados. O conteúdo existente foi preservado. ' +
             (e as Error).message,
         );
+        recordDiagnostic('storage', e);
         setBlocked(true);
       }
       setReady(true);
+      }).catch(e => { if (active) { recordDiagnostic('storage', e); setBlocked(true); setError('Armazenamento indisponível. Abra a recuperação.'); setReady(true); } });
     });
-    const stored = (event: StorageEvent) => {
-      if (event.key === OWNER_KEY) {
-        window.location.reload();
-        return;
-      }
-      if (event.key !== STORAGE_KEY) return;
+    const notify = () => {
       try {
-        const d = load(localStorage);
-        disk.current = localStorage.getItem(STORAGE_KEY);
-        setData(d);
-        setEditor(null);
-        setUndo(null);
-        setMessage('Dados atualizados por outra aba.');
-      } catch (e) {
-        setError((e as Error).message);
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw !== disk.current || localStorage.getItem(OWNER_KEY) !== diskOwner.current) {
+          setStale(true);
+          if (raw) assertSupportedVersion(JSON.parse(raw));
+        }
       }
+      catch (e) { recordDiagnostic('storage', e); setStale(true); setError(storageFailure(e)); }
     };
+    const stored = (event: StorageEvent) => {
+      if (event.key === OWNER_KEY || event.key === STORAGE_KEY) notify();
+    };
+    const stop = observeChanges(notify);
     window.addEventListener('storage', stored);
-    return () => window.removeEventListener('storage', stored);
+    return () => { active = false; window.removeEventListener('storage', stored); stop(); };
   }, []);
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -282,27 +301,37 @@ export default function Home() {
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
   }, [data.settings.theme]);
-  function commit(next: Data) {
+  async function commit(next: Data, beforeWrite?: () => void) {
+    const expected = disk.current;
+    const expectedOwner = diskOwner.current;
+    pendingWrites.current++; setSaving(true);
+    window.addEventListener('beforeunload', protectPendingWrite);
+    try { await withWriteLock(() => {
+    if (localStorage.getItem(OWNER_KEY) !== expectedOwner) throw Error('A conta mudou em outra aba. Recarregue antes de salvar.');
     if (
       auth.session &&
       localStorage.getItem(OWNER_KEY) !== auth.session.user.id
     )
       throw Error('A conta mudou em outra aba. Recarregue antes de salvar.');
     if (blocked) throw Error('Recupere seus dados antes de salvar.');
-    if (localStorage.getItem(STORAGE_KEY) !== disk.current)
+    if (localStorage.getItem(STORAGE_KEY) !== expected)
       throw Error('Os dados mudaram em outra aba. Recarregue antes de salvar.');
     validateRelations(next);
+    beforeWrite?.();
     next = save(localStorage, next);
     disk.current = localStorage.getItem(STORAGE_KEY) || '';
     setData(next);
     current.current = next;
     cloud.changed();
+    publishChange('statechanged');
     setError('');
+    }); } finally { pendingWrites.current--; setSaving(pendingWrites.current > 0); if (!pendingWrites.current) window.removeEventListener('beforeunload', protectPendingWrite); }
   }
-  function safely(action: () => void) {
+  async function safely(action: () => void | Promise<void>) {
     try {
-      action();
+      await action();
     } catch (e) {
+      recordDiagnostic('storage', e);
       setError(storageFailure(e));
     }
   }
@@ -399,7 +428,7 @@ export default function Home() {
           </DialogTitle>
           <DialogDescription>
             {cloud.conflict?.remote
-              ? 'Escolha qual conjunto completo deseja manter. Os dados não serão mesclados.'
+              ? 'Seus dados foram alterados em outro dispositivo. Escolha qual conjunto completo deseja manter. Os dados não serão mesclados.'
               : 'Deseja salvar seus dados atuais na sua conta?'}
           </DialogDescription>
           <p>
@@ -463,15 +492,15 @@ export default function Home() {
   const props = {
     data,
     saveSettings: (settings: Row) =>
-      safely(() => {
+      safely(async () => {
         validateRow('settings', settings);
-        commit({ ...current.current, settings });
+        await commit({ ...current.current, settings });
         setMessage('Configurações salvas com sucesso.');
       }),
     edit,
     update: (kind: Collection, row: Row) =>
-      safely(() => {
-        commit(upsert(current.current, kind, row));
+      safely(async () => {
+        await commit(upsert(current.current, kind, row));
         setUndo(null);
         setMessage('Associação salva. Os custos foram recalculados.');
       }),
@@ -518,8 +547,8 @@ export default function Home() {
             <button
               aria-label="Alternar tema"
               onClick={() =>
-                safely(() =>
-                  commit({
+                safely(async () =>
+                  await commit({
                     ...data,
                     settings: {
                       ...data.settings,
@@ -547,7 +576,11 @@ export default function Home() {
             </button>
           </div>
         </header>
-        <main className="workspace">
+        <main className="workspace" aria-busy={saving}>
+          {saving && <output>Salvando neste dispositivo…</output>}
+          {stale && <output className="notice">Dados atualizados em outra aba. Sua edição foi preservada. Feche o formulário para atualizar.
+            <button disabled={!!editor} onClick={() => safely(() => { if (auth.session && localStorage.getItem(OWNER_KEY) !== auth.session.user.id) { window.location.reload(); return; } applyCloud(load(localStorage)); setStale(false); })}>Atualizar dados</button>
+          </output>}
           {error && (
             <div className="notice error" role="alert">
               {error}
@@ -585,16 +618,18 @@ export default function Home() {
                   onChange={async (e) => {
                     try {
                       const file = e.target.files?.[0];
-                      if (file) setIncoming(parseBackup(await file.text()));
+                      if (file) { if (file.size > 20_000_000) throw Error('Arquivo maior que 20 MB.'); const inspected = await inspectBackup(await file.text()); setIncoming(inspected.data); setIncomingInfo(inspected); }
                     } catch (e) {
                       setError((e as Error).message);
                     }
                   }}
                 />
               </label>
+              <button onClick={() => { window.location.hash = 'recovery'; window.location.reload(); }}>Abrir modo de recuperação</button>
+              <button onClick={() => safely(() => { const copy = recoveryCopy(localStorage); if (!copy) throw Error('Nenhuma cópia válida disponível.'); setIncoming(copy); })}>Restaurar cópia anterior</button>
               <button
                 onClick={() =>
-                  safely(() => {
+                  safely(async () => {
                     const text = localStorage.getItem(
                       recoveryKey(localStorage.getItem(OWNER_KEY)),
                     );
@@ -623,7 +658,7 @@ export default function Home() {
                   syncError={cloud.error}
                 /></Disclosure></>
               )}
-              <PageBoundary key={page}><Suspense fallback={<PageSkeleton />}>
+              <PageBoundary key={page} back={() => go('Configurações')}><Suspense fallback={<PageSkeleton />}>
               {page === 'Alertas' && <Alerts data={data} go={go} appError={!!error} />}
               {page === 'Auditoria' && <FinancialAudit data={data} go={go} />}
               {page === 'Assistente' && <Assistant data={data} />}
@@ -632,7 +667,7 @@ export default function Home() {
               {page === 'Planejamento' && <Planning {...props} />}
               {page === 'Patrimônio' && <NetWorth {...props} />}
               {page === 'Simulações' && <Simulations {...props} />}
-              {page === 'Importar' && <Imports {...props} commitImport={(next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise novamente.'); commit(next); }} />}
+              {page === 'Importar' && <Imports {...props} commitImport={async (next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise novamente.'); await commit(next); }} />}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}
@@ -641,19 +676,20 @@ export default function Home() {
               {page === 'Gastos' && <Expenses {...props} />}{' '}
               {page === 'Investimentos' && <Investments {...props} />}{' '}
               {page === 'Planos' && <Plans {...props} />}{' '}
-              {page === 'Relatórios' && <Reports data={data} go={go} commitReport={(next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise o fechamento novamente.'); commit(next); }} />}
+              {page === 'Relatórios' && <Reports data={data} go={go} commitReport={async (next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise o fechamento novamente.'); await commit(next); }} />}
               {page === 'Análises' && <Analysis {...props} />}{' '}
               {page === 'Configurações' && (
                 <SettingsView
                   data={data}
                   edit={edit}
+                  syncStatus={cloud.status}
                   notificationOwner={notificationOwner}
                   notificationDiagnostic={notificationDiagnostic}
-                  onSaveNotifications={(notificationPreferences) => { commit({ ...current.current, notificationPreferences }); setMessage('Preferências de notificações salvas.'); }}
+                  onSaveNotifications={async (notificationPreferences) => { await commit({ ...current.current, notificationPreferences }); setMessage('Preferências de notificações salvas.'); }}
                   onSaveSettings={(settings) =>
-                    safely(() => {
+                    safely(async () => {
                       validateRow('settings', settings);
-                      commit({ ...current.current, settings });
+                      await commit({ ...current.current, settings });
                       setMessage('Configurações salvas com sucesso.');
                     })
                   }
@@ -662,13 +698,13 @@ export default function Home() {
                     try {
                       if (file.size > 20_000_000)
                         throw Error('Arquivo maior que 20 MB.');
-                      setIncoming(parseBackup(await file.text()));
+                      const inspected = await inspectBackup(await file.text()); setIncoming(inspected.data); setIncomingInfo(inspected);
                     } catch (e) {
                       setError((e as Error).message);
                     }
                   }}
                   onRecovery={() =>
-                    safely(() => {
+                    safely(async () => {
                       const text = localStorage.getItem(
                         recoveryKey(localStorage.getItem(OWNER_KEY)),
                       );
@@ -703,10 +739,10 @@ export default function Home() {
           row={editor.row}
           data={data}
           onClose={() => setEditor(null)}
-          onSave={(row) => {
+          onSave={async (row) => {
             const kind = editor.kind;
             validateRow(kind, row);
-            commit(
+            await commit(
               kind === 'settings' || kind === 'bike'
                 ? kind === 'bike' ? updateBikeAsset(data, row, today()) : { ...data, [kind]: row }
                 : upsert(data, kind, row),
@@ -737,10 +773,10 @@ export default function Home() {
             <button
               className="danger"
               onClick={() =>
-                safely(() => {
+                safely(async () => {
                   if (!deletion) return;
                   const before = data;
-                  commit(remove(data, deletion.kind, deletion.row.id));
+                  await commit(remove(data, deletion.kind, deletion.row.id));
                   setUndo(before);
                   setDeletion(null);
                   setMessage('Registro excluído.');
@@ -778,11 +814,9 @@ export default function Home() {
               className="danger"
               disabled={reset === 'total' && resetText !== 'RESET'}
               onClick={() =>
-                safely(() => {
+                safely(async () => {
                   if (!reset) return;
-                  recovery();
-                  if (reset === 'total') exportBackup();
-                  commit(resetData(data, reset));
+                  await commit(resetData(data, reset), () => { recovery(); if (reset === 'total') exportBackup(); });
                   setReset(null);
                   setUndo(null);
                   setMessage('Dados limpos. Backup de recuperação preservado.');
@@ -801,6 +835,7 @@ export default function Home() {
             Os dados abaixo substituirão os atuais. Uma cópia dos dados atuais
             será salva e baixada antes da importação.
           </DialogDescription>
+          {incomingInfo?.data === incoming && <p>Versão original: {incomingInfo?.sourceVersion} · Gerado em: {incomingInfo?.generatedAt ? new Date(incomingInfo.generatedAt).toLocaleString('pt-BR') : 'Data não informada'}</p>}
           {incoming && (
             <div className="import-summary">
               {collections.map((k) => (
@@ -816,24 +851,28 @@ export default function Home() {
             <button
               className="primary"
               onClick={() =>
-                safely(() => {
+                safely(async () => {
                   if (!incoming) return;
                   if (blocked) {
+                    if (stale) throw Error('Os dados mudaram em outra aba. Revise a recuperação antes de continuar.');
+                    const expected = localStorage.getItem(STORAGE_KEY);
+                    const owner = localStorage.getItem(OWNER_KEY);
+                    await withWriteLock(() => {
+                    if (localStorage.getItem(STORAGE_KEY) !== expected || localStorage.getItem(OWNER_KEY) !== owner) throw Error('Os dados mudaram em outra aba. Revise a recuperação.');
                     const raw =
                       localStorage.getItem(STORAGE_KEY) ||
                       localStorage.getItem('rota-financeira') ||
                       '';
-                    localStorage.setItem('rota-corrupted-recovery', raw);
+                    localStorage.setItem(`rota-corrupted-recovery:${localStorage.getItem(OWNER_KEY) || 'guest'}`, raw);
                     download(raw, 'rota-dados-preservados.json');
                     const restored = save(localStorage, incoming);
                     disk.current = localStorage.getItem(STORAGE_KEY) || '';
                     setData(restored);
                     setBlocked(false);
                     setError('');
+                    });
                   } else {
-                    recovery();
-                    exportBackup();
-                    commit(incoming);
+                    await commit(incoming, () => { recovery(); exportBackup(); });
                   }
                   setIncoming(null);
                   setUndo(null);
@@ -852,8 +891,8 @@ export default function Home() {
           {undo && (
             <button
               onClick={() =>
-                safely(() => {
-                  commit(undo);
+                safely(async () => {
+                  await commit(undo);
                   setUndo(null);
                   setMessage('Exclusão desfeita.');
                 })

@@ -495,7 +495,7 @@ export function load(storage: Pick<Storage, 'getItem'>): Data {
     ? validateData({ ...JSON.parse(legacy), dataVersion: 0 })
     : defaults();
 }
-export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>, d: Data) {
+export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem' | 'removeItem'>>, d: Data) {
   const current = storage.getItem?.(STORAGE_KEY);
   if (current) {
     let parsed: unknown;
@@ -552,9 +552,26 @@ export function save(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, '
     storage.setItem(migrationKey, previous || JSON.stringify(d));
   }
   if (JSON.stringify(d) !== JSON.stringify(normalized)) {
-    storage.setItem(`rota-money-rounding:${crypto.randomUUID()}`, JSON.stringify(d));
+    storage.setItem(`rota-money-rounding:${owner}:${crypto.randomUUID()}`, JSON.stringify(d));
   }
-  storage.setItem(STORAGE_KEY, encoded);
+  // Keep the last valid snapshot separately. Quota failure aborts before publication.
+  if (current && current !== encoded) {
+    let valid = false;
+    try { validateData(JSON.parse(current)); valid = true; } catch { /* never replace a valid recovery copy with corruption */ }
+    if (valid) storage.setItem(`rota-last-valid:${owner}`, current);
+  }
+  let written = false;
+  try {
+    if (current !== encoded) { storage.setItem(STORAGE_KEY, encoded); written = true; }
+    if (storage.getItem && storage.getItem(STORAGE_KEY) !== encoded)
+      throw Error('Não foi possível confirmar a gravação. A cópia anterior foi preservada.');
+  } catch (error) {
+    if (written) {
+      if (current !== undefined && current !== null) storage.setItem(STORAGE_KEY, current);
+      else storage.removeItem?.(STORAGE_KEY);
+    }
+    throw error;
+  }
   return normalized;
 }
 export function download(text: string, name: string) {

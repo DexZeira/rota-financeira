@@ -21,11 +21,17 @@ void test('PWA: instalação pública, limpeza restrita e navegação offline',a
   w.events.get('fetch')({request:{url:'https://example.test/',method:'GET',mode:'navigate'},respondWith:(p) => {pending=p;}});
   assert.equal((await Promise.resolve(pending)).cached,'/index.html');
 });
-void test('PWA: navegação online sempre atualiza o shell em cache',async () => {
+void test('PWA: navegação online retorna a rede sem prender o usuário ao shell antigo',async () => {
   const response = { clone: () => ({ updated: true }), updated: true };
   const w = worker(async () => response); let pending;
   w.events.get('fetch')({request:{url:'https://example.test/',method:'GET',mode:'navigate'},respondWith:(p) => {pending=p;}});
   assert.equal((await Promise.resolve(pending)).updated, true);
+});
+void test('PWA: erro HTTP usa shell instalado e atualização não apaga chunks de outras abas', async () => {
+  const w=worker(async()=>({ok:false,status:503}),{matchAll:async()=>[{},{}]});let pending;
+  w.events.get('activate')({waitUntil:p=>{pending=p;}});await Promise.resolve(pending);assert.deepEqual(w.removed,[]);
+  w.events.get('fetch')({request:{url:'https://example.test/',method:'GET',mode:'navigate'},respondWith:p=>{pending=p;}});
+  assert.equal((await Promise.resolve(pending)).cached,'/index.html');
 });
 void test('PWA nunca intercepta Auth, dados, POST, origens externas ou URLs com tokens',() => {
   const w = worker();

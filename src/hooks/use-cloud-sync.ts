@@ -1,3 +1,5 @@
+import { withWriteLock, publishChange } from '../services/tab-coordination';
+import { recordDiagnostic } from '../services/app-diagnostics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Data } from '../model';
 import { defaults } from '../model';
@@ -10,6 +12,7 @@ import {
 import {
   accountKey,
   fingerprint,
+  parseSyncMeta,
   metaKey,
   OWNER_KEY,
   resolveInitialSync,
@@ -24,6 +27,7 @@ export function useCloudSync(
   ready: boolean,
   data: Data,
   apply: (data: Data) => void,
+  editing = false,
 ) {
   const [settled, setSettled] = useState<string>();
   const [status, setStatus] = useState('Somente neste dispositivo');
@@ -34,26 +38,40 @@ export function useCloudSync(
     remote: CloudState | null;
     localUpdated?: string;
   } | null>(null);
-  const latest = useRef({ data, apply, user });
+  const latest = useRef({ data, apply, user, editing });
   const generation = useRef(0);
   const busy = useRef(false);
   const meta = useRef<SyncMeta>({});
   const conflictRef = useRef(false);
   const reviewedRevision = useRef<string | null | undefined>(undefined);
+  const failures = useRef(0);
+  const authExpired = useRef(false);
   const device = useRef('');
   const prepared = useRef<string | undefined>(undefined);
   useEffect(() => {
-    latest.current = { data, apply, user };
-  }, [data, apply, user]);
+    latest.current = { data, apply, user, editing };
+  }, [data, apply, user, editing]);
 
   const synchronize = useCallback(
-    async (choice?: 'local' | 'cloud' | 'empty') => {
+    async (choice?: 'local' | 'cloud' | 'empty', automatic = false) => {
+      if (automatic && (failures.current >= 3 || authExpired.current)) return;
+      if (!automatic) {
+        failures.current = 0;
+        authExpired.current = false;
+      }
       const owner = latest.current.user;
       if (!owner || prepared.current !== owner || busy.current) return;
       const ticket = generation.current;
       const valid = () => {
-        try { return ticket === generation.current && latest.current.user === owner && localStorage.getItem(OWNER_KEY) === owner; }
-        catch { return false; }
+        try {
+          return (
+            ticket === generation.current &&
+            latest.current.user === owner &&
+            localStorage.getItem(OWNER_KEY) === owner
+          );
+        } catch {
+          return false;
+        }
       };
       busy.current = true;
       try {
@@ -66,7 +84,7 @@ export function useCloudSync(
           );
           return;
         }
-        setStatus('Salvando…');
+        setStatus('Aguardando sincronização');
         const remote = await loadCloudState(owner);
         if (!valid()) return;
         const local = load(localStorage);
@@ -78,6 +96,7 @@ export function useCloudSync(
           reviewedRevision.current = remote?.updated_at ?? null;
           conflictRef.current = true;
           setConflict({ remote, localUpdated: meta.current.localUpdated });
+          publishChange('conflict');
           setStatus('A nuvem mudou novamente. Revise sua escolha.');
           return;
         }
@@ -90,6 +109,7 @@ export function useCloudSync(
           reviewedRevision.current = remote.updated_at;
           conflictRef.current = true;
           setConflict({ remote, localUpdated: meta.current.localUpdated });
+          publishChange('conflict');
           setStatus('Dados diferentes encontrados');
           return;
         }
@@ -102,6 +122,7 @@ export function useCloudSync(
           reviewedRevision.current = remote?.updated_at ?? null;
           conflictRef.current = true;
           setConflict({ remote, localUpdated: meta.current.localUpdated });
+          publishChange('conflict');
           setStatus('Escolha quais dados usar');
           return;
         }
@@ -113,8 +134,20 @@ export function useCloudSync(
             : choice === 'empty'
               ? defaults()
               : local;
+        if (
+          (decision === 'download' || choice === 'empty') &&
+          latest.current.editing
+        ) {
+          setStatus(
+            'Atualização disponível. Termine sua edição antes de sincronizar.',
+          );
+          return;
+        }
         let result = remote;
         if (decision === 'upload') {
+          // Server CAS arbitrates remote writes. Do not hold the local storage
+          // lock during a network request: offline edits must stay responsive.
+          if (!valid()) throw Error('Conta mudou antes da gravação.');
           result = await saveCloudState(
             owner,
             next,
@@ -132,23 +165,26 @@ export function useCloudSync(
               localUpdated: meta.current.localUpdated,
             });
             setStatus('Dados diferentes encontrados');
+            publishChange('conflict');
             return;
           }
         }
         if (!valid() || !result) return;
         // Never replace a new local edit made while a request was in flight.
         if (decision === 'download' || choice === 'empty') {
-          if (fingerprint(load(localStorage)) !== fingerprint(local)) {
-            conflictRef.current = true;
-            setConflict({
-              remote: result,
-              localUpdated: meta.current.localUpdated,
-            });
-            return;
-          }
-          localStorage.setItem(`rota-cloud-recovery:${owner}`, backup(local));
-          const persisted = save(localStorage, next);
-          latest.current.apply(persisted);
+          await withWriteLock(() => {
+            if (
+              !valid() ||
+              latest.current.editing ||
+              fingerprint(load(localStorage)) !== fingerprint(local)
+            )
+              throw Error(
+                'Os dados locais mudaram durante a sincronização. Revise antes de continuar.',
+              );
+            localStorage.setItem(`rota-cloud-recovery:${owner}`, backup(local));
+            const persisted = save(localStorage, next);
+            latest.current.apply(persisted);
+          });
         }
         meta.current = {
           ...meta.current,
@@ -164,26 +200,47 @@ export function useCloudSync(
         setSettled(owner);
         setLastSync(meta.current.lastSync);
         const pending = fingerprint(load(localStorage)) !== meta.current.base;
-        setStatus(pending ? 'Salvando…' : 'Salvo');
+        failures.current = 0;
+        publishChange('syncdone');
+        setStatus(pending ? 'Aguardando sincronização' : 'Sincronizado');
         if (pending) setWake((value) => value + 1);
       } catch (caught) {
+        recordDiagnostic('sync', caught);
         if (valid()) {
-          const source = caught && typeof caught === 'object'
-            ? caught as Partial<SyncErrorDetails>
-            : {};
+          const source =
+            caught && typeof caught === 'object'
+              ? (caught as Partial<SyncErrorDetails>)
+              : {};
           const details: SyncErrorDetails = {
-            message: typeof source.message === 'string'
-              ? source.message
-              : 'Erro desconhecido de sincronização.',
+            message:
+              typeof source.message === 'string'
+                ? source.message
+                : 'Erro desconhecido de sincronização.',
             code: typeof source.code === 'string' ? source.code : undefined,
-            details: typeof source.details === 'string' ? source.details : undefined,
+            details:
+              typeof source.details === 'string' ? source.details : undefined,
             hint: typeof source.hint === 'string' ? source.hint : undefined,
-            status: typeof source.status === 'number' ? source.status : undefined,
+            status:
+              typeof source.status === 'number' ? source.status : undefined,
           };
+          failures.current =
+            details.status === 401 ||
+            (details.status &&
+              details.status >= 400 &&
+              details.status < 500 &&
+              details.status !== 429)
+              ? 3
+              : failures.current + 1;
+          if (details.status === 401) authExpired.current = true;
           setError(details);
           // The selected account has already been isolated locally, so it can work offline.
           setSettled(owner);
-          setStatus(syncStatus(details, navigator.onLine));
+          setStatus(
+            syncStatus(details, navigator.onLine) +
+              (failures.current >= 3
+                ? ' Tentativas automáticas pausadas. Use Sincronizar agora.'
+                : ''),
+          );
         }
       } finally {
         if (ticket === generation.current) busy.current = false;
@@ -200,32 +257,39 @@ export function useCloudSync(
     conflictRef.current = false;
     reviewedRevision.current = undefined;
     queueMicrotask(() => {
-      if (ticket !== generation.current) return;
-      setConflict(null);
-      setError(undefined);
-      setSettled(undefined);
-      if (!user) {
-        setLastSync(undefined);
-        setStatus('Somente neste dispositivo');
-        return;
-      }
-      try {
-        const next = switchAccount(localStorage, user, load(localStorage));
-        latest.current.apply(next);
-        meta.current = JSON.parse(
-          localStorage.getItem(metaKey(user)) || '{}',
-        ) as SyncMeta;
-        device.current =
-          localStorage.getItem('rota-cloud-device') || crypto.randomUUID();
-        localStorage.setItem('rota-cloud-device', device.current);
-        prepared.current = user;
-        setLastSync(meta.current.lastSync);
-        void synchronize();
-      } catch {
-        setStatus(
-          'Falha ao preparar os dados locais. Faça backup antes de continuar.',
-        );
-      }
+      void (async () => {
+        if (ticket !== generation.current) return;
+        setConflict(null);
+        setError(undefined);
+        setSettled(undefined);
+        if (!user) {
+          setLastSync(undefined);
+          setStatus('Somente neste dispositivo');
+          return;
+        }
+        try {
+          const next = await withWriteLock(() => {
+            if (ticket !== generation.current) return null;
+            return switchAccount(localStorage, user, load(localStorage));
+          });
+          if (!next || ticket !== generation.current) return;
+          failures.current = 0;
+          authExpired.current = false;
+          latest.current.apply(next);
+          meta.current = parseSyncMeta(localStorage.getItem(metaKey(user)));
+          device.current =
+            localStorage.getItem('rota-cloud-device') || crypto.randomUUID();
+          localStorage.setItem('rota-cloud-device', device.current);
+          prepared.current = user;
+          setLastSync(meta.current.lastSync);
+          void synchronize(undefined, true);
+        } catch (error) {
+          recordDiagnostic('storage', error);
+          setStatus(
+            'Falha ao preparar os dados locais. Faça backup antes de continuar.',
+          );
+        }
+      })();
     });
     return () => {
       generation.current = ticket + 1;
@@ -235,7 +299,7 @@ export function useCloudSync(
   useEffect(() => {
     if (!user || !ready) return;
     const timer = window.setTimeout(() => {
-      if (!conflictRef.current) void synchronize();
+      if (!conflictRef.current) void synchronize(undefined, true);
     }, 1000);
     return () => window.clearTimeout(timer);
   }, [data, user, ready, synchronize, wake]);
@@ -246,15 +310,15 @@ export function useCloudSync(
     let active = true;
     const tick = async () => {
       if (!conflictRef.current && document.visibilityState === 'visible')
-        await synchronize();
-      delay = navigator.onLine ? 30000 : Math.min(delay * 2, 120000);
+        await synchronize(undefined, true);
+      delay = failures.current ? Math.min(delay * 2, 120000) : 30000;
       if (active)
         timer = setTimeout(() => {
           void tick();
         }, delay);
     };
     const resume = () => {
-      if (!conflictRef.current) void synchronize();
+      if (!conflictRef.current) void synchronize(undefined, true);
     };
     const offline = () =>
       setStatus('Offline — alterações serão sincronizadas quando possível.');
@@ -275,10 +339,16 @@ export function useCloudSync(
   const changed = () => {
     if (!user) return;
     meta.current.localUpdated = new Date().toISOString();
-    localStorage.setItem(metaKey(user), JSON.stringify(meta.current));
+    try {
+      localStorage.setItem(metaKey(user), JSON.stringify(meta.current));
+    } catch (error) {
+      recordDiagnostic('storage', error);
+    }
+    failures.current = 0;
+    if (authExpired.current) { setStatus('Salvo localmente · Sessão expirada. Entre novamente para sincronizar.'); return; }
     setStatus(
       navigator.onLine
-        ? 'Salvando…'
+        ? 'Salvo localmente · Aguardando sincronização'
         : 'Offline — alterações serão sincronizadas quando possível.',
     );
   };

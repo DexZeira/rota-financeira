@@ -18,7 +18,7 @@ export function NotificationSettings({
 }: {
   preferences: NotificationPreferences;
   owner: string;
-  onSave: (p: NotificationPreferences) => void;
+  onSave: (p: NotificationPreferences) => void | Promise<void>;
   diagnostic: string;
 }) {
   const [draft, setDraft] = useState(preferences),
@@ -74,10 +74,10 @@ export function NotificationSettings({
   return (
     <form
       className="notification-settings"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         try {
-          onSave(validateNotificationPreferences(draft));
+          await onSave(validateNotificationPreferences(draft));
           setMessage('Preferências de notificações salvas.');
         } catch {
           setMessage(

@@ -40,6 +40,20 @@ export type SyncMeta = {
   lastSync?: string;
   localUpdated?: string;
 };
+export function parseSyncMeta(text: string | null): SyncMeta {
+  if (!text) return {};
+  const raw: unknown = JSON.parse(text);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('Metadados de sincronização inválidos.');
+  const result: SyncMeta = {};
+  for (const key of ['base', 'revision', 'lastSync', 'localUpdated'] as const) {
+    const value = (raw as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      if (typeof value !== 'string' || !value.length || (key !== 'base' && !Number.isFinite(Date.parse(value)))) throw Error('Revisão de sincronização inválida.');
+      result[key] = value;
+    }
+  }
+  return result;
+}
 export type SyncErrorDetails = {
   message: string;
   code?: string;

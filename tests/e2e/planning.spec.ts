@@ -52,6 +52,9 @@ test('Hoje e recorrência: cadastro, calendário, pausa e conferência persistem
   ).toBe(true);
   await page.getByRole('button', { name: 'Recorrências', exact: true }).click();
   await page.getByRole('button', { name: 'Pausar', exact: true }).click();
+  // Persistence now waits for the cross-tab Web Lock. Reload only after the UI
+  // acknowledges the save, instead of cancelling an in-flight write.
+  await expect(page.getByRole('button', { name: 'Ativar', exact: true })).toBeVisible();
   await page.reload();
   await navigate(page, 'Planejamento');
   await expect(

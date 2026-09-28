@@ -2,7 +2,7 @@ import { OWNER_KEY, accountKey, recoveryKey } from './sync-core';
 
 type Store = Pick<Storage, 'length' | 'key' | 'getItem' | 'removeItem'>;
 export type StoredCopy = { key: string; text: string; bytes: number; protected: boolean };
-const isCopy = (key: string) => /^rota-cloud-(?:account|recovery):.+$/.test(key) || key.startsWith('rota-money-before-migration:') || key.startsWith('rota-money-rounding:') ||
+const isCopy = (key: string) => /^rota-cloud-(?:account|recovery):.+$/.test(key) || key.startsWith('rota-corrupted-recovery:') || key.startsWith('rota-last-valid:') || key.startsWith('rota-money-before-migration:') || key.startsWith('rota-money-rounding:') ||
   ['rota-recovery', 'rota-cloud-guest-recovery', 'rota-corrupted-recovery'].includes(key);
 
 export function inspectStorage(storage: Store) {
@@ -17,10 +17,18 @@ export function inspectStorage(storage: Store) {
     const size = 2 * (key.length + text.length);
     bytes += size;
     if (isCopy(key)) copies.push({ key, text, bytes: size,
-      protected: key === recoveryKey(owner) || key === 'rota-corrupted-recovery' || key.startsWith('rota-money-before-migration:') ||
+      protected: key === recoveryKey(owner) || key.startsWith('rota-last-valid:') || key.startsWith('rota-corrupted-recovery') || key.startsWith('rota-money-before-migration:') ||
         (owner !== null && key === accountKey(owner)) });
   }
   return { bytes, copies };
+}
+/** The physical quota covers the whole origin; the UI only exposes copies belonging to its owner. */
+export function ownerCopies(copies: StoredCopy[], owner: string | null) {
+  const suffix = owner || 'guest';
+  return copies.filter(({ key }) => key === accountKey(suffix) || key === recoveryKey(owner) ||
+    key === `rota-last-valid:${suffix}` || key === `rota-corrupted-recovery:${suffix}` ||
+    (key.startsWith('rota-money-before-migration:') && key.endsWith(`:${suffix}`)) ||
+    key.startsWith(`rota-money-rounding:${suffix}:`) || (!owner && key === 'rota-cloud-guest-recovery'));
 }
 
 export function removeStoredCopy(storage: Store, copy: StoredCopy) {

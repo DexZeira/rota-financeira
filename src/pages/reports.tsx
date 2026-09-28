@@ -139,7 +139,7 @@ export function Reports({
 }: {
   data: Data;
   go: ViewProps['go'];
-  commitReport: (next: Data, expected: Data) => void;
+  commitReport: (next: Data, expected: Data) => Promise<void>;
 }) {
   const [period, setPeriod] = useState(() =>
     shiftPeriod(today().slice(0, 7), -1),
@@ -277,7 +277,7 @@ export function Reports({
         allowPartial,
         reprocess: closed,
       });
-      commitReport(next, d);
+      await commitReport(next, d);
       setRevision(0);
       setChecked([]);
       setAllowPartial(false);
@@ -292,9 +292,9 @@ export function Reports({
       setBusy(false);
     }
   }
-  function reopen() {
+  async function reopen() {
     try {
-      commitReport(reopenMonth(d, period, new Date().toISOString()), d);
+      await commitReport(reopenMonth(d, period, new Date().toISOString()), d);
       setConfirmReopen(false);
       setMessage('Mês reaberto. O relatório anterior continua disponível.');
     } catch (error) {

@@ -8,6 +8,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfig } from '../services/supabase';
 import { observeSession } from '../services/auth-session';
+import { publishChange } from '../services/tab-coordination';
 
 function client() {
   if (!supabase) throw Error(supabaseConfig.message);
@@ -22,7 +23,11 @@ const actions = {
       password,
       options: { emailRedirectTo: window.location.origin + '/' },
     }),
-  signOut: () => client().auth.signOut(),
+  signOut: async () => {
+    const result = await client().auth.signOut();
+    if (!result.error) publishChange('logout');
+    return result;
+  },
   resetPassword: (email: string) =>
     client().auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + '/',

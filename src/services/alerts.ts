@@ -473,14 +473,14 @@ export function deriveAlerts(
       'Há uma mensagem de erro ativa na interface. Confira o aviso exibido antes de repetir a operação.',
       'Configurações',
     );
-  if (usage && usage.quota > 0 && usage.bytes / usage.quota >= 0.9)
+  if (usage && usage.quota > 0 && usage.bytes / usage.quota >= 0.8)
     add(
       'system',
       'storage',
       'quota',
-      'attention',
+      usage.bytes / usage.quota >= 0.95 ? 'important' : 'attention',
       'Armazenamento próximo da quota conhecida',
-      'Uso de pelo menos 90% da quota da origem informada pelo navegador (inclui caches; não é a quota específica do localStorage). Confira os backups em Configurações.',
+      `Uso de pelo menos ${usage.bytes / usage.quota >= 0.95 ? 95 : usage.bytes / usage.quota >= 0.9 ? 90 : 80}% da quota da origem informada pelo navegador (inclui caches; não é a quota específica do localStorage). Confira os backups em Configurações.`,
       'Configurações',
     );
   for (const [condition, id, title] of [

@@ -11,7 +11,8 @@ export async function loadCloudState(user: string): Promise<CloudState | null> {
     .select('data,updated_at,device_id,schema_version')
     .eq('user_id', user)
     .abortSignal(AbortSignal.timeout(15000))
-    .maybeSingle();
+    .maybeSingle()
+    .retry(false); // The application owns bounded backoff; avoid nested SDK retries.
   if (error) throw syncError(error, status);
   return data ? decode(data) : null;
 }
@@ -30,7 +31,8 @@ export async function saveCloudState(
       p_device_id: device,
       p_expected_updated_at: revision,
     })
-    .abortSignal(AbortSignal.timeout(15000));
+    .abortSignal(AbortSignal.timeout(15000))
+    .retry(false);
   if (error) throw syncError(error, status);
   if (!Array.isArray(rows)) throw syncError({ message: 'Resposta inválida da função de sincronização.', code: 'INVALID_RESPONSE' });
   const result = rows as Parameters<typeof decode>[0][];

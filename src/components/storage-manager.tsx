@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card } from './common';
-import { inspectStorage, removeStoredCopy, storageFailure, type StoredCopy } from '../services/storage-quota';
+import { inspectStorage, ownerCopies, removeStoredCopy, storageFailure, type StoredCopy } from '../services/storage-quota';
+import { OWNER_KEY } from '../services/sync-core';
 import { download } from '../services/storage';
 
 export function StorageManager() {
@@ -8,8 +9,13 @@ export function StorageManager() {
   const [selected, setSelected] = useState<StoredCopy>();
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState('');
+  function currentCopy(copy: StoredCopy) {
+    if (!ownerCopies([copy], localStorage.getItem(OWNER_KEY)).length || localStorage.getItem(copy.key) !== copy.text)
+      throw Error('A conta ou esta cópia mudou. Verifique o armazenamento novamente.');
+    return copy.text;
+  }
   function refresh() {
-    try { setInventory(inspectStorage(localStorage)); setSelected(undefined); setMessage(''); }
+    try { const inventory = inspectStorage(localStorage); setInventory({ ...inventory, copies: ownerCopies(inventory.copies, localStorage.getItem(OWNER_KEY)) }); setSelected(undefined); setMessage(''); }
     catch (error) { setMessage(storageFailure(error)); }
   }
   return <Card title="Armazenamento e cópias locais" action={<button onClick={refresh}>Verificar espaço</button>}>
@@ -24,12 +30,12 @@ export function StorageManager() {
     </>}
     {selected && <div className="card">
       <p>Salve esta cópia antes de removê-la. A remoção afeta somente esta cópia adicional neste navegador.</p>
-      <button onClick={() => { try { download(selected.text, 'rota-financeira-copia-local.json'); setMessage('Download solicitado. Confirme que o arquivo foi salvo antes de remover.'); } catch { setMessage('Download indisponível. Use Copiar esta cópia.'); } }}>Baixar esta cópia</button>
-      <button onClick={async () => { try { await navigator.clipboard.writeText(selected.text); setMessage('Cópia transferida para a área de transferência. Salve em um arquivo antes de remover.'); } catch { setMessage('Não foi possível copiar. A cópia local foi preservada.'); } }}>Copiar esta cópia</button>
+      <button onClick={() => { try { download(currentCopy(selected), 'rota-financeira-copia-local.json'); setMessage('Download solicitado. Confirme que o arquivo foi salvo antes de remover.'); } catch { setMessage('Download indisponível ou cópia alterada. Verifique o armazenamento novamente.'); } }}>Baixar esta cópia</button>
+      <button onClick={async () => { try { await navigator.clipboard.writeText(currentCopy(selected)); setMessage('Cópia transferida para a área de transferência. Salve em um arquivo antes de remover.'); } catch { setMessage('Não foi possível copiar. A cópia local foi preservada.'); } }}>Copiar esta cópia</button>
       {!selected.protected && <>
         <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> Confirmei que salvei esta cópia e quero removê-la deste navegador.</label>
         <button className="danger" disabled={!confirmed} onClick={() => {
-          try { removeStoredCopy(localStorage, selected); refresh(); setMessage('Cópia adicional removida.'); }
+          try { currentCopy(selected); removeStoredCopy(localStorage, selected); refresh(); setMessage('Cópia adicional removida.'); }
           catch (error) { setMessage(storageFailure(error)); }
         }}>Remover somente esta cópia</button>
       </>}

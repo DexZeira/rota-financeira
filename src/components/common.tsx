@@ -316,7 +316,7 @@ export function Editor({
   row?: Row;
   data: Data;
   onClose: () => void;
-  onSave: (r: Row) => void;
+  onSave: (r: Row) => void | Promise<void>;
 }) {
   const [value, setValue] = useState<Row>(
     row ? { ...emptyRow(kind), ...row } : { ...emptyRow(kind), id: id() },
@@ -355,14 +355,14 @@ export function Editor({
                 : 'Preencha os dados. As alterações serão salvas neste navegador.'}
         </DialogDescription>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             try {
               const cleaned = { ...value };
               for (const f of schemas[kind])
                 if (f.type === 'number' && cleaned[f.key] === '' && !f.required)
                   cleaned[f.key] = f.nullable ? null : 0;
-              onSave(cleaned);
+              await onSave(cleaned);
             } catch (e) {
               setError((e as Error).message);
             }

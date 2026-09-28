@@ -12,9 +12,10 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "test": "node tests/run.mjs",
-    "test:rls": "node --env-file-if-exists=.env.test.local tests/supabase-live.mjs",
+    "test:rls": "node tests/run.mjs --compile-only && node tests/supabase-live.mjs",
     "test:market-live": "node scripts/market-live.mjs",
-    "test:e2e": "npm run build && playwright test",
+    "build:e2e": "tsc --noEmit && vite build --mode e2e && node scripts/build-pwa.mjs .test-output/e2e-dist",
+    "test:e2e": "npm run build:e2e && playwright test",
     "verify": "npm test && npm run lint && npm run build"
   },
   "dependencies": {

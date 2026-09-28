@@ -57,7 +57,7 @@ const initialReview = (category = 'outras'): Review => ({
 });
 
 export function Imports(
-  p: ViewProps & { commitImport: (next: Data, expected: Data) => void },
+  p: ViewProps & { commitImport: (next: Data, expected: Data) => Promise<void> },
 ) {
   const [file, setFile] = useState<{
       name: string;
@@ -250,7 +250,7 @@ export function Imports(
       ),
     [p.data.imports.links],
   );
-  function apply() {
+  async function apply() {
     if (!file || !confirmed) return;
     try {
       if (base.current !== p.data)
@@ -272,7 +272,7 @@ export function Imports(
         { source: file.source, fileName: file.name, hash: file.hash },
         profile,
       );
-      p.commitImport(next, base.current);
+      await p.commitImport(next, base.current);
       invalidate();
       setFile(null);
       if (fileInput.current) fileInput.current.value = '';
@@ -287,9 +287,9 @@ export function Imports(
       );
     }
   }
-  const act = (fn: () => void) => {
+  const act = async (fn: () => void | Promise<void>) => {
     try {
-      fn();
+      await fn();
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível salvar.');
@@ -1048,8 +1048,8 @@ export function Imports(
           </p>
           <button
             onClick={() =>
-              act(() => {
-                p.commitImport(
+              act(async () => {
+                await p.commitImport(
                   validateData({
                     ...p.data,
                     imports: {
@@ -1076,8 +1076,8 @@ export function Imports(
               type="checkbox"
               checked={r.enabled}
               onChange={() =>
-                act(() =>
-                  p.commitImport(
+                act(async () =>
+                  await p.commitImport(
                     validateData({
                       ...p.data,
                       imports: {
