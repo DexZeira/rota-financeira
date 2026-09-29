@@ -140,7 +140,14 @@ export class MockOpenFinanceProvider implements OpenFinanceProvider {
     this.check(c, owner);
     if (a.connectionId !== c.id || c.consentStatus !== 'authorized')
       throw new OpenFinanceError('AUTH_REQUIRED');
-    const date = this.now().toISOString().slice(0, 10);
+    const localDateKey = (): string => {
+    const d = this.now();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const date = localDateKey();
     const items: RemoteTransaction[] =
       options.cursor === 'mock-v1' || date < options.since
         ? []

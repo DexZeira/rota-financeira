@@ -44,3 +44,6 @@ next-env.d.ts
 .test-output/
 *.tsbuildinfo
 .qa-artifacts-e2e.log
+
+# opencode (ferramentação local do agente)
+.opencode/

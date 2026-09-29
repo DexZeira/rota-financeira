@@ -41,15 +41,13 @@ export function SettingsView({
   onReset: (kind: string) => void;
   onRecovery: () => void;
 }) {
-  const [lastBackup, setLastBackup] = useState(
-    () => localStorage.getItem('rota-financeira-last-backup') || '',
-  );
-  function markBackup() {
+  const [lastBackup, setLastBackup] = useState<string | null>(localStorage.getItem('rota-financeira-last-backup'));
+  const markBackup = () => {
     const time = new Date().toISOString();
     setLastBackup(time);
     try { localStorage.setItem('rota-financeira-last-backup', time); }
-    catch { setDownloadStatus('Backup solicitado; não foi possível registrar sua data neste navegador.'); }
-  }
+    catch {}
+  };
   const [copyStatus, setCopyStatus] = useState('');
   const [downloadStatus, setDownloadStatus] = useState('');
   const [settings, setSettings] = useState<Row>({
@@ -64,23 +62,18 @@ export function SettingsView({
       <strong>{text}</strong>
     </div>
   );
-  function saveSettings() {
-    const next = {
-      ...d,
-      settings: {
-        ...d.settings,
-        defaultTarget: settings.defaultTarget,
-        idealTargetPercent: settings.idealTargetPercent,
-        acceleratedTargetPercent: settings.acceleratedTargetPercent,
-      },
-    };
+  const saveSettings = () => {
+    const next = { ...d, settings: { ...d.settings, ...settings } };
     onSaveSettings(next.settings);
-  }
+  };
+  const persistOpenFinance = async (next: Data, base: Data) => {
+    await onSaveOpenFinance(next, base);
+  };
   return (
     <>
 
       <div className="settings-groups">
-<Disclosure title="Contas conectadas" description="Instituições, consentimento e revisão bancária"><ConnectedAccounts key={notificationOwner} data={d} owner={notificationOwner} onSave={onSaveOpenFinance}/></Disclosure>
+<Disclosure title="Contas conectadas" description="Instituições, consentimento e revisão bancária"><ConnectedAccounts key={notificationOwner} data={d} owner={notificationOwner} onSave={persistOpenFinance}/></Disclosure>
 <Disclosure title="Dados e Segurança" description="Quota, backup de emergência e diagnóstico privado"><DataSecurity data={d} syncStatus={syncStatus}/></Disclosure>
 <Disclosure title="Notificações" description="Opcional, com controle de privacidade"><NotificationSettings key={JSON.stringify(d.notificationPreferences)+notificationOwner} preferences={d.notificationPreferences} owner={notificationOwner} onSave={onSaveNotifications} diagnostic={notificationDiagnostic}/></Disclosure>
 <Disclosure title="Planejamento" description="Rotina de trabalho, saldo e custos essenciais">      <Card

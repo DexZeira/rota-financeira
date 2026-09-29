@@ -87,4 +87,4 @@ export const emptyOpenFinance = (): OpenFinanceState => ({
   transactions: [],
   sync: [],
 });
-export type Mode = 'disabled' | 'mock' | 'sandbox';
+export type Mode = 'disabled' | 'mock' | 'sandbox' | 'production';

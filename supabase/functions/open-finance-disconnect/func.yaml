@@ -1,0 +1,4 @@
+name: open-finance-disconnect
+route: /open-finance/disconnect
+runtime: deno
+main: index.ts

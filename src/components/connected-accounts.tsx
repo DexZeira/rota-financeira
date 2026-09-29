@@ -17,6 +17,7 @@ import {
 import type { Review } from '../services/import/types';
 import { recordDiagnostic } from '../services/app-diagnostics';
 import { transactionPage } from '../services/open-finance/state';
+import { createOpenFinanceProvider } from '../services/open-finance/provider.factory';
 
 const subscribeNetwork = (notify: () => void) => {
   window.addEventListener('online', notify);
@@ -54,7 +55,15 @@ export function ConnectedAccounts({
     Record<string, string>
   >({});
   const mode = import.meta.env.VITE_OPEN_FINANCE_MODE || 'disabled';
-  const provider = useMemo(() => new MockOpenFinanceProvider(), []);
+  const realEnabled = import.meta.env.OPEN_FINANCE_REAL_ENABLED === 'true';
+  // Selecionar provider com base na configuração
+  const provider = useMemo(() => {
+    if (mode === 'mock') {
+      return new MockOpenFinanceProvider();
+    } else if (realEnabled && mode === 'sandbox') {
+      return createOpenFinanceProvider();
+    }    return new MockOpenFinanceProvider();
+  }, [mode, realEnabled]);
   const sync = useMemo(() => new OpenFinanceSyncService(provider), [provider]);
   const [institutions, setInstitutions] = useState<Institution[]>([]),
     [query, setQuery] = useState('');
@@ -216,7 +225,7 @@ export function ConnectedAccounts({
             <p>
               {labels[c.status]} ·{' '}
               {c.lastSuccessfulSyncAt
-                ? `Última sincronização: ${new Date(c.lastSuccessfulSyncAt).toLocaleString('pt-BR')}`
+                ? `Última sincronização:{new Date(c.lastSuccessfulSyncAt).toLocaleString('pt-BR')}`
                 : 'Nunca sincronizado'}
             </p>
             <p>
@@ -470,6 +479,13 @@ export function ConnectedAccounts({
         </button>
       </fieldset>
       <output>{busy ? 'Processando…' : message}</output>
+      {/* Indicador de ambiente */}
+      {mode === 'sandbox' && (
+        <div style={{ marginTop: '1rem', padding: '0.5rem', backgroundColor: '#e6f4ff', borderRadius: '4px' }}>
+          <p><strong>Conexão em modo sandbox</strong></p>
+          <p>A integração com a Pluggy está configurada para ambiente de testes.</p>
+        </div>
+      )}
     </section>
   );
 }

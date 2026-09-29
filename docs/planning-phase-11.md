@@ -104,7 +104,24 @@ Os projetos Playwright abrangem larguras 320/360/390/430/768/1366/1920 e as sete
 
 ## Validações
 
-Resultados finais serão registrados após a conclusão das suítes. Logs locais ignorados pelo Git: `.test-output/phase-eleven-verify.log` e `.test-output/phase-eleven-e2e.log`.
+Execução anterior (28/09): 416 unitários aprovados; E2E completo com 489 aprovados e uma falha de timeout ao abrir Hoje em 390 px. Esse resultado não foi uma aprovação integral de E2E.
+
+Retomada em 30/09, sobre `1615862` (já inclui o trabalho posterior da Fase 12):
+
+- Corrigidos dois métodos do adapter Pluggy cujo `throw` estava dentro do comentário, causando TS2355. Permanecem explicitamente indisponíveis; não retornam sucesso fictício.
+- Restaurado o padrão `disabled` da interface quando não há escolha explícita do modo Open Finance.
+- Corrigido o modo de recuperação independente: tanto arquivo quanto cópia anterior exigem reautorização e limpam cursores, preservando transações.
+- Substituídas oito aprovações artificiais da suíte de integração real por `todo`. Um teste comportamental verifica que todas as operações ainda não implementadas do adapter rejeitam com erro explícito. Esses testes não validam chamadas reais, RLS ou sandbox.
+- `npm run verify`: **417 passed, 0 failed, 0 skipped, 8 todo**; lint, TypeScript e build aprovados.
+- E2E focado em Open Finance e Fase 7, 390 px: **10 passed, 0 failed**. O timeout anterior não se reproduziu nessa execução.
+- `npm run test:e2e`: **497 passed, 0 failed, 0 skipped, 0 flaky**, em 8,1 minutos. A suíte completa local foi executada; o timeout anterior não voltou a ocorrer e não foi aplicada uma correção especulativa naquele cenário.
+- `git diff --check` nos arquivos desta retomada: aprovado. O comando global aponta espaço final preexistente em `MEMORY.md:5`, parte de alterações do usuário preservadas.
+
+Logs locais ignorados pelo Git: `.test-output/phase-eleven-resume-verify.log`, `.test-output/phase-eleven-resume-focused.log` e `.test-output/phase-eleven-resume-e2e.log`.
+
+Arquivos alterados nesta retomada: `src/components/connected-accounts.tsx`, `src/components/recovery-mode.tsx`, `src/services/open-finance/pluggy-provider.ts`, `tests/e2e/open-finance.spec.ts`, `tests/open-finance-real.test.ts`, `tests/run.mjs` e este documento. Alterações existentes em AGENTS/MEMORY e seus backups foram preservadas. Nenhum commit, push, deploy ou acesso ao backend real foi feito nesta retomada.
+
+Pronto para revisão/commit das correções locais: **sim**. Fase 11 validada no escopo mock/local: **sim**. Integração bancária real ou produção aprovada: **não**; o código posterior da Fase 12 ainda contém operações indisponíveis e os oito cenários externos continuam pendentes.
 
 ## Pendências e próxima etapa
 

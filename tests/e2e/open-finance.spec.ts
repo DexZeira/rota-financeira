@@ -37,6 +37,29 @@ test.beforeEach(async ({ context }) => {
   );
 });
 
+test('Open Finance mock: recuperação por arquivo e cópia exige nova autorização', async ({ page }) => {
+  await page.goto('/'); await open(page); await connect(page);
+  const original = await page.evaluate(() => localStorage.getItem('rota-financeira-v1')!);
+  for (const source of ['file', 'copy']) {
+    if (source === 'copy') await page.evaluate(raw => localStorage.setItem('rota-last-valid:guest', raw), original);
+    await page.goto('/#recovery'); await page.reload();
+    await expect(page.getByRole('heading', { name: 'Recuperação dos dados' })).toBeVisible();
+    if (source === 'file') {
+      await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(original) });
+    } else {
+      await page.getByRole('button', { name: 'Restaurar cópia anterior', exact: true }).click();
+    }
+    await page.getByLabel('Confirmação de recuperação').fill('RESTAURAR');
+    await page.getByRole('button', { name: 'Confirmar recuperação', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('rota-financeira-v1')!).openFinance.connections[0].status)).toBe('reauthorization_required');
+    await open(page);
+    await expect(page.getByRole('button', { name: 'Renovar acesso', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sincronizar agora', exact: true })).toHaveCount(0);
+    await expect(page.getByText('Compra demonstração', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('rota-financeira-v1')!).openFinance.sync[0].cursor)).toBeNull();
+  }
+});
+
 test('Open Finance mock: OFX com outro rótulo de conta exige conciliação e mantém um lançamento', async ({
   page,
 }) => {

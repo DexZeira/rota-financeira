@@ -1,0 +1,4 @@
+name: open-finance-connect
+route: /open-finance/connect
+runtime: deno
+main: index.ts

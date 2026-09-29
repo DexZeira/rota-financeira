@@ -5,6 +5,7 @@ import { recoveryCopy } from '../services/recovery';
 import { save, STORAGE_KEY, download } from '../services/storage';
 import { withWriteLock } from '../services/tab-coordination';
 import { OWNER_KEY } from '../services/sync-core';
+import { restoredOpenFinance } from '../services/open-finance/state';
 export function RecoveryMode() {
   const [candidate, setCandidate] = useState<ReturnType<typeof defaults>>();
   const [confirmation, setConfirmation] = useState('');
@@ -19,7 +20,7 @@ export function RecoveryMode() {
       owner: localStorage.getItem(OWNER_KEY),
     });
     setConfirmation('');
-    setCandidate(data);
+    setCandidate(data.openFinance ? { ...data, openFinance: restoredOpenFinance(data.openFinance) } : data);
   };
   return (
     <main className="workspace">

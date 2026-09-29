@@ -2,6 +2,25 @@ import ts from 'typescript';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
+
+// Função para compilar e copiar os testes
+function compileTestFile(file) {
+  const output = ts
+    .transpileModule(readFileSync(file, 'utf8'), {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+      },
+    })
+    .outputText.replace(
+      /from (['"])(\.[^'"]+)\1/g,
+      (_, q, path) => 'from ' + q + path + '.js' + q,
+    );
+  const dest = '.test-output/' + file.replace(/\.ts$/, '.js');
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, output);
+}
+
 for (const file of [
   'tests/open-finance.test.ts',
   'src/services/open-finance/types.ts', 'src/services/open-finance/errors.ts', 'src/services/open-finance/provider.ts', 'src/services/open-finance/mock-provider.ts', 'src/services/open-finance/state.ts', 'src/services/open-finance/sync.ts', 'src/services/open-finance/reconciliation.ts',
@@ -74,21 +93,20 @@ for (const file of [
   'src/services/work-type.ts',
   'tests/work-type.test.ts',
 ]) {
-  const output = ts
-    .transpileModule(readFileSync(file, 'utf8'), {
-      compilerOptions: {
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ES2022,
-      },
-    })
-    .outputText.replace(
-      /from (['"])(\.[^'"]+)\1/g,
-      (_, q, path) => 'from ' + q + path + '.js' + q,
-    );
-  const dest = '.test-output/' + file.replace(/\.ts$/, '.js');
-  mkdirSync(dirname(dest), { recursive: true });
-  writeFileSync(dest, output);
+  compileTestFile(file);
 }
+
+// Agora compilando os arquivos específicos de Open Finance
+for (const file of [
+  'src/services/open-finance/pluggy-provider.ts',
+  'tests/open-finance-real.test.ts',
+  'tests/open-finance-deduplication.test.ts',
+  'tests/open-finance-ownership.test.ts',
+  'tests/open-finance-errors.test.ts'
+]) {
+  compileTestFile(file);
+}
+
 if (process.argv.includes('--compile-only')) process.exit(0);
 const result = spawnSync(
   process.execPath,
@@ -126,6 +144,7 @@ const result = spawnSync(
     '.test-output/tests/savings-yield.test.js',
     '.test-output/tests/savings-integration.test.js',
     '.test-output/tests/work-type.test.js',
+    '.test-output/tests/open-finance-real.test.js',
   ],
   { stdio: 'inherit' },
 );

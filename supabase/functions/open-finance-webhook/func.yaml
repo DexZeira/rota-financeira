@@ -1,0 +1,4 @@
+name: open-finance-webhook
+route: /open-finance/webhook
+runtime: deno
+main: index.ts

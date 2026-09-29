@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/build-pwa.mjs",
-    "start": "vite preview --host 127.0.0.1",
-    "lint": "oxlint",
+    "check:edge": "deno check supabase/functions/**/*.ts",
+    "check:supabase": "supabase check",
     "format": "oxfmt",
+    "lint": "oxlint",
     "test": "node tests/run.mjs",
     "test:rls": "node tests/run.mjs --compile-only && node tests/supabase-live.mjs",
     "test:market-live": "node scripts/market-live.mjs",

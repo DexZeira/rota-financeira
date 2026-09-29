@@ -125,6 +125,10 @@
     break-inside: avoid;
     border-color: #aaa;
   }
+
+  [data-slot='sidebar-inset'] {
+    background-color: #fff !important;
+  }
 }
 
 .dark .reports-page input[type='month'],

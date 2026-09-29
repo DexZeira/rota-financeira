@@ -1,0 +1,4 @@
+name: open-finance-sync
+route: /open-finance/sync
+runtime: deno
+main: index.ts
