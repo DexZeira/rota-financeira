@@ -103,6 +103,14 @@ test('fechamento, alteração histórica, revisão, reabertura e leitura offline
       exact: true,
     }),
   ).toBeVisible();
+  await page.evaluate(() => {
+    const key = 'rota-financeira-v1',
+      d = JSON.parse(localStorage.getItem(key)!);
+    d.expenses[0].amount = 30000;
+    localStorage.setItem(key, JSON.stringify(d));
+  });
+  await page.reload();
+  await navigate(page, 'Relatórios');
   await context.setOffline(true);
   await checklist(page);
   await page.getByRole('button', { name: 'Fechar mês', exact: true }).click();

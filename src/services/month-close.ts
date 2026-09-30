@@ -7,10 +7,15 @@ import { monthContext, categoryKey } from './budget';
 import { planningPhaseTwo } from './planning-phase-two';
 import { addDays, generateOccurrences } from './recurrences';
 import { validateData } from './storage';
-import { explainFinancialChange } from './financial-change-explainer';
+import {
+  compareMonths,
+  explainFinancialChange,
+} from './financial-change-explainer';
+import { auditFinancialData, type AuditIssue } from './financial-audit';
 import {
   validPeriod,
   validateReporting,
+  type MonthlyCloseState,
   type MonthlyFinancialSnapshot,
   type MonthlyClosure,
 } from './reporting-state';
@@ -31,19 +36,86 @@ export function shiftPeriod(period: string, offset: number) {
     Number(period.slice(0, 4)) * 12 + Number(period.slice(5)) - 1 + offset;
   return `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`;
 }
+const signatureMoneyKeys = new Set([
+  'amount',
+  'amountcents',
+  'actualrevenue',
+  'balance',
+  'cashpurchasecents',
+  'closingcashcents',
+  'cost',
+  'debtinterestcents',
+  'debtpaymentscents',
+  'debtprincipalreductioncents',
+  'essential',
+  'expensecents',
+  'grossassetscents',
+  'incomecents',
+  'installmentamount',
+  'investmentcontributionscents',
+  'investmentreturncents',
+  'investmentwithdrawalscents',
+  'liabilitiescents',
+  'limitcents',
+  'netcashflowcents',
+  'networthcents',
+  'openingcash',
+  'openingcashcents',
+  'openingnetworthcents',
+  'otherincomecents',
+  'price',
+  'revenue',
+  'valuecents',
+  'workincomecents',
+]);
+const signatureIgnoredKeys = new Set([
+  'account',
+  'accountlabel',
+  'activity',
+  'createdat',
+  'description',
+  'document',
+  'filename',
+  'hash',
+  'maskednumber',
+  'name',
+  'notes',
+  'theme',
+  'updatedat',
+]);
+function signatureValue(value: unknown, key = ''): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => signatureValue(item))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  }
+  if (typeof value === 'number') {
+    if (key.endsWith('cents')) return Math.trunc(value);
+    return signatureMoneyKeys.has(key) ? toCents(value) : value;
+  }
+  if (!value || typeof value !== 'object') return value;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record)
+    .filter((name) => !signatureIgnoredKeys.has(name.toLocaleLowerCase()))
+    .sort()
+    .reduce<Record<string, unknown>>((result, name) => {
+      result[name] = signatureValue(record[name], name.toLocaleLowerCase());
+      return result;
+    }, {});
+}
 /** SHA-256 over source data only. Reporting metadata never invalidates itself.
- * Date-less configuration is included conservatively because it is not versioned.
+ * Arrays and object keys are canonicalized so storage order is irrelevant.
  */
 export async function reportSourceSignature(d: Data, period: string) {
   const { end } = periodBounds(period);
-  const payload = JSON.stringify([
+  const payload = JSON.stringify(signatureValue([
     d.settings,
     d.bike,
     ...collections
       .filter((k) => k !== 'netWorthSnapshots')
       .map((k) => [k, d[k].filter((r) => !r.date || String(r.date) <= end)]),
     d.imports.links.filter((l) => l.transaction.date <= end),
-  ]);
+  ]));
   const bytes = new TextEncoder().encode(payload);
   const hash = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(hash)]
@@ -56,6 +128,120 @@ export async function isMonthStale(d: Data, c: MonthlyClosure) {
     latestSnapshot(c)!.sourceSignature !==
     (await reportSourceSignature(d, c.period))
   );
+}
+export type MonthlyCloseBlocker = {
+  id: string;
+  title: string;
+  description: string;
+  sourceId?: string;
+};
+export type MonthlyCloseAssessment = {
+  period: string;
+  state: MonthlyCloseState;
+  snapshot: MonthlyFinancialSnapshot | null;
+  previous: MonthlyFinancialSnapshot | null;
+  comparison: ReturnType<typeof compareMonths> | null;
+  blockers: MonthlyCloseBlocker[];
+  warnings: string[];
+};
+function pendingImportBlockers(d: Data): MonthlyCloseBlocker[] {
+  return d.imports.sessions.flatMap((session) => {
+    const resolved =
+      session.invalidCount +
+      session.importedCount +
+      session.matchedCount +
+      session.ignoredCount;
+    const pending = session.rowCount - resolved;
+    return pending > 0
+      ? [{
+          id: `import:${session.id}:pending`,
+          title: 'Importação sem decisão',
+          description: `${pending} linha(s) da importação ainda aguardam revisão.`,
+          sourceId: session.id,
+        }]
+      : [];
+  });
+}
+function auditBlockers(issues: AuditIssue[]): MonthlyCloseBlocker[] {
+  return issues
+    .filter((issue) => issue.severity === 'error')
+    .map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      description: issue.description,
+      sourceId: issue.sourceId,
+    }));
+}
+function blockingIssues(d: Data, at: string): MonthlyCloseBlocker[] {
+  const blockers = pendingImportBlockers(d);
+  try {
+    blockers.push(...auditBlockers(auditFinancialData(d, at)));
+  } catch {
+    blockers.push({
+      id: `audit:${at}:invalid`,
+      title: 'Auditoria indisponível',
+      description: 'A integridade dos dados não pôde ser confirmada.',
+    });
+  }
+  return blockers;
+}
+export async function assessMonth(
+  d: Data,
+  period: string,
+  options: { at: string; inflation?: InflationMonth[] },
+): Promise<MonthlyCloseAssessment> {
+  const closure = d.reporting.closures.find((item) => item.period === period);
+  const blockers: MonthlyCloseBlocker[] = [];
+  let snapshot: MonthlyFinancialSnapshot | null = null;
+  try {
+    if (periodBounds(period).end >= options.at)
+      blockers.push({
+        id: `reporting:${period}:in-progress`,
+        title: 'Período em andamento',
+        description: 'O mês precisa estar encerrado antes do fechamento.',
+      });
+    else
+      snapshot = await buildMonthlySnapshot(d, period, {
+        at: options.at,
+        generatedAt: options.at + 'T00:00:00.000Z',
+        inflation: options.inflation,
+      });
+  } catch {
+    blockers.push({
+      id: `reporting:${period}:invalid-snapshot`,
+      title: 'Snapshot inválido',
+      description: 'Não foi possível consolidar os dados do período.',
+    });
+  }
+  blockers.push(...blockingIssues(d, options.at));
+  const previous = d.reporting.closures
+    .filter((item) => item.status === 'closed' && item.period < period)
+    .sort((a, b) => b.period.localeCompare(a.period))
+    .map(latestSnapshot)
+    .find((item): item is MonthlyFinancialSnapshot =>
+      item !== undefined && item.dataCompleteness !== 'insufficient',
+    ) ?? null;
+  const comparison = snapshot && previous ? compareMonths(snapshot, previous) : null;
+  const currentSignature = snapshot?.sourceSignature;
+  const latest = latestSnapshot(closure);
+  const unchanged = !!latest && latest.sourceSignature === currentSignature;
+  const state: MonthlyCloseState =
+    closure?.status === 'reopened' && unchanged
+      ? 'reopened'
+      : unchanged && blockers.length === 0
+        ? 'closed'
+        : blockers.length
+          ? 'open'
+          : 'ready';
+  return {
+    period,
+    state,
+    snapshot,
+    previous,
+    comparison,
+    blockers,
+    warnings: snapshot?.warnings ?? [],
+  };
 }
 const total = (rows: Row[], key: string, cents = false) =>
   rows.reduce(
@@ -316,14 +502,31 @@ export async function closeMonth(
   const existing = d.reporting.closures.find((c) => c.period === period);
   if (periodBounds(period).end >= options.at)
     throw Error('O mês ainda está em andamento.');
-  if (existing?.status === 'closed' && !options.reprocess)
+  const blockers = blockingIssues(d, options.at);
+  if (blockers.length) throw Error('Resolva as pendências críticas antes de fechar o mês.');
+  if (existing?.status === 'closed' && !options.reprocess) {
+    const currentSignature = await reportSourceSignature(d, period);
+    if (latestSnapshot(existing)?.sourceSignature === currentSignature) return d;
     throw Error('Mês já fechado. Reabra ou reprocesse explicitamente.');
+  }
   if (existing && existing.revisions.length >= 100)
     throw Error('Limite de 100 revisões por mês atingido.');
   const snapshot = await buildMonthlySnapshot(d, period, {
     ...options,
     revision: (existing?.revisions.length ?? 0) + 1,
   });
+  if (existing && latestSnapshot(existing)?.sourceSignature === snapshot.sourceSignature) {
+    if (existing.status === 'closed') return d;
+    const reporting = {
+      closures: d.reporting.closures.map((closure) =>
+        closure.period === period
+          ? { ...closure, status: 'closed' as const, regeneratedAt: closure.regeneratedAt }
+          : closure,
+      ),
+    };
+    validateReporting(reporting);
+    return { ...d, reporting };
+  }
   if (snapshot.dataCompleteness !== 'complete' && !options.allowPartial)
     throw Error('Confirme o fechamento com dados parciais.');
   const closure: MonthlyClosure = {

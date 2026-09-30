@@ -3,7 +3,7 @@ import { type Data, money, today } from '../model';
 import type { ViewProps } from './shared';
 import { PageHeader, Disclosure } from '../components/finance-ui';
 import {
-  buildMonthlySnapshot,
+  assessMonth,
   closeMonth,
   reopenMonth,
   latestSnapshot,
@@ -68,11 +68,13 @@ function Compare({
   before,
   title,
   rate,
+  comparison,
 }: {
   now: Snapshot;
   before?: Snapshot;
   title: string;
   rate: number | null;
+  comparison?: ReturnType<typeof compareMonths>;
 }) {
   if (!before)
     return (
@@ -81,7 +83,7 @@ function Compare({
         <p>Sem fechamento comparável.</p>
       </section>
     );
-  const result = compareMonths(now, before);
+  const result = comparison ?? compareMonths(now, before);
   const real =
     rate === null
       ? null
@@ -153,7 +155,7 @@ export function Reports({
     data: Data;
     period: string;
     inflation: InflationMonth[];
-    snapshot?: Snapshot;
+    assessment?: Awaited<ReturnType<typeof assessMonth>>;
     error?: string;
   }>();
   const [checked, setChecked] = useState<string[]>([]),
@@ -172,7 +174,8 @@ export function Reports({
     preview?.data === d &&
     preview.period === period &&
     preview.inflation === inflation;
-  const current = ready ? preview.snapshot : undefined;
+  const assessment = ready ? preview.assessment : undefined;
+  const current = assessment?.snapshot ?? undefined;
   const report =
     (revision
       ? closure?.revisions.find((r) => r.revision === revision)
@@ -188,6 +191,7 @@ export function Reports({
     : '';
   const confirmed = checkedSource === reviewKey ? checked : [];
   const closed = closure?.status === 'closed';
+  const closeState = assessment?.state ?? 'open';
   const valid = validPeriod(period),
     inProgress = valid && periodBounds(period).end >= today();
   useEffect(() => {
@@ -215,13 +219,9 @@ export function Reports({
   useEffect(() => {
     let active = true;
     if (!valid) return;
-    buildMonthlySnapshot(d, period, {
-      at: today(),
-      generatedAt: new Date().toISOString(),
-      inflation,
-    })
-      .then((snapshot) => {
-        if (active) setPreview({ data: d, period, inflation, snapshot });
+    assessMonth(d, period, { at: today(), inflation })
+      .then((next) => {
+        if (active) setPreview({ data: d, period, inflation, assessment: next });
       })
       .catch((error) => {
         if (active)
@@ -266,7 +266,12 @@ export function Reports({
     setMessage('');
   }
   async function save() {
-    if (!current || busy || confirmed.length !== checklist.length) return;
+    if (
+      !current ||
+      busy ||
+      closeState !== 'ready' ||
+      confirmed.length !== checklist.length
+    ) return;
     setBusy(true);
     setMessage('');
     try {
@@ -322,6 +327,22 @@ export function Reports({
             onChange={(e) => selectPeriod(e.target.value)}
           />
         </label>
+        <div className="report-period-nav" aria-label="Navegação de meses">
+          <button
+            type="button"
+            onClick={() => selectPeriod(shiftPeriod(period, -1))}
+            disabled={!valid}
+          >
+            Mês anterior
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPeriod(shiftPeriod(period, 1))}
+            disabled={!valid || shiftPeriod(period, 1) > today().slice(0, 7)}
+          >
+            Próximo mês
+          </button>
+        </div>
         {closure && (
           <label>
             Revisão
@@ -342,17 +363,24 @@ export function Reports({
         )}
       </div>
       {!valid && <p role="alert">Selecione um mês válido.</p>}
-      <output>
-        {closed
-          ? 'Fechado'
-          : closure
-            ? 'Reaberto'
-            : inProgress
-              ? 'Em andamento'
-              : 'Aberto'}
-        {latest ? ` · revisão ${report?.revision ?? latest.revision}` : ''}
-        {stale ? ' · Desatualizado — houve alteração nos dados de origem.' : ''}
-      </output>
+      <section className={`report-status report-status-${closeState}`} aria-label="Status do fechamento" aria-live="polite">
+        <div>
+          <span className="report-status-label">Status do mês</span>
+          <strong>
+            {closeState === 'ready'
+              ? 'Pronto para fechar'
+              : closeState === 'closed'
+                ? 'Fechado'
+                : closeState === 'reopened'
+                  ? 'Reaberto'
+                  : inProgress
+                    ? 'Em andamento'
+                    : 'Aberto'}
+          </strong>
+        </div>
+        {latest && <span>Revisão {report?.revision ?? latest.revision}</span>}
+        {stale && <p>Desatualizado — houve alteração nos dados de origem.</p>}
+      </section>
       <p className="report-no-print">
         {inflationStatus}. Relatórios salvos mantêm a inflação registrada no
         fechamento.
@@ -363,6 +391,26 @@ export function Reports({
           relatórios salvos permanecem disponíveis.
         </p>
       )}
+      {assessment?.blockers.length ? (
+        <section className="report-issues report-blockers" aria-label="Bloqueios do fechamento" role="alert">
+          <h2>Resolva antes de fechar</h2>
+          <ul>
+            {assessment.blockers.map((blocker) => (
+              <li key={blocker.id}>
+                <strong>{blocker.title}</strong> · {blocker.description}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {assessment?.warnings.length ? (
+        <section className="report-issues report-warnings" aria-label="Avisos do fechamento">
+          <h2>Avisos</h2>
+          <ul>
+            {assessment.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+          </ul>
+        </section>
+      ) : null}
       {message && <output>{message}</output>}
       {report ? (
         <>
@@ -580,9 +628,10 @@ export function Reports({
           <Disclosure title="Comparações e médias">
             <Compare
               now={report}
-              before={snapshotFor(shiftPeriod(period, -1))}
+              before={assessment?.previous ?? undefined}
               title="Mês anterior"
               rate={report.inflationRate}
+              comparison={assessment?.comparison ?? undefined}
             />
             <Compare
               now={report}
@@ -645,11 +694,6 @@ export function Reports({
               Confira os dados atuais antes de salvar uma revisão. Nenhum
               lançamento será bloqueado ou apagado.
             </p>
-            <ul>
-              {current.warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
             <fieldset disabled={busy || inProgress}>
               <legend>Checklist de conferência</legend>
               {checklist.map((label) => (
@@ -685,6 +729,7 @@ export function Reports({
               disabled={
                 busy ||
                 inProgress ||
+                closeState !== 'ready' ||
                 confirmed.length !== checklist.length ||
                 (current.dataCompleteness !== 'complete' && !allowPartial)
               }
@@ -755,6 +800,18 @@ export function Reports({
               ))}
             </select>
           </label>
+          {closure && (
+            <ol className="report-revisions" aria-label="Revisões do mês">
+              {[...closure.revisions].reverse().map((item) => (
+                <li key={item.revision} className={item.revision === (report?.revision ?? latest?.revision) ? 'current' : undefined}>
+                  <button type="button" onClick={() => setRevision(item.revision)}>
+                    Revisão {item.revision}
+                  </button>
+                  <span>{new Date(item.generatedAt).toLocaleString('pt-BR')}</span>
+                </li>
+              ))}
+            </ol>
+          )}
           {!history.length && <p>Seu primeiro fechamento aparecerá aqui.</p>}
         </Disclosure>
       </div>

@@ -7,6 +7,8 @@ import {
   reopenMonth,
   isMonthStale,
   shiftPeriod,
+  assessMonth,
+  reportSourceSignature,
 } from '../src/services/month-close';
 import {
   compareMonths,
@@ -91,7 +93,7 @@ void test('reabertura e reprocessamento preservam revisões e não mudam lançam
   const d = await closeMonth(fixture(), '2026-08', options),
     original = JSON.stringify(d.reporting.closures[0].revisions[0]);
   assert.equal(await isMonthStale(d, d.reporting.closures[0]), false);
-  await assert.rejects(closeMonth(d, '2026-08', options), /já fechado/);
+  assert.equal(await closeMonth(d, '2026-08', options), d);
   const reopened = reopenMonth(d, '2026-08', options.generatedAt);
   assert.equal(reopened.reporting.closures[0].status, 'reopened');
   assert.equal(reopenMonth(reopened, '2026-08', options.generatedAt), reopened);
@@ -110,10 +112,50 @@ void test('reabertura e reprocessamento preservam revisões e não mudam lançam
     ...options,
     reprocess: true,
   });
-  assert.equal(processed.reporting.closures[0].revisions[2].revision, 3);
+  assert.equal(processed.reporting.closures[0].revisions.length, 2);
   assert.equal(
     processed.reporting.closures[0].regeneratedAt,
     options.generatedAt,
+  );
+});
+void test('prévia classifica estado, bloqueios e avisos sem alterar os dados', async () => {
+  const d = fixture();
+  assert.equal(
+    (await assessMonth(d, '2026-08', { at: options.at })).state,
+    'ready',
+  );
+  d.imports.sessions = [{
+    id: 'pending', source: 'csv', fileName: 'dados.csv',
+    createdAt: options.generatedAt, hash: 'a'.repeat(64), rowCount: 2,
+    importedCount: 1, matchedCount: 0, ignoredCount: 0,
+    duplicateCount: 0, invalidCount: 0,
+  }];
+  const assessment = await assessMonth(d, '2026-08', { at: options.at });
+  assert.equal(assessment.state, 'open');
+  assert.ok(assessment.blockers.some((b) => b.id === 'import:pending:pending'));
+  assert.ok(assessment.snapshot);
+  assert.ok(assessment.warnings.some((warning) => warning.includes('IPCA')));
+  const closed = await closeMonth(fixture(), '2026-08', options);
+  assert.equal(
+    (await assessMonth(closed, '2026-08', { at: options.at })).state,
+    'closed',
+  );
+  assert.equal(
+    (await assessMonth(reopenMonth(closed, '2026-08', options.generatedAt), '2026-08', { at: options.at })).state,
+    'reopened',
+  );
+});
+void test('assinatura ignora ordem de armazenamento e preserva centavos', async () => {
+  const a = fixture();
+  const b = fixture();
+  a.expenses.push({ ...a.expenses[0], id: 'expense-2', amount: 301.23 });
+  b.expenses.push({ ...b.expenses[0], id: 'expense-2', amount: 301.23 });
+  b.expenses = [...b.expenses].reverse();
+  b.settings.openingCash = 1000.005;
+  a.settings.openingCash = 1000.005;
+  assert.equal(
+    await reportSourceSignature(a, '2026-08'),
+    await reportSourceSignature(b, '2026-08'),
   );
 });
 void test('exclusão de lançamento marca fechamento desatualizado sem apagar snapshot', async () => {

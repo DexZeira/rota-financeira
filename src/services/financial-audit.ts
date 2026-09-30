@@ -496,7 +496,7 @@ export function auditFinancialData(
     periods.add(c.period);
   }
   if (
-    num(d.planningVersion) > 7 ||
+    num(d.planningVersion) > 8 ||
     num(d.investmentVersion) > 1 ||
     num(d.reportingVersion) > 1 ||
     num(d.dataVersion) > 6

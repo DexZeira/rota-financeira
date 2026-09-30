@@ -64,6 +64,7 @@ export type MonthlyClosure = {
   regeneratedAt: string | null;
   revisions: MonthlyFinancialSnapshot[];
 };
+export type MonthlyCloseState = 'open' | 'ready' | 'closed' | 'reopened';
 export type ReportingState = { closures: MonthlyClosure[] };
 export const emptyReporting = (): ReportingState => ({ closures: [] });
 export const validPeriod = (p: string) =>
