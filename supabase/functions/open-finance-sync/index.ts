@@ -1,5 +1,11 @@
 import { serve } from 'https://deno.land/std@0.194.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  canSyncOpenFinanceConnection,
+  getOpenFinanceConfiguration,
+  logOpenFinanceEvent,
+  openFinanceErrorResponse,
+} from '../_shared/open-finance.ts';
 
 // Tipos para dados da Pluggy
 interface PluggyAccount {
@@ -45,16 +51,11 @@ interface ProcessedAccount {
   external_account_id: string;
 }
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-const PLUGGY_CLIENT_ID = Deno.env.get('PLUGGY_CLIENT_ID') ?? '';
-const PLUGGY_CLIENT_SECRET = Deno.env.get('PLUGGY_CLIENT_SECRET') ?? '';
-
-if (!PLUGGY_CLIENT_ID || !PLUGGY_CLIENT_SECRET) {
-  throw new Error('PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET must be set');
-}
-
 serve(async (req: Request) => {
+  const configurationResult = getOpenFinanceConfiguration(true);
+  if (!configurationResult.ok) return configurationResult.response;
+
+  const { configuration, correlationId } = configurationResult;
   try {
     // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
@@ -67,7 +68,7 @@ serve(async (req: Request) => {
 
     const token = authHeader.substring(7); // Remove "Bearer "
     // Validar token e obter usuário
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const userClient = createClient(configuration.supabaseUrl, configuration.supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: userError } = await userClient.auth.getUser(token);
@@ -104,6 +105,11 @@ serve(async (req: Request) => {
       );
     }
 
+    if (!canSyncOpenFinanceConnection(connectionData, userId)) {
+      logOpenFinanceEvent('open_finance.sync_connection_unavailable', 409, correlationId);
+      return openFinanceErrorResponse(409, correlationId);
+    }
+
     // Autenticar na Pluggy
     const authResponse = await fetch('https://api.pluggy.ai/auth', {
       method: 'POST',
@@ -112,8 +118,8 @@ serve(async (req: Request) => {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        clientId: PLUGGY_CLIENT_ID,
-        clientSecret: PLUGGY_CLIENT_SECRET
+        clientId: configuration.pluggyClientId,
+        clientSecret: configuration.pluggyClientSecret
       })
     });
 
@@ -196,6 +202,7 @@ serve(async (req: Request) => {
         .from('open_finance_accounts')
         .select('*')
         .eq('external_account_id', account.id)
+        .eq('connection_id', connectionId)
         .single();
       if (error && error.code !== 'PGRST116') {  // Se for "no rows returned", não é erro
         throw new Error(`Account lookup error: ${error.message}`);
@@ -253,6 +260,7 @@ serve(async (req: Request) => {
           .from('open_finance_accounts')
           .select('*')
           .eq('external_account_id', balance.accountId)
+          .eq('connection_id', connectionId)
           .single();
 
         if (!error && existingBalanceRecord) {
@@ -275,10 +283,16 @@ serve(async (req: Request) => {
     // Processar transações
     const transactionUpsertPromises = allTransactions.map(async (transaction: PluggyTransaction) => {
       if (!transaction.id || !transaction.accountId) return;
+      const accountData = processedAccounts.find((acc) => acc.external_account_id === transaction.accountId);
+      if (!accountData) {
+        throw new Error(`Account not found for transaction: ${transaction.id}`);
+      }
+
       const { data: existingTransaction, error } = await userClient
         .from('open_finance_transactions')
         .select('*')
         .eq('external_transaction_id', transaction.id)
+        .eq('account_id', accountData.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {  // Se for "no rows returned", não é erro
@@ -307,10 +321,6 @@ serve(async (req: Request) => {
         return;
       } else {
         // Inserir nova transação
-        const accountData = processedAccounts.find((acc) => acc.external_account_id === transaction.accountId);
-        if (!accountData) {
-          throw new Error(`Account not found for transaction: ${transaction.id}`);
-        }
         const { error: insertError } = await userClient
           .from('open_finance_transactions')
           .insert([{
@@ -354,17 +364,8 @@ serve(async (req: Request) => {
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error: unknown) {
-    console.error('Error in open-finance-sync:', error);
-    let errorMessage: string = 'Failed to synchronize data';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    return new Response(
-      JSON.stringify({        error: 'Failed to synchronize data',
-        details: errorMessage
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+  } catch {
+    logOpenFinanceEvent('open_finance.sync_failed', 500, correlationId);
+    return openFinanceErrorResponse(500, correlationId);
   }
 });

@@ -1,11 +1,10 @@
 import { serve } from 'https://deno.land/std@0.194.0/http/server.ts';
-
-// Configurações do Supabase
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
-}
+import { getOpenFinanceConfiguration, logOpenFinanceEvent, openFinanceErrorResponse } from '../_shared/open-finance.ts';
 serve(async (req: Request) => {
+  const configurationResult = getOpenFinanceConfiguration(false);
+  if (!configurationResult.ok) return configurationResult.response;
+
+  const { correlationId } = configurationResult;
   try {
     // Pluggy permite headers customizados no cadastro do webhook. A assinatura
     // usada aqui só pode ser implementada após esse contrato ser configurado.
@@ -17,18 +16,10 @@ serve(async (req: Request) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Webhook verification is not configured' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    );
+    return openFinanceErrorResponse(503, correlationId);
 
-  } catch (error) {
-    console.error('Error in open-finance-webhook:', error);
-    return new Response(
-      JSON.stringify({        error: 'Failed to process webhook',
-        details: getErrorMessage(error)
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+  } catch {
+    logOpenFinanceEvent('open_finance.webhook_failed', 500, correlationId);
+    return openFinanceErrorResponse(500, correlationId);
   }
 });

@@ -98,6 +98,7 @@ for (const file of [
 
 // Agora compilando os arquivos específicos de Open Finance
 for (const file of [
+  'supabase/functions/_shared/open-finance.ts',
   'src/services/open-finance/pluggy-provider.ts',
   'tests/open-finance-real.test.ts',
   'tests/open-finance-deduplication.test.ts',

@@ -1,16 +1,18 @@
 import { serve } from 'https://deno.land/std@0.194.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7?target=deno';
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-const PLUGGY_CLIENT_ID = Deno.env.get('PLUGGY_CLIENT_ID') ?? '';
-const PLUGGY_CLIENT_SECRET = Deno.env.get('PLUGGY_CLIENT_SECRET') ?? '';
-
-if (!PLUGGY_CLIENT_ID || !PLUGGY_CLIENT_SECRET) {
-  throw new Error('PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET must be set');
-}
+import {
+  buildPendingAuthorizationUpdate,
+  createOpenFinanceState,
+  getOpenFinanceConfiguration,
+  logOpenFinanceEvent,
+  openFinanceErrorResponse,
+} from '../_shared/open-finance.ts';
 
 serve(async (req: Request) => {
+  const configurationResult = getOpenFinanceConfiguration(true);
+  if (!configurationResult.ok) return configurationResult.response;
+
+  const { configuration, correlationId } = configurationResult;
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -22,7 +24,7 @@ serve(async (req: Request) => {
 
     const token = authHeader.substring(7);
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const userClient = createClient(configuration.supabaseUrl, configuration.supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: userError } = await userClient.auth.getUser(token);
@@ -46,43 +48,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const authResponse = await fetch('https://api.pluggy.ai/auth', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        clientId: PLUGGY_CLIENT_ID,
-        clientSecret: PLUGGY_CLIENT_SECRET
-      })
-    });
-
-    if (!authResponse.ok) {
-      throw new Error(`Pluggy Auth error: ${authResponse.status}`);
-    }
-
-    const authData = await authResponse.json();
-    const accessToken = authData.accessToken;
-
-    const pluggyResponse = await fetch('https://api.pluggy.ai/items', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({
-        institutionId: institutionId,
-        properties: {}
-      })
-    });
-
-    if (!pluggyResponse.ok) {
-      throw new Error(`Pluggy API error: ${pluggyResponse.status}`);
-    }
-
-    const itemData = await pluggyResponse.json();
+    const state = await createOpenFinanceState();
 
     const { data, error } = await userClient
       .from('open_finance_connections')
@@ -90,41 +56,28 @@ serve(async (req: Request) => {
         {
           user_id: userId,
           provider: 'pluggy',
-          external_item_id: itemData.id,
-          connector_id: itemData.connectorId,
-          institution_name: itemData.institution?.name,
-          status: itemData.status,
-          environment: Deno.env.get('OPEN_FINANCE_ENV') ?? 'sandbox',
+          environment: configuration.environment,
+          ...buildPendingAuthorizationUpdate(state),
           created_at: new Date().toISOString()
         }
       ])
-      .select();
+      .select('id')
+      .single();
 
-    if (error) {
-      throw new Error(`Database error: ${error.message}`);
+    if (error || !data) {
+      throw new Error('Database error');
     }
 
     return new Response(
       JSON.stringify({
-        item_id: itemData.id,
-        connect_token: itemData.connectToken
+        connection_id: data.id,
+        state: state.value,
+        status: 'pending_authorization'
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    console.error('Error in open-finance-connect:', error);
-
-    let errorMessage = 'Failed to create connection';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to create connection',
-        details: errorMessage
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    logOpenFinanceEvent('open_finance.connect_failed', 500, correlationId);
+    return openFinanceErrorResponse(500, correlationId);
   }
 });

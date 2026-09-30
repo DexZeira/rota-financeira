@@ -1,21 +1,19 @@
 import { serve } from 'https://deno.land/std@0.194.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-// Configurações do Supabase
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
-}
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
-const PLUGGY_CLIENT_ID = Deno.env.get('PLUGGY_CLIENT_ID')!;
-const PLUGGY_CLIENT_SECRET = Deno.env.get('PLUGGY_CLIENT_SECRET')!;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
+import {
+  buildPendingAuthorizationUpdate,
+  createOpenFinanceState,
+  getOpenFinanceConfiguration,
+  logOpenFinanceEvent,
+  ownsOpenFinanceConnection,
+  openFinanceErrorResponse,
+} from '../_shared/open-finance.ts';
 
 serve(async (req: Request) => {
+  const configurationResult = getOpenFinanceConfiguration(true);
+  if (!configurationResult.ok) return configurationResult.response;
+
+  const { configuration, correlationId } = configurationResult;
   try {
     // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
@@ -28,7 +26,7 @@ serve(async (req: Request) => {
 
     const token = authHeader.substring(7); // Remove "Bearer "
     // Validar token e obter usuário
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const userClient = createClient(configuration.supabaseUrl, configuration.supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: userError } = await userClient.auth.getUser(token);
@@ -58,65 +56,39 @@ serve(async (req: Request) => {
       .eq('id', connectionId)
       .eq('user_id', userId)
       .single();
-    if (connectionError || !connectionData) {
+    if (connectionError || !connectionData || !ownsOpenFinanceConnection(connectionData, userId)) {
       return new Response(
         JSON.stringify({ error: 'Connection not found or unauthorized' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Autenticar na Pluggy
-    const authResponse = await fetch('https://api.pluggy.ai/auth', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        clientId: PLUGGY_CLIENT_ID,
-        clientSecret: PLUGGY_CLIENT_SECRET
+    const state = await createOpenFinanceState();
+    const { data: updatedConnection, error: updateError } = await userClient
+      .from('open_finance_connections')
+      .update({
+        ...buildPendingAuthorizationUpdate(state),
+        updated_at: new Date().toISOString(),
       })
-    });
+      .eq('id', connectionId)
+      .eq('user_id', userId)
+      .select('id')
+      .single();
 
-    if (!authResponse.ok) {
-      throw new Error(`Pluggy Auth error:{authResponse.status}`);
+    if (updateError || !updatedConnection) {
+      throw new Error('Database error');
     }
-
-    const authData = await authResponse.json();
-    const accessToken = authData.accessToken;
-
-    // Criar token de reconexão para a Item existente
-    const connectTokenResponse = await fetch('https://api.pluggy.ai/connect_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({
-        itemId: connectionData.external_item_id
-      })
-    });
-
-    if (!connectTokenResponse.ok) {
-      throw new Error(`Pluggy Connect Token error: ${connectTokenResponse.status}`);
-    }
-
-    const connectTokenData = await connectTokenResponse.json();
 
     return new Response(
-      JSON.stringify({        connectToken: connectTokenData.connectToken,
-        itemId: connectionData.external_item_id
+      JSON.stringify({
+        connection_id: updatedConnection.id,
+        state: state.value,
+        status: 'pending_authorization',
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
-    console.error('Error in open-finance-reconnect:', error);
-    return new Response(
-      JSON.stringify({        error: 'Failed to initiate reconnection',
-        details: getErrorMessage(error)
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+  } catch {
+    logOpenFinanceEvent('open_finance.reconnect_failed', 500, correlationId);
+    return openFinanceErrorResponse(500, correlationId);
   }
 });

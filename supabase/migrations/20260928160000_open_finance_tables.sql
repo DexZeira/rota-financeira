@@ -12,6 +12,9 @@ create table if not exists public.open_finance_connections (
   institution_name text,
   status text,
   environment text, -- sandbox ou production
+  connect_state_hash text unique,
+  connect_state_expires_at timestamptz,
+  connect_state_consumed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   last_sync_at timestamptz,
