@@ -86,7 +86,7 @@ Arquivos transversais desta implementação:
 - `playwright.config.ts`, `tests/frontend-workspace.test.ts`, `tests/pwa.test.mjs`, `tests/e2e/redesign-global.spec.ts`, `tests/e2e/navigation.ts` e adaptações de seletores das suítes existentes para a nova navegação de Configurações.
 - `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`, este relatório e a decisão permanente em `MEMORY.md`.
 
-A worktree continha alterações prévias extensas, inclusive Supabase/Manio e scripts de manutenção. O diff total do Git não representa somente este redesign. Essas alterações foram preservadas; não houve commit, push, deploy nem migração remota nesta entrega.
+A worktree continha alterações prévias extensas, inclusive Supabase/Manio e scripts de manutenção. O diff total do Git não representa somente este redesign. Essas alterações foram preservadas; este agente não executou commit, push, deploy nem migração remota. Commits feitos por processos externos durante a execução não foram revertidos.
 
 ## Revisão e correções finais
 
@@ -110,5 +110,13 @@ Adaptações explícitas: a evolução usa somente posições/fechamentos salvos
 Executados após as correções de código: `npm test` (495 casos: 487 aprovados, oito TODOs preexistentes, zero falhas), `npm run lint`, `npx tsc --noEmit`, `npm run build:e2e` e `npm run build`. Os dois builds passaram e prepararam 84 assets públicos para uso offline. Fonte local, rotas e seções de Configurações têm cobertura de cache sem interceptar APIs, autenticação ou URLs privadas.
 
 Os E2E usam build isolado e credenciais fictícias, com rede remota bloqueada/mocks. A execução externa do preview utiliza `ROTA_E2E_EXTERNAL_SERVER=1`, evitando a limitação de encerramento da árvore de processos no sandbox Windows. Capturas locais ficam em `.impeccable/review/` e `.qa-artifacts/2.0/`, ignoradas pelo Git, com as 23 telas nos dois temas, além de login e gráficos.
+
+Resultados finais confirmados de E2E:
+
+- `playwright test --project=390 --project=1366`: 159 aprovados, um caso exclusivo de mobile ignorado no desktop, zero falhas (160 casos).
+- `playwright test tests/e2e/redesign-global.spec.ts --project=360 --project=390 --project=430 --project=768 --project=1024 --project=1366 --project=1440 --project=1920`: 40 aprovados, zero falhas. Inclui as 23 telas com fixture válida nos dois temas, perfil/persistência, auth, buscas e gráfico/privacidade.
+- `playwright test --project=320x568 --project=360x640 --project=360x740 --project=390x664 --project=390x844 --project=412x732 --project=430x932`: 70 aprovados, zero falhas. Verifica editores, importação, simulações, relatórios, busca, assistente e contas conectadas em sete alturas móveis.
+
+As suítes devem rodar em sequência quando usam a pasta de artefatos padrão: execuções simultâneas competem pela limpeza e gravação dos traces. As execuções finais acima foram isoladas. Após encerramento de uma sessão local, reiniciar o preview antes de usar a opção de servidor externo.
 
 Limites da evidência: navegador Chromium com viewports emulados; não certifica dispositivos físicos, Safari ou serviços remotos. Não foi medido Lighthouse, nem declarado cumprimento integral de WCAG. Não há nova dependência de biblioteca no redesign; lazy loading de páginas e chunk separado de charts foram preservados.
