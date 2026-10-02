@@ -34,7 +34,7 @@ async function seed(page: Page, count = 1) {
   await page.goto('/');
   await navigate(page, 'Relatórios');
   await expect(
-    page.getByRole('region', { name: 'Resumo mensal' }),
+    page.getByLabel('Principais valores do mês'),
   ).toContainText('R$');
 }
 async function checklist(page: Page) {
@@ -44,6 +44,9 @@ async function checklist(page: Page) {
   await expect(checks).toHaveCount(7);
   for (const checkbox of await checks.all()) await checkbox.check();
   await page.getByLabel('Confirmo o fechamento com dados parciais').check();
+  await page
+    .getByLabel('Entendi que este fechamento criará uma revisão imutável')
+    .check();
 }
 test('fechamento, alteração histórica, revisão, reabertura e leitura offline', async ({
   page,
@@ -78,7 +81,7 @@ test('fechamento, alteração histórica, revisão, reabertura e leitura offline
   await expect(page.getByText(/Desatualizado — houve alteração/)).toBeVisible();
   await checklist(page);
   await page
-    .getByRole('button', { name: 'Reprocessar mês', exact: true })
+    .getByRole('button', { name: 'Criar nova revisão', exact: true })
     .click();
   await expect(
     page.getByText('Fechamento salvo. A revisão anterior foi preservada.', {
@@ -93,10 +96,10 @@ test('fechamento, alteração histórica, revisão, reabertura e leitura offline
   expect(revisions).toHaveLength(2);
   expect(revisions[0]).toEqual(first);
   expect(revisions[1].expenseCents).toBe(25000);
-  await page.getByText('Reabrir mês', { exact: true }).click();
+  await page.getByText('Revisar consequência e reabrir', { exact: true }).click();
   await page.getByLabel('Entendi e quero reabrir').check();
   await page
-    .getByRole('button', { name: 'Confirmar reabertura', exact: true })
+    .getByRole('button', { name: /^Reabrir \d{4}-\d{2}$/ })
     .click();
   await expect(
     page.getByText('Mês reaberto. O relatório anterior continua disponível.', {
@@ -123,7 +126,7 @@ test('fechamento, alteração histórica, revisão, reabertura e leitura offline
     .getByRole('combobox', { name: 'Revisão', exact: true })
     .selectOption('1');
   await expect(
-    page.getByRole('region', { name: 'Resumo mensal' }),
+    page.getByRole('region', { name: 'Resultado fechado' }),
   ).toContainText('200,00');
   expect(
     await page.evaluate(

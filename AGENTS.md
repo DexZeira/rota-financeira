@@ -1,375 +1,102 @@
+@'
 # AGENTS.md
 
-Você é o agente principal responsável por desenvolver, corrigir e manter o projeto FinControl.
+Você é o agente de desenvolvimento do projeto Rota Financeira.
 
-Seu objetivo é realizar alterações corretas, pequenas, seguras e verificáveis, preservando o funcionamento existente do sistema.
+Objetivo: implementar, corrigir e manter o sistema com alterações pequenas, corretas, seguras e verificáveis.
 
----
+## Fluxo obrigatório
 
-# 1. CONTEXTO OBRIGATÓRIO
+Antes de alterar código:
 
-Antes de realizar uma tarefa relevante:
+1. Entenda a tarefa.
+2. Inspecione somente os arquivos diretamente relacionados.
+3. Confirme no código tipos, hooks, componentes, APIs e fontes de dados antes de usá-los.
+4. Carregue as Skills relevantes à tarefa quando necessário.
+5. Leia `PROJECT.md` apenas quando precisar entender arquitetura ou estrutura geral.
+6. Leia `MEMORY.md` apenas quando a tarefa depender de decisões persistentes ou histórico que não esteja claro no código.
 
-1. Leia `PROJECT.md`.
-2. Leia `MEMORY.md`.
-3. Analise os arquivos diretamente relacionados à tarefa.
-4. Verifique tipos, hooks, componentes e utilitários relacionados antes de alterar código.
-5. Não presuma que uma função, hook, campo, rota ou API existe. Confirme no código.
+Não leia `PROJECT.md`, `MEMORY.md` ou grandes partes do projeto automaticamente para tarefas locais.
 
-Para alterações simples e locais, não leia arquivos desnecessários.
-
----
-
-# 2. REGRA PRINCIPAL
-
-Não faça alterações maiores do que o necessário.
+## Implementação
 
 Prefira:
-
-* corrigir a causa do problema;
-* reutilizar código existente;
-* preservar arquitetura existente;
-* realizar alterações localizadas;
-* manter compatibilidade com dados já armazenados.
+- corrigir a causa do problema;
+- reutilizar código existente;
+- alterações localizadas;
+- preservar arquitetura e comportamento existentes;
+- preservar compatibilidade com dados persistidos.
 
 Evite:
+- reescrever arquivos sem necessidade;
+- abstrações prematuras;
+- dependências desnecessárias;
+- alterações não relacionadas à tarefa;
+- duplicar regras de negócio.
 
-* reescrever componentes inteiros sem necessidade;
-* criar abstrações prematuras;
-* instalar bibliotecas desnecessárias;
-* modificar páginas não relacionadas à tarefa;
-* alterar aparência global sem solicitação;
-* remover funcionalidades existentes para facilitar uma implementação.
+Nunca invente:
+- APIs;
+- hooks;
+- componentes;
+- propriedades;
+- variáveis de ambiente;
+- resultados de testes.
 
----
+Use TypeScript com tipagem forte. Evite `any` sem necessidade técnica real.
 
-# 3. PROIBIÇÕES
+Regras financeiras devem usar cálculos determinísticos existentes no código. Não substitua cálculos TypeScript por cálculos produzidos por LLM.
 
-Nunca:
+Antes de alterar armazenamento, banco, schemas ou formatos persistidos, verifique compatibilidade com dados existentes e carregue a Skill apropriada.
 
-* invente APIs;
-* invente propriedades;
-* invente hooks;
-* invente componentes;
-* invente variáveis de ambiente;
-* invente resultados de testes;
-* diga que o build passou sem executar o build quando for possível executá-lo;
-* esconda erros apenas para fazer o TypeScript compilar;
-* use `any` sem necessidade técnica real;
-* duplique regras de negócio importantes;
-* altere formato de armazenamento persistente sem verificar compatibilidade.
+## Skills
 
----
-
-# 4. TYPESCRIPT
-
-O projeto utiliza TypeScript.
-
-Regras:
-
-* preserve tipagem forte;
-* evite `any`;
-* prefira tipos existentes;
-* não crie tipos duplicados;
-* verifique interfaces antes de adicionar propriedades;
-* alterações de tipos devem ser refletidas em todos os usos relacionados;
-* campos opcionais devem ser realmente opcionais quando necessário.
-
----
-
-# 5. REACT
-
-Ao trabalhar com React:
-
-* evitar estado duplicado;
-* evitar efeitos desnecessários;
-* evitar cálculos importantes espalhados em vários componentes;
-* reutilizar hooks existentes;
-* preservar fluxo de dados atual quando estiver correto;
-* não causar loops de renderização;
-* não alterar dependências de `useEffect` sem analisar as consequências.
-
-Componentes devem permanecer legíveis e focados.
-
----
-
-# 6. REGRAS DE NEGÓCIO
-
-Regras financeiras devem possuir uma única fonte de verdade sempre que possível.
-
-Não replique o mesmo cálculo em várias páginas.
-
-Quando existir função, helper ou hook apropriado, reutilize-o.
-
-Valores monetários não devem depender de strings formatadas para cálculos internos.
-
-Separe:
-
-* valor numérico;
-* valor exibido formatado.
-
----
-
-# 7. DÍVIDAS
-
-Para dívidas parceladas, NÃO existe campo manual:
-
-`valorOriginal`
-
-O usuário informa:
-
-* nome;
-* quantidade total de parcelas;
-* valor da parcela;
-* parcelas já pagas;
-* vencimento;
-* juros, quando houver;
-* observações.
-
-O valor total deve ser calculado:
-
-```ts
-valorTotal = quantidadeTotalParcelas * valorParcela
-```
-
-As parcelas restantes:
-
-```ts
-parcelasRestantes =
-  quantidadeTotalParcelas - parcelasPagas
-```
-
-O saldo restante:
-
-```ts
-saldoRestante =
-  parcelasRestantes * valorParcela
-```
-
-Exemplo:
-
-```text
-12 parcelas
-1 paga
-R$ 500 por parcela
-
-Valor total = R$ 6.000
-Parcelas restantes = 11
-Saldo restante = R$ 5.500
-```
-
-Nunca recrie um campo editável de valor original.
-
----
-
-# 8. INVESTIMENTOS
-
-A área de investimentos deve permitir apresentar rendimento de investimentos usando referências financeiras.
+Use Skills sob demanda.
 
 Exemplos:
+- regras do Rota Financeira → `rota-financeira-rules`
+- cálculos financeiros → `financial-calculations`
+- frontend → `frontend-conventions`
+- Supabase → `supabase-safety`
+- migrações/backups → `data-migrations-backup`
+- regressões/testes → `regression-testing`
 
-* CDI;
-* percentual do CDI;
-* rendimento anual;
-* rendimento mensal estimado quando aplicável.
+Skills de design, acessibilidade, UX, temas e testes de interface devem ser carregadas somente quando a tarefa realmente exigir.
 
-Evite tratar taxas econômicas como valores eternamente fixos quando houver mecanismo de atualização.
+Não carregue várias Skills sem necessidade.
 
-Cálculos devem informar claramente quando forem estimativas.
+## Validação
 
----
+Após alterações relevantes, execute somente as validações apropriadas à mudança.
 
-# 9. VEÍCULOS
+Quando aplicável:
+1. TypeScript;
+2. lint;
+3. testes relacionados;
+4. build.
 
-O sistema possui gerenciamento de veículos.
+Não diga que um comando passou sem executá-lo.
 
-O veículo principal usado como referência atualmente é:
+Não encerre a tarefa com erros novos conhecidos causados pela alteração.
 
-Honda XRE 190 2025.
+## Memória
 
-A área de veículos pode se relacionar com:
+Atualize `MEMORY.md` somente quando surgir:
+- decisão permanente;
+- regra de negócio nova ou alterada;
+- mudança arquitetural relevante;
+- comportamento definitivo que futuras tarefas precisam conhecer.
 
-* manutenção;
-* despesas;
-* impostos;
-* quilometragem;
-* custo por quilômetro;
-* depreciação.
+Não registre logs, tentativas, raciocínio, tarefas triviais ou informações óbvias no código.
 
-Não acople desnecessariamente regras específicas de uma única moto ao funcionamento geral do sistema.
+## Comunicação
 
----
+Responda em português e seja objetivo.
 
-# 10. MANUTENÇÃO
+Ao concluir, informe:
+- o que foi alterado;
+- arquivos modificados;
+- validações executadas;
+- limitações ou pendências reais.
 
-A área de manutenção deve permitir acompanhar itens por:
-
-* quilometragem;
-* data;
-* prioridade;
-* situação;
-* custo.
-
-Sempre que possível, separar:
-
-* recomendação;
-* histórico realizado;
-* próxima manutenção.
-
-Não sobrescrever histórico ao atualizar próxima manutenção.
-
----
-
-# 11. IMPOSTOS
-
-O projeto possui área de impostos relacionada a veículos.
-
-Pode incluir:
-
-* IPVA;
-* licenciamento;
-* outros custos aplicáveis.
-
-Valores externos sujeitos a alteração não devem ser tratados como constantes eternas.
-
-Se não houver fonte confiável disponível, deixe claro que o dado precisa ser atualizado em vez de inventar um valor.
-
----
-
-# 12. STORAGE E PERSISTÊNCIA
-
-Antes de alterar persistência:
-
-1. localize a implementação atual;
-2. verifique prefixos e chaves utilizadas;
-3. analise dados existentes;
-4. preserve compatibilidade sempre que possível.
-
-Nunca altere silenciosamente estruturas persistidas se isso puder apagar ou invalidar dados existentes.
-
-Se uma mudança estrutural for necessária, considere migração.
-
----
-
-# 13. INTERFACE
-
-A interface deve permanecer:
-
-* limpa;
-* moderna;
-* simples;
-* consistente;
-* responsiva;
-* fácil para usuários comuns.
-
-Não adicionar campos, botões ou informações sem utilidade clara.
-
-Não alterar identidade visual global apenas por preferência do agente.
-
-Preserve suporte a:
-
-* tema claro;
-* tema escuro;
-* tema do sistema;
-
-quando já implementado.
-
----
-
-# 14. VALIDAÇÃO OBRIGATÓRIA
-
-Depois de alterações relevantes:
-
-1. verifique erros de TypeScript;
-2. execute lint quando configurado;
-3. execute testes relacionados quando existirem;
-4. execute o build;
-5. corrija erros causados pela alteração.
-
-Não encerre a tarefa com erros novos conhecidos.
-
----
-
-# 15. INVESTIGAÇÃO DE BUGS
-
-Ao encontrar um bug:
-
-1. reproduza ou determine a condição que o causa;
-2. localize a origem;
-3. identifique por que ocorre;
-4. corrija a causa;
-5. verifique efeitos colaterais;
-6. valide o cenário original.
-
-Não aplique correções superficiais apenas para esconder sintomas.
-
----
-
-# 16. MEMÓRIA
-
-`MEMORY.md` contém decisões persistentes importantes.
-
-Antes de contradizer uma decisão registrada:
-
-1. confirme que a nova tarefa realmente exige mudança;
-2. explique tecnicamente a incompatibilidade;
-3. atualize a memória caso a decisão antiga seja substituída.
-
----
-
-# 17. QUANDO ATUALIZAR MEMORY.md
-
-Atualize somente quando houver:
-
-* decisão permanente;
-* nova regra de negócio;
-* mudança de arquitetura relevante;
-* bug importante cuja causa deve ser lembrada;
-* comportamento definitivo do sistema;
-* preferência persistente do projeto.
-
-Não salvar:
-
-* logs;
-* tentativas temporárias;
-* raciocínio interno;
-* conversa casual;
-* tarefas pequenas concluídas;
-* informações já óbvias no código.
-
-A memória deve permanecer curta e útil.
-
----
-
-# 18. COMUNICAÇÃO
-
-Responda em português.
-
-Seja objetivo.
-
-Ao concluir uma tarefa, informe:
-
-* problema encontrado;
-* solução aplicada;
-* arquivos modificados;
-* resultado das validações;
-* pendências reais, caso existam.
-
-Não envie explicações enormes quando uma resposta curta for suficiente.
-
-Não repita várias vezes a mesma informação.
-
----
-
-# 19. PRIORIDADE
-
-Quando houver conflito entre:
-
-1. pedido atual do usuário;
-2. regras atuais de negócio;
-3. memória antiga;
-4. implementação antiga;
-
-priorize a decisão mais recente e explicitamente solicitada pelo usuário, desde que seja tecnicamente possível.
-
-Quando uma regra antiga for substituída definitivamente, atualize `MEMORY.md`.
+Não repita informações desnecessariamente.
+'@ | Set-Content "AGENTS.md" -Encoding UTF8

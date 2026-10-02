@@ -1,12 +1,12 @@
 import type { Link, Transaction } from './types';
 export const strongKey = (t: Transaction) =>
   t.externalId && t.accountLabel
-    ? JSON.stringify([t.source, t.source === 'open_finance' ? t.accountId : t.accountLabel, t.externalId])
+    ? JSON.stringify([t.source, ['open_finance', 'manio'].includes(t.source) ? t.accountId : t.accountLabel, t.externalId])
     : '';
 export const contentKey = (t: Transaction) =>
   JSON.stringify([
     t.source,
-    t.source === 'open_finance' ? t.accountId : t.accountLabel,
+    ['open_finance', 'manio'].includes(t.source) ? t.accountId : t.accountLabel,
     t.date,
     t.direction,
     t.amountCents,

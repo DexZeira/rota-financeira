@@ -2,6 +2,227 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.financial-health > .health-review-overview {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 24px;
+  margin: 0 0 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 8px 24px;
+}
+.health-review-overview > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.health-review-overview > div > svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.health-review-overview h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.health-review-overview > p {
+  grid-column: 1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding-left: 32px;
+}
+.health-review-overview dl {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-self: center;
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.health-review-overview dt {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.health-review-overview dd {
+  font-size: 24px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 0;
+}
+.health-toolbar {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 16px 24px;
+  display: flex;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+.health-toolbar > label {
+  width: min(100%, 240px);
+  font-size: 12px;
+}
+.health-toolbar > output {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding-bottom: 12px;
+}
+.alerts-page > output {
+  display: block;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-block: 16px;
+}
+.financial-health > .health-review-list {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 8px 24px;
+  margin: 0 0 24px;
+}
+.health-review-list > .financial-item {
+  padding-block: 20px;
+}
+.health-review-list > .financial-item:last-of-type {
+  border-bottom: 0;
+}
+.health-review-list .financial-item-main {
+  align-items: start;
+}
+.health-review-list .financial-item-value small {
+  font-size: 12px;
+  background: var(--secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.health-review-list .financial-item > p {
+  font-size: 13px;
+  max-width: 75ch;
+  color: var(--muted-foreground);
+}
+.health-review-list .financial-item > button {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.situation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.situation-layout > .situation-current,
+.situation-layout > .disclosure {
+  min-width: 0;
+  padding: 24px;
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  border: 0;
+  margin: 0;
+}
+.situation-current h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+.situation-page .health-stats {
+  display: block;
+}
+.situation-page .health-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 16px 0;
+  width: 100%;
+  gap: 4px 16px;
+  align-items: center;
+}
+.situation-page .health-stat:last-child {
+  border-bottom: 0;
+}
+.situation-page .health-stat > span {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.situation-page .health-stat > strong {
+  font-size: 20px;
+  text-align: right;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  font-variant-numeric: tabular-nums;
+}
+.situation-page .health-stat > small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.situation-page .health-stat:hover {
+  background: var(--secondary);
+}
+.situation-current .health-stat:first-child > strong {
+  font-size: 32px;
+}
+.situation-current > p,
+.situation-layout .disclosure-body > p {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.situation-page > section,
+.situation-page > .disclosure {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  border: 0;
+  padding: 16px 24px;
+  margin-block: 24px;
+}
+@media (max-width: 767px) {
+  .financial-health > .health-review-overview {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 12px;
+  }
+  .health-review-overview dl {
+    grid-column: 1;
+    grid-row: auto;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 16px 0 0;
+  }
+  .health-toolbar {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px;
+  }
+  .health-toolbar > label {
+    flex: 1 1 120px;
+  }
+  .health-toolbar > output {
+    margin: 0;
+    padding-bottom: 0;
+    width: 100%;
+  }
+  .financial-health > .health-review-list {
+    padding-inline: 16px;
+  }
+  .situation-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .situation-layout > .situation-current,
+  .situation-layout > .disclosure,
+  .situation-page > section,
+  .situation-page > .disclosure {
+    padding: 16px;
+  }
+  .situation-page .health-stat > strong {
+    font-size: 18px;
+  }
+}
 .financial-health .financial-item {
   padding-block: 1rem;
   border-bottom: 1px solid var(--border);

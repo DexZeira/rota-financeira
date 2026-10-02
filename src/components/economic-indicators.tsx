@@ -1,6 +1,7 @@
 import { dec, brDate } from '../model';
 import { type EconomicIndicators } from '../hooks/use-economic-indicators';
 import { type FinancialIndicator } from '../services/indicator-cache';
+import './economic-indicators.css';
 
 export const indicatorStatus = { actual: 'Atual', estimated: 'Estimado', cached: 'Em cache', unavailable: 'Indisponível' };
 function Indicator({ label, indicator }: { label: string; indicator: FinancialIndicator }) {

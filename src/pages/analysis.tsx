@@ -6,6 +6,8 @@ import { Card, NoData, Choice, Fields } from '../components/common';
 import { type Row, num, money, dec, brDate, today } from '../model';
 import { costs, financial, prioritized, investmentBalance, workResult, sum, simulate } from '../calculations';
 import { type ViewProps, value } from './shared';
+import { PrivateValue } from '../components/value-privacy';
+import './analysis.css';
 export function Analysis(p: ViewProps) {
   const d = p.data,
     [filter, setFilter] = useState('30 dias'),
@@ -67,10 +69,9 @@ export function Analysis(p: ViewProps) {
     });
   const activities = [...new Set(work.map((r) => String(r.activity)))];
   return (
-    <>
-      <PageHeader title="Seu dinheiro em perspectiva" description="Perguntas simples. Decisões mais claras." />
-      <button type="button" onClick={() => p.go('Relatórios')}>Comparar fechamentos mensais</button>
-      <div className="section-heading">
+    <div className="analysis-page">
+      <PageHeader title="Seu dinheiro em perspectiva" description="Observe os fluxos do período e compare seus resultados." action={<button type="button" onClick={() => p.go('Relatórios')}>Comparar fechamentos mensais</button>} />
+      <div className="analysis-period section-heading">
         <p>
           Período: {brDate(start)} a {brDate(at)}
         </p>
@@ -81,9 +82,10 @@ export function Analysis(p: ViewProps) {
           options={['7 dias', '30 dias', 'mês', 'ano']}
         />
       </div>
+      <section className="analysis-current-position" aria-label="Posição atual"><div><span>Caixa registrado</span><strong><PrivateValue>{money(f.cash)}</PrivateValue></strong></div><div><span>Patrimônio líquido atual</span><strong><PrivateValue>{money(f.netWorth)}</PrivateValue></strong></div><div><span>Dívidas atuais</span><strong><PrivateValue>{money(f.debt)}</PrivateValue></strong></div></section>
       <div className="analysis-questions">
         {([['Lucro', 'Seu lucro está melhorando?'], ['Gastos', 'Como seus gastos evoluem?'], ['Faturamento', 'Como seu faturamento evoluiu?']] as const).map(([m, question]) => (
-          <section className="analysis-question" key={m}><div className="section-heading"><div><p className="eyebrow">{m === 'Lucro' ? '01 · RESULTADO ESTIMADO' : m === 'Gastos' ? '02 · DESPESAS' : '03 · RECEITAS'}</p><h2>{question}</h2></div></div><Chart title={m === 'Lucro' ? 'Lucro estimado (R$)' : `${m} (R$)`} items={series(m)} />{!series(m).length && <p className="empty-state">Ainda não há dados suficientes para esta análise.</p>}</section>
+          <section className="analysis-question" key={m}><h2>{question}</h2><Chart title={m === 'Lucro' ? 'Lucro estimado (R$)' : `${m} (R$)`} items={series(m)} />{m === 'Lucro' && <p className="inline-note">Estimativa com os custos atuais da moto. O período altera os fluxos apresentados.</p>}</section>
         ))}
       </div>
       <details className="disclosure"><summary>Seu patrimônio e os custos de hoje</summary><div className="two-grid">
@@ -201,6 +203,6 @@ export function Analysis(p: ViewProps) {
           {value('Patrimônio projetado', money(sim.netWorth))}
         </div>
       </Card>
-    </details><details className="disclosure"><summary>Evolução dos últimos meses</summary><TrendChart data={d}/></details></>
+    </details><details className="disclosure"><summary>Evolução dos últimos meses</summary><TrendChart data={d}/></details></div>
   );
 }

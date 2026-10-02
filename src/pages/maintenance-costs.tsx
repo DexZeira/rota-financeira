@@ -1,13 +1,17 @@
 import { Card } from '../components/common';
 import { maintenanceSummary } from '../calculations';
 import { type Data, dec, money, num } from '../model';
+import './maintenance-costs.css';
 const rate = (n: number | null) =>
   n === null ? 'Indisponível' : `R$ ${dec(n, 4)}/km`;
 export function MaintenanceCostSummary({ data }: { data: Data }) {
   const m = maintenanceSummary(data);
   return (
-    <Card title="Custo de manutenção por km">
-      <div className="work-stats">
+    <Card
+      title="Custo de manutenção por km"
+      className="maintenance-cost-summary"
+    >
+      <div className="maintenance-cost-comparison">
         <div className="detail">
           <span>Estimado</span>
           <strong>{rate(m.totalEstimatedCostPerKm)}</strong>
@@ -27,11 +31,11 @@ export function MaintenanceCostSummary({ data }: { data: Data }) {
       <p className="inline-note">
         A vida útil usa o intervalo em km quando não preenchida. Itens com
         estimativa substituem previsões da aba Moto de mesmo nome ou vinculadas
-        no cadastro. Aliases e nomes normalizados também identificam o mesmo componente;
-        correspondências incertas precisam de confirmação abaixo. Seguro e documentação continuam no custo
-        operacional.
+        no cadastro. Aliases e nomes normalizados também identificam o mesmo
+        componente; correspondências incertas precisam de confirmação abaixo.
+        Seguro e documentação continuam no custo operacional.
       </p>
-      <div className="work-list">
+      <div className="maintenance-component-costs">
         {m.items
           .filter((r) => r.estimatedCostPerKm !== null || r.hasActualCost)
           .map((r) => (

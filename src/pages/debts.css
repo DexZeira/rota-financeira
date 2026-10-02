@@ -1,0 +1,26 @@
+.debts-page { min-width: 0; }
+.debt-position { display: grid; grid-template-columns: 1.3fr 1fr 1fr; background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 24px; }
+.debt-position > div { display: grid; align-content: center; gap: 8px; padding: 24px; border-right: 1px solid var(--border); min-width: 0; }
+.debt-position > div:last-child { border: 0; }
+.debt-position span { color: var(--muted-foreground); font-size: 12px; }
+.debt-position strong { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.debt-position > div:first-child strong { font-size: 32px; }
+.debt-workspace { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); align-items: start; gap: 24px; margin-bottom: 24px; }
+.debt-commitments { min-width: 0; background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+.debt-commitments h2 { font-size: 16px; margin: 0; }
+.debt-commitments .section-heading > span { color: var(--muted-foreground); font-size: 12px; }
+.debt-commitments .financial-item { padding-block: 20px; }
+.debt-commitments .financial-item-name h3 { font-size: 14px; }
+.debt-commitments .financial-item-value strong { font-size: 18px; }
+.debt-commitments .financial-item > small { color: var(--muted-foreground); font-size: 11px; }
+.debt-strategy { min-width: 0; }
+.debt-strategy .card { margin: 0; }
+.debt-strategy .card > .section-heading { flex-wrap: wrap; align-items: flex-start; }
+.debt-strategy .choice { width: 100%; }
+.debt-strategy .rank-row { display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 12px; padding-block: 18px; }
+.debt-strategy .rank-row > strong { grid-column: 2; font-size: 14px; font-variant-numeric: tabular-nums; }
+.debt-strategy .rank-row h3 { font-size: 13px; line-height: 1.6; }
+.debt-strategy .rank-row p { font-size: 12px; line-height: 1.6; }
+.debt-strategy .rank { background: var(--muted); color: var(--primary); border-radius: 6px; width: 28px; height: 28px; font-size: 12px; }
+@media (max-width: 1000px) { .debt-workspace { grid-template-columns: 1fr; } }
+@media (max-width: 767px) { .debt-position { grid-template-columns: 1fr; } .debt-position > div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px; border-right: 0; border-bottom: 1px solid var(--border); } .debt-position strong, .debt-position > div:first-child strong { font-size: 20px; text-align: right; } .debt-commitments { padding: 16px; } }

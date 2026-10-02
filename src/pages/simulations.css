@@ -1,6 +1,71 @@
 .simulations-page {
   min-width: 0;
 }
+.simulation-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  align-items: start;
+  margin-block: 24px;
+}
+.simulation-editor,
+.simulation-output {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  min-width: 0;
+  padding: 24px;
+}
+.simulation-output > h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+.simulation-editor > fieldset:first-child {
+  margin-top: 0;
+}
+.simulation-editor > fieldset + fieldset {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+  margin-top: 24px;
+}
+.simulation-editor legend {
+  font-size: 16px;
+}
+.simulation-editor p,
+.simulation-results p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.simulation-results > p:first-child {
+  margin-top: 0;
+}
+.simulation-comparison thead {
+  background: var(--secondary);
+}
+.simulation-comparison th,
+.simulation-comparison td {
+  padding: 12px 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.simulation-comparison tbody th {
+  font-weight: 500;
+}
+.simulation-comparison td:last-child {
+  font-weight: 650;
+}
+.simulation-output .inline-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.simulation-output .inline-stats .detail strong {
+  font-size: 16px;
+}
+.simulations-page > .disclosure {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  border: 0;
+  padding-inline: 24px;
+}
 .simulations-page fieldset {
   min-width: 0;
   margin-block: 1rem;
@@ -70,7 +135,20 @@
 .simulation-schedule span {
   display: block;
 }
+@media (max-width: 1023px) {
+  .simulation-workspace {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
 @media (max-width: 767px) {
+  .simulation-editor,
+  .simulation-output {
+    padding: 16px;
+  }
+  .simulations-page > .disclosure {
+    padding-inline: 16px;
+  }
   .simulation-fields,
   .simulation-columns {
     grid-template-columns: minmax(0, 1fr);

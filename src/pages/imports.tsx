@@ -8,6 +8,8 @@ import {
   brDate,
 } from '../model';
 import { type ViewProps } from './shared';
+import { PageHeader } from '../components/finance-ui';
+import { FileUp, FileCheck2, Check } from 'lucide-react';
 import { csvCells, detectCsv } from '../services/import/csv-import';
 import {
   decodeStatement,
@@ -57,7 +59,9 @@ const initialReview = (category = 'outras'): Review => ({
 });
 
 export function Imports(
-  p: ViewProps & { commitImport: (next: Data, expected: Data) => Promise<void> },
+  p: ViewProps & {
+    commitImport: (next: Data, expected: Data) => Promise<void>;
+  },
 ) {
   const [file, setFile] = useState<{
       name: string;
@@ -297,38 +301,81 @@ export function Imports(
   };
   return (
     <div className="imports-page">
-      <h1>Importar</h1>
-      <p>
+      <PageHeader
+        title="Importar extrato"
+        description="Traga seus lançamentos e confirme cada decisão antes de salvar."
+      />
+      <ol className="import-steps" aria-label="Etapas da importação">
+        <li
+          aria-current={!file ? 'step' : undefined}
+          data-complete={Boolean(file)}
+        >
+          <FileUp size={18} aria-hidden="true" />
+          <span>
+            Selecionar arquivo<small>CSV ou OFX</small>
+          </span>
+        </li>
+        <li
+          aria-current={file && !rows.length ? 'step' : undefined}
+          data-complete={rows.length > 0}
+        >
+          <FileCheck2 size={18} aria-hidden="true" />
+          <span>
+            Conferir e revisar<small>Origem, colunas e linhas</small>
+          </span>
+        </li>
+        <li aria-current={rows.length > 0 ? 'step' : undefined}>
+          <Check size={18} aria-hidden="true" />
+          <span>
+            Confirmar<small>Somente linhas revisadas</small>
+          </span>
+        </li>
+      </ol>
+      <p className="import-source-note">
         CSV e OFX, processados neste dispositivo. Revise antes de confirmar. O
         arquivo original não é salvo.
       </p>
       {error && <p role="alert">{error}</p>}
       {notice && <output>{notice}</output>}
-      <label>
-        Arquivo CSV ou OFX
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".csv,.ofx"
-          onChange={(e) => void chooseFile(e.target.files?.[0])}
-        />
-      </label>
-      <label>
-        Codificação
-        <select
-          value={encoding}
-          onChange={(e) => {
-            setEncoding(e.target.value as typeof encoding);
-            invalidate();
-          }}
-        >
-          <option value="auto">Detectar UTF-8 / Windows-1252</option>
-          <option value="utf-8">UTF-8</option>
-          <option value="windows-1252">Windows-1252 / Latin-1</option>
-        </select>
-      </label>
+      <section className="import-upload" aria-label="Selecionar arquivo">
+        <div className="import-upload-intro">
+          <FileUp size={28} aria-hidden="true" />
+          <div>
+            <h2>Seu extrato começa aqui</h2>
+            <p>Arquivo de até 10 MB, processado neste dispositivo.</p>
+          </div>
+        </div>
+        <div className="import-fields">
+          <label>
+            Arquivo CSV ou OFX
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".csv,.ofx"
+              onChange={(e) => void chooseFile(e.target.files?.[0])}
+            />
+          </label>
+          <label>
+            Codificação
+            <select
+              value={encoding}
+              onChange={(e) => {
+                setEncoding(e.target.value as typeof encoding);
+                invalidate();
+              }}
+            >
+              <option value="auto">Detectar UTF-8 / Windows-1252</option>
+              <option value="utf-8">UTF-8</option>
+              <option value="windows-1252">Windows-1252 / Latin-1</option>
+            </select>
+          </label>
+        </div>
+      </section>
       {file && (
-        <section aria-label="Configuração do arquivo">
+        <section
+          className="import-configuration"
+          aria-label="Configuração do arquivo"
+        >
           <h2>1. Conferir arquivo</h2>
           <p>
             {file.name} · {file.source.toUpperCase()} · limite de 10 MB / 50.000
@@ -483,7 +530,7 @@ export function Imports(
       )}
       {busy && <output>Analisando localmente…</output>}
       {rows.length > 0 && (
-        <section aria-label="Preview da importação">
+        <section className="import-preview" aria-label="Preview da importação">
           <h2>2. Revisar {rows.length} linhas</h2>
           <p>
             {summary.credits.length} créditos:{' '}
@@ -935,22 +982,24 @@ export function Imports(
               )}
             </section>
           )}
-          <h2>3. Confirmar</h2>
-          <p>
-            {selectedCount} linhas revisadas. Linhas pendentes e inválidas não
-            serão importadas.
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            Revisei as decisões e confirmo a gravação
-          </label>
-          <button disabled={!confirmed || !selectedCount} onClick={apply}>
-            Confirmar importação
-          </button>
+          <div className="import-confirmation">
+            <h2>3. Confirmar</h2>
+            <p>
+              {selectedCount} linhas revisadas. Linhas pendentes e inválidas não
+              serão importadas.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+              />
+              Revisei as decisões e confirmo a gravação
+            </label>
+            <button disabled={!confirmed || !selectedCount} onClick={apply}>
+              Confirmar importação
+            </button>
+          </div>
         </section>
       )}
       <details>
@@ -1076,19 +1125,20 @@ export function Imports(
               type="checkbox"
               checked={r.enabled}
               onChange={() =>
-                act(async () =>
-                  await p.commitImport(
-                    validateData({
-                      ...p.data,
-                      imports: {
-                        ...p.data.imports,
-                        rules: p.data.imports.rules.map((x) =>
-                          x.id === r.id ? { ...x, enabled: !x.enabled } : x,
-                        ),
-                      },
-                    }),
-                    p.data,
-                  ),
+                act(
+                  async () =>
+                    await p.commitImport(
+                      validateData({
+                        ...p.data,
+                        imports: {
+                          ...p.data.imports,
+                          rules: p.data.imports.rules.map((x) =>
+                            x.id === r.id ? { ...x, enabled: !x.enabled } : x,
+                          ),
+                        },
+                      }),
+                      p.data,
+                    ),
                 )
               }
             />

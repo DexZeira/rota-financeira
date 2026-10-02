@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 import { defaults, emptyRow, today } from '../../src/model';
 import { encodeMoney } from '../../src/services/money-codec';
 import { MockOpenFinanceProvider } from '../../src/services/open-finance/mock-provider';
@@ -7,10 +7,7 @@ import { emptyOpenFinance } from '../../src/services/open-finance/types';
 
 async function open(page: Page) {
   await navigate(page, 'Configurações');
-  await page
-    .locator('summary')
-    .filter({ hasText: 'Contas conectadas' })
-    .click();
+  await selectSettingsSection(page, 'Integrações');
 }
 async function connect(page: Page) {
   await page
@@ -20,11 +17,10 @@ async function connect(page: Page) {
   await page
     .getByRole('button', { name: 'Instituição demonstração', exact: true })
     .click();
-  await expect(
-    page.getByRole('button', { name: 'Autorizar demonstração' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Autorizar demonstração' }).click();
-  await page.getByRole('button', { name: 'Sincronizar agora' }).click();
+  const authorize = page.getByRole('button', { name: 'Conectar', exact: true });
+  await expect(authorize).toBeVisible();
+  await authorize.click();
+  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
   await expect(
     page.getByText('Compra demonstração', { exact: true }),
   ).toBeVisible();
@@ -35,6 +31,13 @@ test.beforeEach(async ({ context }) => {
       ? r.continue()
       : r.fulfill({ status: 503, body: '{}' }),
   );
+});
+
+test('retorno OAuth abre a aplicação diretamente em Open Finance', async ({ page }) => {
+  await page.goto('/open-finance/callback');
+  await expect(page.getByRole('heading', { name: 'Configurações', level: 1 })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Integrações', exact: true, includeHidden: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: 'Contas conectadas', exact: true })).toBeVisible();
 });
 
 test('Open Finance mock: recuperação por arquivo e cópia exige nova autorização', async ({ page }) => {
@@ -51,10 +54,11 @@ test('Open Finance mock: recuperação por arquivo e cópia exige nova autoriza�
     }
     await page.getByLabel('Confirmação de recuperação').fill('RESTAURAR');
     await page.getByRole('button', { name: 'Confirmar recuperação', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Hoje', level: 1 })).toBeVisible();
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('rota-financeira-v1')!).openFinance.connections[0].status)).toBe('reauthorization_required');
     await open(page);
-    await expect(page.getByRole('button', { name: 'Renovar acesso', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Sincronizar agora', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Conectar', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toHaveCount(0);
     await expect(page.getByText('Compra demonstração', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('rota-financeira-v1')!).openFinance.sync[0].cursor)).toBeNull();
   }
@@ -115,13 +119,12 @@ test('Open Finance mock: OFX com outro rótulo de conta exige conciliação e ma
   await expect(
     page.getByRole('button', { name: 'Importar lançamento', exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByRole('button', {
-      name: 'Conciliar com Compra demonstração',
-      exact: true,
-    })
-    .click();
-  await expect(page.getByText(/Efetivada.*Revisada/)).toBeVisible();
+  // Open reconciliation details for the transaction
+  const txRow = page.locator('.connected-transaction-row').filter({ hasText: 'Compra demonstração' });
+  await txRow.getByText('Revisar e conciliar', { exact: true }).click();
+  await txRow.getByRole('button', { name: 'Conciliar com Compra demonstração', exact: true }).click();
+  await expect(txRow.locator('.transaction-state')).toContainText('Efetivada');
+  await expect(txRow.locator('.transaction-state')).toContainText('Revisada');
   expect(
     await page.evaluate(
       () =>
@@ -184,15 +187,19 @@ test('Open Finance mock: dez contas, paginação limitada e transferência sem e
     name: 'Contas conectadas',
     exact: true,
   });
-  await expect(section.locator('article > strong')).toHaveCount(25);
-  await section
+  await expect(section.locator('.connected-transaction-row')).toHaveCount(25);
+  const transferRow = section
+    .locator('.connected-transaction-row')
+    .filter({ hasText: 'Registro 0' });
+  await transferRow.getByText('Revisar e conciliar', { exact: true }).click();
+  await transferRow
     .getByRole('button', {
       name: 'Conciliar transferência com Conta demonstração',
       exact: true,
     })
     .first()
     .click();
-  await expect(section.getByText(/Efetivada.*Revisada/)).toHaveCount(2);
+  await expect(section.getByText('Revisada', { exact: true })).toHaveCount(2);
   expect(
     await page.evaluate(() => {
       const state = JSON.parse(localStorage.getItem('rota-financeira-v1')!);
@@ -200,10 +207,9 @@ test('Open Finance mock: dez contas, paginação limitada e transferência sem e
     }),
   ).toBe(0);
   await section.getByRole('button', { name: 'Próxima página' }).click();
-  await expect(section.locator('article > strong')).toHaveCount(25);
-  await expect(section.getByText('Registro 25', { exact: true })).toBeVisible();
+  await expect(section.locator('.connected-transaction-row')).toHaveCount(25);
   await section.getByRole('button', { name: 'Próxima página' }).click();
-  await expect(section.locator('article > strong')).toHaveCount(10);
+  await expect(section.locator('.connected-transaction-row')).toHaveCount(10);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -217,21 +223,29 @@ test('Open Finance mock: conectar, revisar, persistir, revogar e consultar offli
   await page.goto('/');
   await open(page);
   await connect(page);
-  await page
-    .getByRole('button', { name: 'Importar lançamento', exact: true })
-    .click();
-  await expect(page.getByText(/Efetivada.*Revisada/)).toBeVisible();
+  // Open reconciliation details for the transaction
+  const txRow = page.locator('.connected-transaction-row').filter({ hasText: 'Compra demonstração' });
+  await txRow.getByText('Revisar e conciliar', { exact: true }).click();
+  await txRow.getByRole('button', { name: 'Importar lançamento', exact: true }).click();
+  await expect(txRow.locator('.transaction-state')).toContainText('Efetivada');
+  await expect(txRow.locator('.transaction-state')).toContainText('Revisada');
   await page.reload();
   await open(page);
-  await expect(page.getByText(/Efetivada.*Revisada/)).toBeVisible();
-  page.once('dialog', (d) => d.accept());
+  // After reload, find the transaction row again
+  const txRowAfterReload = page.locator('.connected-transaction-row').filter({ hasText: 'Compra demonstração' });
+  await expect(txRowAfterReload.locator('.transaction-state')).toContainText('Efetivada');
+  await expect(txRowAfterReload.locator('.transaction-state')).toContainText('Revisada');
   await page
-    .getByRole('button', { name: 'Revogar acesso', exact: true })
+    .getByRole('button', { name: 'Desconectar Instituição demonstração', exact: true })
+    .click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Desconectar', exact: true })
     .click();
   await expect(
-    page.getByRole('button', { name: 'Sincronizar agora' }),
+    page.getByRole('button', { name: 'Sincronizar', exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByText(/Consentimento: Revogado/)).toBeVisible();
+  await expect(page.getByText('Sem novas atualizações', { exact: true })).toBeVisible();
   expect(
     await page.evaluate(
       () =>
@@ -282,13 +296,12 @@ test('Open Finance mock: concilia lançamento manual sem duplicação', async ({
   await expect(
     page.getByRole('button', { name: 'Importar lançamento', exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByRole('button', {
-      name: 'Conciliar com Compra demonstração',
-      exact: true,
-    })
-    .click();
-  await expect(page.getByText(/Efetivada.*Revisada/)).toBeVisible();
+  // Open reconciliation details for the transaction
+  const txRow = page.locator('.connected-transaction-row').filter({ hasText: 'Compra demonstração' });
+  await txRow.getByText('Revisar e conciliar', { exact: true }).click();
+  await txRow.getByRole('button', { name: 'Conciliar com Compra demonstração', exact: true }).click();
+  await expect(txRow.locator('.transaction-state')).toContainText('Efetivada');
+  await expect(txRow.locator('.transaction-state')).toContainText('Revisada');
   expect(
     await page.evaluate(
       () =>
@@ -310,16 +323,16 @@ test('Open Finance mock: expiração requer renovação e teclado acessa autoriz
   });
   await page.reload();
   await open(page);
-  await page.getByRole('button', { name: 'Sincronizar agora' }).click();
+  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
   const renew = page.getByRole('button', {
-    name: 'Renovar acesso',
+    name: 'Conectar',
     exact: true,
   });
   await expect(renew).toBeVisible();
   await renew.focus();
   await page.keyboard.press('Enter');
   await expect(
-    page.getByRole('button', { name: 'Sincronizar agora' }),
+    page.getByRole('button', { name: 'Sincronizar', exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(

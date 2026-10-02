@@ -171,7 +171,7 @@ export function reconcileTransaction(
       ...(index.descriptions.get(k + ':' + t.normalizedDescription) ?? []),
       ...(index.days.get(k) ?? []),
     ]) {
-      if (c.account && t.accountLabel && c.account !== t.accountLabel && !(t.source==='open_finance' && (c.source==='csv' || c.source==='ofx'))) continue;
+      if (c.account && t.accountLabel && c.account !== t.accountLabel && !(['open_finance', 'manio'].includes(t.source) && (c.source==='csv' || c.source==='ofx'))) continue;
       const identical =
         c.date === t.date &&
         normalizeDescription(c.name) === t.normalizedDescription;
@@ -209,7 +209,7 @@ export function transferSuggestions(transactions: Transaction[]) {
           t.direction === 'debit' ? 'credit' : 'debit',
         ),
       ) ?? [])
-        if (other.accountLabel && (other.source === 'open_finance' && t.source === 'open_finance' ? other.accountId !== t.accountId : other.accountLabel !== t.accountLabel))
+        if (other.accountLabel && (['open_finance', 'manio'].includes(other.source) && ['open_finance', 'manio'].includes(t.source) ? other.accountId !== t.accountId : other.accountLabel !== t.accountLabel))
           matches.push(other.line);
     if (matches.length) result.set(t.line, matches);
   }

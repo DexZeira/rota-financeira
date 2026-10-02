@@ -12,6 +12,8 @@ import {
 } from '../components/financial-health';
 import { deriveAlerts, alertArea } from '../services/alerts';
 import { isMonthStale } from '../services/month-close';
+import { Bell, ListChecks, ArrowUpRight } from 'lucide-react';
+import { PrivateValue } from '../components/value-privacy';
 import './financial-health.css';
 type Props = { data: Data; go: (page: string) => void };
 const moneyCents = (n: number | null) =>
@@ -87,12 +89,30 @@ export function Alerts({
     important: 'Importante',
   };
   return (
-    <div className="financial-health">
+    <div className="financial-health alerts-page">
       <PageHeader
         title="Alertas"
         description="Condições atuais que merecem atenção. Dados locais, sem recomendações automáticas."
       />
-      <div className="health-filters">
+      <section
+        className="health-review-overview"
+        aria-label="Resumo dos alertas"
+      >
+        <div>
+          <Bell size={20} aria-hidden="true" />
+          <h2>{alerts.length} condições identificadas</h2>
+        </div>
+        <p>Revise os avisos por área e siga para o registro de origem.</p>
+        <dl>
+          {Object.entries(labels).map(([key, label]) => (
+            <div key={key}>
+              <dt>{label}</dt>
+              <dd>{alerts.filter((a) => a.severity === key).length}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <div className="health-filters health-toolbar">
         <label>
           Severidade
           <select
@@ -140,28 +160,30 @@ export function Alerts({
       {data.reporting.closures.length > 0 && checked?.data !== data && (
         <p>Conferência de assinaturas dos relatórios ainda não disponível.</p>
       )}
-      {!filtered.length && (
-        <EmptyState
-          title="Nenhum alerta neste filtro"
-          description="Os dados disponíveis não indicam condições para este filtro."
-        />
-      )}
-      {filtered.slice(0, limit).map((a) => (
-        <FinancialItem
-          key={a.id}
-          title={a.title}
-          context={labels[a.severity]}
-          description={`${alertArea(a.source)}${a.date ? ' · ' + brDate(a.date) : ''}`}
-        >
-          <p>{a.description}</p>
-          <button onClick={() => go(a.action.route)}>{a.action.label}</button>
-        </FinancialItem>
-      ))}
-      {filtered.length > limit && (
-        <button onClick={() => setLimit((n) => n + 30)}>
-          Mostrar mais alertas
-        </button>
-      )}
+      <section className="health-review-list" aria-label="Alertas encontrados">
+        {!filtered.length && (
+          <EmptyState
+            title="Nenhum alerta neste filtro"
+            description="Os dados disponíveis não indicam condições para este filtro."
+          />
+        )}
+        {filtered.slice(0, limit).map((a) => (
+          <FinancialItem
+            key={a.id}
+            title={a.title}
+            context={labels[a.severity]}
+            description={`${alertArea(a.source)}${a.date ? ' · ' + brDate(a.date) : ''}`}
+          >
+            <p>{a.description}</p>
+            <button onClick={() => go(a.action.route)}>{a.action.label}</button>
+          </FinancialItem>
+        ))}
+        {filtered.length > limit && (
+          <button onClick={() => setLimit((n) => n + 30)}>
+            Mostrar mais alertas
+          </button>
+        )}
+      </section>
       <button onClick={() => go('Auditoria')}>
         Conferir qualidade dos dados
       </button>
@@ -177,57 +199,82 @@ export function FinancialAudit({ data, go }: Props) {
     (i) => severity === 'Todos' || i.severity === severity,
   );
   return (
-    <div className="financial-health">
+    <div className="financial-health audit-page">
       <PageHeader
         title="Auditoria"
         description="Consistência e qualidade dos registros. Nenhuma correção é feita automaticamente."
       />
-      <label>
-        Status
-        <select
-          value={severity}
-          onChange={(e) => {
-            setSeverity(e.target.value);
-            setLimit(30);
-          }}
-        >
-          <option>Todos</option>
-          {Object.entries(labels).map(([key, value]) => (
-            <option key={key} value={key}>
-              {value}
-            </option>
+      <section
+        className="health-review-overview"
+        aria-label="Resumo das verificações"
+      >
+        <div>
+          <ListChecks size={20} aria-hidden="true" />
+          <h2>Qualidade dos seus registros</h2>
+        </div>
+        <p>Confira as inconsistências e corrija o lançamento de origem.</p>
+        <dl>
+          {Object.entries(labels).map(([key, label]) => (
+            <div key={key}>
+              <dt>{label}</dt>
+              <dd>{audit.filter((a) => a.severity === key).length}</dd>
+            </div>
           ))}
-        </select>
-      </label>
-      <output>
-        {audit.filter((a) => a.severity === 'error').length} erros ·{' '}
-        {audit.filter((a) => a.severity === 'warning').length} avisos ·{' '}
-        {audit.filter((a) => a.severity === 'info').length} informações
-      </output>
-      {!filtered.length && (
-        <EmptyState
-          title="Nenhuma inconsistência detectada neste filtro"
-          description="Resultado das verificações disponíveis, não uma certificação de todos os dados."
-        />
-      )}
-      {filtered.slice(0, limit).map((i) => (
-        <FinancialItem
-          key={i.id}
-          title={i.title}
-          context={labels[i.severity]}
-          description={`Registro: ${i.sourceId || 'geral'}`}
-        >
-          <p>{i.description}</p>
-          <button onClick={() => go(i.suggestedAction.route)}>
-            {i.suggestedAction.label}
+        </dl>
+      </section>
+      <div className="health-toolbar">
+        <label>
+          Status
+          <select
+            value={severity}
+            onChange={(e) => {
+              setSeverity(e.target.value);
+              setLimit(30);
+            }}
+          >
+            <option>Todos</option>
+            {Object.entries(labels).map(([key, value]) => (
+              <option key={key} value={key}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <output>
+          {audit.filter((a) => a.severity === 'error').length} erros ·{' '}
+          {audit.filter((a) => a.severity === 'warning').length} avisos ·{' '}
+          {audit.filter((a) => a.severity === 'info').length} informações
+        </output>
+      </div>
+      <section
+        className="health-review-list"
+        aria-label="Verificações encontradas"
+      >
+        {!filtered.length && (
+          <EmptyState
+            title="Nenhuma inconsistência detectada neste filtro"
+            description="Resultado das verificações disponíveis, não uma certificação de todos os dados."
+          />
+        )}
+        {filtered.slice(0, limit).map((i) => (
+          <FinancialItem
+            key={i.id}
+            title={i.title}
+            context={labels[i.severity]}
+            description={`Registro: ${i.sourceId || 'geral'}`}
+          >
+            <p>{i.description}</p>
+            <button onClick={() => go(i.suggestedAction.route)}>
+              {i.suggestedAction.label}
+            </button>
+          </FinancialItem>
+        ))}
+        {filtered.length > limit && (
+          <button onClick={() => setLimit((n) => n + 30)}>
+            Mostrar mais verificações
           </button>
-        </FinancialItem>
-      ))}
-      {filtered.length > limit && (
-        <button onClick={() => setLimit((n) => n + 30)}>
-          Mostrar mais verificações
-        </button>
-      )}
+        )}
+      </section>
     </div>
   );
 }
@@ -237,80 +284,93 @@ export function MySituation({ data, go }: Props) {
   const stat = (label: string, value: string, route: string) => (
     <button className="health-stat" onClick={() => go(route)}>
       <span>{label}</span>
-      <strong>{value}</strong>
-      <small>Ver {route}</small>
+      <strong>
+        <PrivateValue>{value}</PrivateValue>
+      </strong>
+      <small>
+        Ver {route} <ArrowUpRight size={14} aria-hidden="true" />
+      </small>
     </button>
   );
   return (
-    <div className="financial-health">
+    <div className="financial-health situation-page">
       <PageHeader
         title="Minha Situação"
         description={`Visão consolidada em ${brDate(s.at)} · valores registrados e projeções identificadas.`}
       />
-      <section aria-label="Situação atual">
-        <h2>Situação atual</h2>
-        <div className="health-stats">
-          {stat('Caixa', moneyCents(s.wealth.cashCents), 'Dashboard')}
-          {stat(
-            'Patrimônio líquido',
-            moneyCents(s.wealth.netCents),
-            'Patrimônio',
-          )}
-          {stat(
-            'Dívidas registradas',
-            moneyCents(
-              Object.values(s.wealth.positions.debts).reduce(
-                (a, b) => a + b,
-                0,
+      <div className="situation-layout">
+        <section className="situation-current" aria-label="Situação atual">
+          <h2>Situação atual</h2>
+          <div className="health-stats">
+            {stat('Caixa', moneyCents(s.wealth.cashCents), 'Dashboard')}
+            {stat(
+              'Patrimônio líquido',
+              moneyCents(s.wealth.netCents),
+              'Patrimônio',
+            )}
+            {stat(
+              'Dívidas registradas',
+              moneyCents(
+                Object.values(s.wealth.positions.debts).reduce(
+                  (a, b) => a + b,
+                  0,
+                ),
               ),
-            ),
-            'Dívidas',
+              'Dívidas',
+            )}
+            {stat('Reserva', moneyCents(p.reserve.totalCents), 'Planejamento')}
+          </div>
+          {s.wealth.partial && (
+            <p>Patrimônio parcial: há bens sem avaliação.</p>
           )}
-          {stat('Reserva', moneyCents(p.reserve.totalCents), 'Planejamento')}
-        </div>
-        {s.wealth.partial && <p>Patrimônio parcial: há bens sem avaliação.</p>}
-        {p.living.partial && (
+          {p.living.partial && (
+            <p>
+              Custo de vida e cobertura da reserva estimados com base parcial;
+              confira o histórico em Planejamento.
+            </p>
+          )}
           <p>
-            Custo de vida e cobertura da reserva estimados com base parcial;
-            confira o histórico em Planejamento.
+            Custo mínimo mensal estimado: {moneyCents(p.living.minimumCents)} ·
+            cobertura da reserva:{' '}
+            {p.reserve.coverage === null
+              ? 'não disponível'
+              : p.reserve.coverage.toLocaleString('pt-BR', {
+                  maximumFractionDigits: 1,
+                }) + ' meses'}
+            .
           </p>
-        )}
-        <p>
-          Custo mínimo mensal estimado: {moneyCents(p.living.minimumCents)} ·
-          cobertura da reserva:{' '}
-          {p.reserve.coverage === null
-            ? 'não disponível'
-            : p.reserve.coverage.toLocaleString('pt-BR', {
-                maximumFractionDigits: 1,
-              }) + ' meses'}
-          .
-        </p>
-      </section>
-      <Disclosure
-        title="Este mês"
-        description="Receitas, despesas, orçamento e meta"
-      >
-        <div className="health-stats">
-          {stat('Receitas registradas', moneyCents(s.incomeCents), 'Trabalho')}
-          {stat('Gastos e manutenção', moneyCents(s.expenseCents), 'Gastos')}
-          {stat(
-            'Orçamento restante',
-            p.budget.rows.length
-              ? moneyCents(p.budget.remainingCents)
-              : 'Não configurado',
-            'Gastos',
-          )}
-          {stat(
-            'Meta mensal selecionada · estimada',
-            moneyCents(s.targetCents),
-            'Planejamento',
-          )}
-        </div>
-        <p>
-          Despesas deste resumo não incluem transferências, aportes ou principal
-          de dívidas. Confira o fluxo completo em Planejamento.
-        </p>
-      </Disclosure>
+        </section>
+        <Disclosure
+          title="Este mês"
+          description="Receitas, despesas, orçamento e meta"
+          defaultOpen
+        >
+          <div className="health-stats">
+            {stat(
+              'Receitas registradas',
+              moneyCents(s.incomeCents),
+              'Trabalho',
+            )}
+            {stat('Gastos e manutenção', moneyCents(s.expenseCents), 'Gastos')}
+            {stat(
+              'Orçamento restante',
+              p.budget.rows.length
+                ? moneyCents(p.budget.remainingCents)
+                : 'Não configurado',
+              'Gastos',
+            )}
+            {stat(
+              'Meta mensal selecionada · estimada',
+              moneyCents(s.targetCents),
+              'Planejamento',
+            )}
+          </div>
+          <p>
+            Despesas deste resumo não incluem transferências, aportes ou
+            principal de dívidas. Confira o fluxo completo em Planejamento.
+          </p>
+        </Disclosure>
+      </div>
       <Disclosure
         title="Próximos 30 dias"
         description={s.forecast.complete ? 'Projetado' : 'Projeção parcial'}

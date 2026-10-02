@@ -4,46 +4,31 @@ import { restoredOpenFinance } from '../src/services/open-finance/state';
 import { inspectBackup } from '../src/services/emergency-backup';
 import { recordDiagnostic } from '../src/services/app-diagnostics';
 import { useLocalNotifications } from '../src/hooks/use-local-notifications';
-import { PageSkeleton, PageHeader, Disclosure } from '../src/components/finance-ui';
+import { PageSkeleton, PageHeader, Feedback } from '../src/components/finance-ui';
+import { BrandLogo } from '../src/components/brand-logo';
+import { ProfileMenu } from '../src/components/profile';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { GlobalSearch } from '../src/components/global-search';
+import { PrivacyToggle, useValuePrivacy } from '../src/components/value-privacy';
 import { storageFailure } from '../src/services/storage-quota';
 import { PageBoundary } from '../src/components/page-boundary';
 import { MONEY_SCHEMA_VERSION } from '../src/services/money-codec';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useAuth } from '../src/components/auth-provider';
 import { AuthForm, AccountPanel } from '../src/components/account';
 import { useCloudSync } from '../src/hooks/use-cloud-sync';
 import { OWNER_KEY, recoveryKey } from '../src/services/sync-core';
-import {
-  LayoutDashboard,
-  Wallet,
-  BriefcaseBusiness,
-  Bike,
-  Wrench,
-  Receipt,
-  TrendingUp,
-  Flag,
-  ChartNoAxesCombined,
-  Settings,
-  Plus,
-  Sun,
-  Moon,
-  Download,
-} from 'lucide-react';
+import { Plus, Sun, Moon, Download, ChevronRight, CircleCheck } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
   SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
   SidebarTrigger,
   SidebarInset,
-  useSidebar,
 } from '@/components/ui/sidebar';
+import { DesktopNavigation, MobileNavigation, pageNames } from '../src/components/app-navigation';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -69,7 +54,10 @@ import {
   type Collection,
   type Row,
 } from '../src/model';
-import { Dashboard } from '../src/pages/dashboard';
+const Dashboard = lazy(() => import('../src/pages/dashboard').then(m => ({ default: m.Dashboard })));
+const Transactions = lazy(() => import('../src/pages/transactions').then(m => ({ default: m.Transactions })));
+const Accounts = lazy(() => import('../src/pages/accounts').then(m => ({ default: m.Accounts })));
+const Budgets = lazy(() => import('../src/pages/budgets').then(m => ({ default: m.Budgets })));
 import { updateBikeAsset } from '../src/services/assets';
 const Assistant = lazy(() => import('../src/pages/assistant').then(m => ({default:m.Assistant})));
 const NetWorth = lazy(() => import('../src/pages/net-worth').then((m) => ({ default: m.NetWorth })));
@@ -105,98 +93,10 @@ import {
   type ResetKind,
 } from '../src/services/storage';
 import { financial, targets, costs } from '../src/calculations';
-const navigation = [
-  ['Hoje', LayoutDashboard],
-  ['Planejamento', Wallet],
-  ['Patrimônio', Wallet],
-  ['Simulações', Wallet],
-  ['Importar', Wallet],
-  ['Dashboard', LayoutDashboard],
-  ['Dívidas', Wallet],
-  ['Trabalho', BriefcaseBusiness],
-  ['Moto', Bike],
-  ['Manutenção', Wrench],
-  ['Gastos', Receipt],
-  ['Investimentos', TrendingUp],
-  ['Planos', Flag],
-  ['Assistente', ChartNoAxesCombined],
-  ['Minha Situação', ChartNoAxesCombined],
-  ['Alertas', ChartNoAxesCombined],
-  ['Auditoria', ChartNoAxesCombined],
-  ['Relatórios', ChartNoAxesCombined],
-  ['Análises', ChartNoAxesCombined],
-  ['Configurações', Settings],
-] as const;
-const navGroups = [
-  { title: 'Principal', pages: ['Hoje', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos'] },
-  { title: 'Planejamento', pages: ['Planejamento', 'Planos', 'Patrimônio', 'Simulações'] },
-  { title: 'Veículo', pages: ['Moto', 'Manutenção'] },
-  { title: 'Insights', pages: ['Assistente', 'Minha Situação', 'Alertas', 'Auditoria', 'Análises', 'Relatórios'] },
-  { title: 'Sistema', pages: ['Importar', 'Configurações'] },
-];
-function Nav({ page, go }: { page: string; go: (page: string) => void }) {
-  const { setOpenMobile, isMobile } = useSidebar();
-  return (
-    <>
-      {navGroups.map((group) => (
-        <div className="nav-group" key={group.title}>
-          <p>{group.title}</p>
-          <SidebarMenu>
-            {group.pages.filter((name) => !isMobile || !['Hoje', 'Trabalho', 'Gastos', 'Investimentos'].includes(name)).map((name) => {
-              const entry = navigation.find(([n]) => n === name)!;
-              const Icon = entry[1];
-              return (
-                <SidebarMenuItem key={name}>
-                  <SidebarMenuButton
-                    isActive={page === name}
-                    onClick={() => {
-                      go(name);
-                      setOpenMobile(false);
-                    }}
-                  >
-                    <Icon />
-                    <span>{name}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </div>
-      ))}
-    </>
-  );
-}
-function MobileNav({ page, go }: { page: string; go: (page: string) => void }) {
-  const { setOpenMobile } = useSidebar();
-  return (
-    <nav className="mobile-nav" aria-label="Navegação móvel">
-      {[
-        ['Hoje', 'Hoje'],
-        ['Trabalho', 'Trabalho'],
-        ['Gastos', 'Gastos'],
-        ['Investimentos', 'Investimentos'],
-      ].map(([name, label]) => {
-        const entry = navigation.find(([n]) => n === name)!;
-        const Icon = entry[1];
-        return (
-          <button
-            key={name}
-            aria-current={page === name ? 'page' : undefined}
-            onClick={() => go(name)}
-          >
-            <Icon size={19} />
-            <span>{label}</span>
-          </button>
-        );
-      })}
-      <button onClick={() => setOpenMobile(true)}>
-        <span aria-hidden="true">•••</span>
-        <span>Mais</span>
-      </button>
-    </nav>
-  );
-}
+import { isOpenFinanceCallbackPath } from '../src/services/open-finance/widget';
 export default function Home() {
+  const { hidden } = useValuePrivacy();
+  const openFinanceCallback = isOpenFinanceCallbackPath(window.location.pathname);
   const auth = useAuth();
   const pendingWrites = useRef(0);
   const [saving, setSaving] = useState(false);
@@ -206,7 +106,10 @@ export default function Home() {
   const [stale, setStale] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [data, setData] = useState<Data>(defaults),
-    [page, setPage] = useState('Hoje'),
+    [page, setPage] = useState<string>(() => {
+      const requested = new URLSearchParams(location.search).get('view');
+      return openFinanceCallback ? 'Configurações' : pageNames.find(name => name === requested) || 'Hoje';
+    }),
     [ready, setReady] = useState(false),
     [error, setError] = useState(''),
     [blocked, setBlocked] = useState(false),
@@ -264,8 +167,7 @@ export default function Home() {
         setData(d);
       } catch (e) {
         setError(
-          'Não foi possível carregar os dados. O conteúdo existente foi preservado. ' +
-            (e as Error).message,
+          'Não foi possível carregar os dados. O conteúdo existente foi preservado; abra a recuperação para continuar.',
         );
         recordDiagnostic('storage', e);
         setBlocked(true);
@@ -352,10 +254,37 @@ export default function Home() {
     );
   }
   const go = useCallback((p: string) => {
+    if (!pageNames.some(name => name === p)) return;
     setPage(p);
+    const url = new URL(location.href);
+    url.searchParams.set('view', p);
+    history.pushState(null, '', url.pathname + url.search + url.hash);
     window.scrollTo({ top: 0 });
   }, []);
+  useEffect(() => {
+    const pop = () => {
+      const requested = new URLSearchParams(location.search).get('view');
+      setPage(pageNames.find(name => name === requested) || 'Hoje');
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
+  }, []);
   const notificationOwner = auth.session?.user.id || "guest";
+  useEffect(() => {
+    document.title = `${page} · Rota Financeira`;
+  }, [page]);
+  useEffect(() => {
+    const quick = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (event.key.toLowerCase() !== 'n' || event.ctrlKey || event.metaKey || event.altKey || event.repeat || editor || blocked) return;
+      if (target instanceof HTMLElement && (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]'))) return;
+      event.preventDefault();
+      setEditor({ kind: 'expenses' });
+    };
+    window.addEventListener('keydown', quick);
+    return () => window.removeEventListener('keydown', quick);
+  }, [editor, blocked]);
   const notificationDiagnostic = useLocalNotifications(data, notificationOwner, ready && !auth.loading && !blocked && !cloud.pending, go);
   function cancelAccount() {
     void auth.signOut().then(({ error: signOutError }) => {
@@ -414,7 +343,7 @@ export default function Home() {
     return () => lifecycle.abort();
   }, []);
   if (!ready || auth.loading)
-    return <output className="loading">Carregando seus dados…</output>;
+    return <PageSkeleton />;
   const accountUi = (
     <>
       {(showLogin || auth.recovery) && (
@@ -482,9 +411,11 @@ export default function Home() {
     return (
       <>
         <div className="loading">
-          <p>Preparando os dados da sua conta…</p>
-          <output>{cloud.status}</output>
-          {error && <p role="alert">{error}</p>}
+          <PageSkeleton />
+          <Feedback tone="sync" title="Preparando os dados da sua conta" announce>
+            {cloud.status}
+          </Feedback>
+          {error && <Feedback tone="error" announce>{error}</Feedback>}
           {!auth.recovery && <button onClick={cancelAccount}>Continuar sem conta</button>}
         </div>
         {accountUi}
@@ -509,36 +440,32 @@ export default function Home() {
     go,
   };
   return (
-    <SidebarProvider>
-      <Sidebar>
+    <SidebarProvider defaultOpen={!window.matchMedia('(max-width: 1023px)').matches && !document.cookie.split('; ').includes('sidebar_state=false')} style={{ '--sidebar-width': '15.5rem', '--sidebar-width-icon': '4.5rem' } as CSSProperties}>
+      <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Pular para o conteúdo</a>
+      <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="brand">
-            <span>RF</span><div>Rota<b>Financeira</b></div>
-          </div>
+          <div className="sidebar-brand"><BrandLogo/><SidebarTrigger className="sidebar-close" aria-label="Fechar menu" /></div>
         </SidebarHeader>
         <SidebarContent>
 
-          <Nav page={page} go={go} />
+          <DesktopNavigation page={page} go={go} />
         </SidebarContent>
         <SidebarFooter>
-          <div className="local-status">
-            <output>{cloud.status}</output>
-          </div>
-          <small>
-            {data.bike.brand} {data.bike.model} · {data.bike.year}
-          </small>
+          <div className="local-status"><CircleCheck size={16} aria-hidden="true"/><output>{cloud.status}</output></div>
+          <small className="sidebar-version">Rota Financeira · 2.0</small>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="topbar">
           <div>
             <SidebarTrigger aria-label="Abrir menu" />
-            <GlobalSearch data={data} go={go} />
-            <span className="topbar-context">{page}</span>
+            <div className="topbar-breadcrumb"><span>Meu espaço</span><ChevronRight size={14} aria-hidden="true"/><span className="topbar-context">{page}</span></div>
           </div>
           <div>
 
-            <DropdownMenu><DropdownMenuTrigger className="primary quick-add-trigger"><Plus size={16} /> Novo</DropdownMenuTrigger><DropdownMenuContent align="end">
+            <GlobalSearch data={data} go={go} edit={edit} />
+            <PrivacyToggle />
+            <DropdownMenu><DropdownMenuTrigger className="primary quick-add-trigger"><Plus size={16} aria-hidden="true" /> Novo</DropdownMenuTrigger><DropdownMenuContent align="end">
   <DropdownMenuItem onClick={() => edit('work')}>Trabalho</DropdownMenuItem>
   <DropdownMenuItem onClick={() => edit('expenses')}>Gasto</DropdownMenuItem>
   <DropdownMenuItem onClick={() => { if (data.debts.length) edit('payments', { ...emptyRow('payments'), id: id(), debtId: data.debts[0].id, date: today(), amount: 0, installments: 0, kind: 'normal' }); else go('Dívidas'); }}>Pagamento</DropdownMenuItem>
@@ -546,7 +473,8 @@ export default function Home() {
   <DropdownMenuItem onClick={() => edit('services')}>Manutenção</DropdownMenuItem>
 </DropdownMenuContent></DropdownMenu>
             <button
-              aria-label="Alternar tema"
+              className="theme-toggle"
+              aria-label={data.settings.theme === 'escuro' ? 'Ativar tema claro' : 'Ativar tema escuro'}
               onClick={() =>
                 safely(async () =>
                   await commit({
@@ -561,29 +489,21 @@ export default function Home() {
               }
             >
               {data.settings.theme === 'escuro' ? (
-                <Sun size={17} />
+                <Sun size={17} aria-hidden="true" />
               ) : (
-                <Moon size={17} />
+                <Moon size={17} aria-hidden="true" />
               )}
             </button>
-            <button
-              className="account-status"
-              onClick={() =>
-                auth.session ? go('Configurações') : setShowLogin(true)
-              }
-              title={cloud.status}
-            >
-              {auth.session ? auth.session.user.email : 'Entrar'}
-            </button>
+            <div className="account-status" title={cloud.status}><ProfileMenu data={data} syncStatus={cloud.status} onSaveSettings={props.saveSettings} go={go} login={() => setShowLogin(true)} onSignOut={cancelAccount}/></div>
           </div>
         </header>
-        <main className="workspace" aria-busy={saving}>
-          {saving && <output>Salvando neste dispositivo…</output>}
-          {stale && <output className="notice">Dados atualizados em outra aba. Sua edição foi preservada. Feche o formulário para atualizar.
+        <main id="main-content" tabIndex={-1} className="workspace" data-page={page} data-private={hidden} aria-busy={saving}>
+          {saving && <Feedback tone="loading" announce>Salvando neste dispositivo…</Feedback>}
+          {stale && <Feedback tone="warning" announce>Dados atualizados em outra aba. Sua edição foi preservada. Feche o formulário para atualizar.
             <button disabled={!!editor} onClick={() => safely(() => { if (auth.session && localStorage.getItem(OWNER_KEY) !== auth.session.user.id) { window.location.reload(); return; } applyCloud(load(localStorage)); setStale(false); })}>Atualizar dados</button>
-          </output>}
+          </Feedback>}
           {error && (
-            <div className="notice error" role="alert">
+            <Feedback tone="error" title="Não foi possível concluir" announce>
               {error}
               {blocked && (
                 <button
@@ -602,7 +522,7 @@ export default function Home() {
                 </button>
               )}
               <button onClick={() => setError('')}>Fechar aviso</button>
-            </div>
+            </Feedback>
           )}
           {blocked ? (
             <div className="card">
@@ -646,20 +566,9 @@ export default function Home() {
           ) : (
             <>
               {page === 'Configurações' && (
-                <><PageHeader title="Configurações" description="Seu aplicativo, do seu jeito." /><Disclosure title="Conta e sincronização" description={cloud.status}><AccountPanel
-                  status={cloud.status}
-                  lastSync={cloud.lastSync}
-                  login={() => setShowLogin(true)}
-                  sync={() => {
-                    void cloud.synchronize();
-                  }}
-                  choose={(choice) => {
-                    void cloud.synchronize(choice);
-                  }}
-                  syncError={cloud.error}
-                /></Disclosure></>
+                <PageHeader title="Configurações" description="Preferências, conexões e dados. Tudo sob seu controle." />
               )}
-              <PageBoundary key={page} back={() => go('Configurações')}><Suspense fallback={<PageSkeleton />}>
+              <PageBoundary key={page} back={() => go('Configurações')}><div className="page-transition"><Suspense fallback={<PageSkeleton />}>
               {page === 'Alertas' && <Alerts data={data} go={go} appError={!!error} />}
               {page === 'Auditoria' && <FinancialAudit data={data} go={go} />}
               {page === 'Assistente' && <Assistant data={data} />}
@@ -670,6 +579,9 @@ export default function Home() {
               {page === 'Simulações' && <Simulations {...props} />}
               {page === 'Importar' && <Imports {...props} commitImport={async (next, expected) => { if (current.current !== expected) throw Error('Dados alterados. Revise novamente.'); await commit(next); }} />}
               {page === 'Dashboard' && <Dashboard {...props} />}{' '}
+              {page === 'Transações' && <Transactions {...props} />}
+              {page === 'Orçamentos' && <Budgets {...props} />}
+              {page === 'Contas' && <Accounts data={data} owner={notificationOwner} onSave={async (next, base) => { if (current.current !== base) throw Error('Os dados mudaram. Revise novamente antes de salvar.'); await commit(next); }}/ >}
               {page === 'Trabalho' && <Work {...props} />}{' '}
               {page === 'Dívidas' && <Debts {...props} />}{' '}
               {page === 'Moto' && <Motorcycle {...props} />}{' '}
@@ -681,6 +593,8 @@ export default function Home() {
               {page === 'Análises' && <Analysis {...props} />}{' '}
               {page === 'Configurações' && (
                 <SettingsView
+                  accountPanel={<AccountPanel status={cloud.status} lastSync={cloud.lastSync} login={() => setShowLogin(true)} sync={() => { void cloud.synchronize(); }} choose={(choice) => { void cloud.synchronize(choice); }} syncError={cloud.error}/>}
+                  openFinanceOnLoad={openFinanceCallback}
                   data={data}
                   edit={edit}
                   syncStatus={cloud.status}
@@ -721,18 +635,18 @@ export default function Home() {
                   }}
                 />
               )}
-              </Suspense></PageBoundary>
+              </Suspense></div></PageBoundary>
             </>
           )}
           <footer className="page-footer">
-            Rota financeira{' '}
+            Rota Financeira · 2.0{' '}
             <span>
               Real = registrado · Estimado = cálculo · Projetado = cenário
             </span>
           </footer>
         </main>
       </SidebarInset>
-      <MobileNav page={page} go={go} />
+      <MobileNavigation page={page} go={go} add={() => edit('expenses')} />
       {accountUi}
       {editor && (
         <Editor

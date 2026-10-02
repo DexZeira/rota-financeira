@@ -1,6 +1,12 @@
 .universal-search-trigger {
   flex-shrink: 0;
+  gap: .75rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  background: var(--surface-canvas);
 }
+.universal-search-trigger kbd { font: inherit; font-size: var(--text-xs); border: 1px solid var(--border); border-radius: .25rem; padding: .125rem .25rem; }
+@media (max-width: 1100px) { .universal-search-trigger span, .universal-search-trigger kbd { display: none; } }
 .universal-search-dialog[data-slot] {
   width: min(640px, calc(100% - 16px));
   max-width: calc(100% - 16px);

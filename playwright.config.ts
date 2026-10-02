@@ -12,22 +12,102 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: {
-    command: 'npx vite preview --mode e2e --host 127.0.0.1',
-    url: 'http://127.0.0.1:4173/',
-    reuseExistingServer: false,
-    timeout: 30_000,
-  },
+  // An externally managed preview avoids Windows sandbox process-tree teardown.
+  webServer:
+    process.env.ROTA_E2E_EXTERNAL_SERVER === '1'
+      ? undefined
+      : {
+          command: 'npx vite preview --mode e2e --host 127.0.0.1',
+          url: 'http://127.0.0.1:4173/',
+          reuseExistingServer: false,
+          timeout: 30_000,
+        },
   projects: [
-    { name: '320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 800 } } },
-    { name: '360', use: { ...devices['Desktop Chrome'], viewport: { width: 360, height: 800 } } },
-    { name: '390', use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } } },
-    { name: '430', use: { ...devices['Desktop Chrome'], viewport: { width: 430, height: 932 } } },
-    { name: '768', use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } } },
-    { name: '1366', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 768 } } },
-    { name: '1920', use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 } } },
+    {
+      name: '320',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 320, height: 800 },
+      },
+    },
+    {
+      name: '360',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 360, height: 800 },
+      },
+    },
+    {
+      name: '375',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 375, height: 667 },
+      },
+    },
+    {
+      name: '390',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+      },
+    },
+    {
+      name: '430',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 430, height: 932 },
+      },
+    },
+    {
+      name: '768',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 768, height: 1024 },
+      },
+    },
+    {
+      name: '1024',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1024, height: 768 },
+      },
+    },
+    {
+      name: '1280',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: '1366',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1366, height: 768 },
+      },
+    },
+    {
+      name: '1440',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+      },
+    },
+    {
+      name: '1920',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+      },
+    },
     ...[
-      [320, 568], [360, 640], [360, 740], [390, 664], [390, 844], [412, 732], [430, 932],
+      [320, 568],
+      [360, 640],
+      [360, 740],
+      [390, 664],
+      [390, 844],
+      [412, 732],
+      [430, 932],
     ].map(([width, height]) => ({
       name: `${width}x${height}`,
       testMatch: /viewport-height\.spec\.ts/,

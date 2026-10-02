@@ -20,11 +20,11 @@ const statusLabels = {
   near_limit: 'Próximo do limite',
   over_budget: 'Acima do orçamento',
 };
-export function BudgetSection(p: ViewProps) {
+export function BudgetSection(p: ViewProps & { defaultOpen?: boolean }) {
   const { budget } = usePhaseTwo(p.data);
   const budgetById = new Map(budget.rows.map((row) => [row.id, row]));
   return (
-    <details className="disclosure">
+    <details className="disclosure" open={p.defaultOpen || undefined}>
       <summary>Quanto posso gastar? · Orçamento do mês</summary>
       <div className="disclosure-body">
         <div className="section-heading">

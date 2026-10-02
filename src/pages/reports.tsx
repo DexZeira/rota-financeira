@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { type Data, money, today } from '../model';
 import type { ViewProps } from './shared';
 import { PageHeader, Disclosure } from '../components/finance-ui';
+import { PrivateValue } from '../components/value-privacy';
 import {
   assessMonth,
   closeMonth,
@@ -59,7 +60,7 @@ function Metric({ label, amount }: { label: string; amount: number | null }) {
   return (
     <div className="report-line">
       <span>{label}</span>
-      <strong>{cash(amount)}</strong>
+      <strong><PrivateValue>{cash(amount)}</PrivateValue></strong>
     </div>
   );
 }
@@ -162,6 +163,7 @@ export function Reports({
     [allowPartial, setAllowPartial] = useState(false),
     [confirmReopen, setConfirmReopen] = useState(false);
   const [checkedSource, setCheckedSource] = useState('');
+  const [closeConfirmationSource, setCloseConfirmationSource] = useState('');
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   const [filter, setFilter] = useState('Todos'),
@@ -190,6 +192,7 @@ export function Reports({
       current.through
     : '';
   const confirmed = checkedSource === reviewKey ? checked : [];
+  const closeConfirmed = closeConfirmationSource === reviewKey;
   const closed = closure?.status === 'closed';
   const closeState = assessment?.state ?? 'open';
   const valid = validPeriod(period),
@@ -263,6 +266,7 @@ export function Reports({
     setChecked([]);
     setAllowPartial(false);
     setConfirmReopen(false);
+    setCloseConfirmationSource('');
     setMessage('');
   }
   async function save() {
@@ -270,7 +274,8 @@ export function Reports({
       !current ||
       busy ||
       closeState !== 'ready' ||
-      confirmed.length !== checklist.length
+      confirmed.length !== checklist.length ||
+      !closeConfirmed
     ) return;
     setBusy(true);
     setMessage('');
@@ -286,6 +291,7 @@ export function Reports({
       setRevision(0);
       setChecked([]);
       setAllowPartial(false);
+      setCloseConfirmationSource('');
       setMessage('Fechamento salvo. A revisão anterior foi preservada.');
     } catch (error) {
       setMessage(
@@ -298,6 +304,9 @@ export function Reports({
     }
   }
   async function reopen() {
+    if (busy) return;
+    setBusy(true);
+    setMessage('');
     try {
       await commitReport(reopenMonth(d, period, new Date().toISOString()), d);
       setConfirmReopen(false);
@@ -306,6 +315,8 @@ export function Reports({
       setMessage(
         error instanceof Error ? error.message : 'Não foi possível reabrir.',
       );
+    } finally {
+      setBusy(false);
     }
   }
   const change = report
@@ -317,53 +328,69 @@ export function Reports({
         title="Relatórios"
         description="Confira o mês, preserve seu fechamento e entenda o que mudou."
       />
-      <div className="report-controls report-no-print">
-        <label>
-          Mês do relatório
-          <input
-            type="month"
-            value={period}
-            max={today().slice(0, 7)}
-            onChange={(e) => selectPeriod(e.target.value)}
-          />
-        </label>
-        <div className="report-period-nav" aria-label="Navegação de meses">
-          <button
-            type="button"
-            onClick={() => selectPeriod(shiftPeriod(period, -1))}
-            disabled={!valid}
-          >
-            Mês anterior
-          </button>
-          <button
-            type="button"
-            onClick={() => selectPeriod(shiftPeriod(period, 1))}
-            disabled={!valid || shiftPeriod(period, 1) > today().slice(0, 7)}
-          >
-            Próximo mês
-          </button>
+      <nav className="report-section-nav report-no-print" aria-label="Seções do relatório"><a href="#report-period-title">Visão do mês</a><a href="#report-close-title">Fechamento</a>{report && <a href="#report-comparison-title">Comparações</a>}<a href="#report-history-title">Histórico</a></nav>
+      <div className="report-month-toolbar">
+      <section className="report-period-step report-no-print" aria-labelledby="report-period-title">
+        <div className="report-step-heading">
+          <span>Etapa 1</span>
+          <div>
+            <h2 id="report-period-title">Selecionar mês</h2>
+            <p>Escolha o período que deseja revisar ou consultar.</p>
+          </div>
         </div>
-        {closure && (
+        <div className="report-controls report-period-controls">
           <label>
-            Revisão
-            <select
-              value={revision}
-              onChange={(e) => setRevision(Number(e.target.value))}
-            >
-              <option value={0}>
-                Mais recente · revisão {latest?.revision}
-              </option>
-              {closure.revisions.map((s) => (
-                <option key={s.revision} value={s.revision}>
-                  Revisão {s.revision}
-                </option>
-              ))}
-            </select>
+            Mês do relatório
+            <input
+              type="month"
+              value={period}
+              max={today().slice(0, 7)}
+              onChange={(e) => selectPeriod(e.target.value)}
+            />
           </label>
-        )}
-      </div>
+          <div className="report-period-nav" aria-label="Navegação de meses">
+            <button
+              type="button"
+              onClick={() => selectPeriod(shiftPeriod(period, -1))}
+              disabled={!valid}
+            >
+              Mês anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => selectPeriod(shiftPeriod(period, 1))}
+              disabled={!valid || shiftPeriod(period, 1) > today().slice(0, 7)}
+            >
+              Próximo mês
+            </button>
+          </div>
+          {closure && (
+            <label>
+              Revisão
+              <select
+                value={revision}
+                onChange={(e) => setRevision(Number(e.target.value))}
+              >
+                <option value={0}>
+                  Mais recente · revisão {latest?.revision}
+                </option>
+                {closure.revisions.map((snapshot) => (
+                  <option key={snapshot.revision} value={snapshot.revision}>
+                    Revisão {snapshot.revision}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </section>
       {!valid && <p role="alert">Selecione um mês válido.</p>}
-      <section className={`report-status report-status-${closeState}`} aria-label="Status do fechamento" aria-live="polite">
+      <section
+        className={`report-status report-status-${closeState}`}
+        aria-label="Status do fechamento"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         <div>
           <span className="report-status-label">Status do mês</span>
           <strong>
@@ -373,51 +400,227 @@ export function Reports({
                 ? 'Fechado'
                 : closeState === 'reopened'
                   ? 'Reaberto'
-                  : inProgress
-                    ? 'Em andamento'
-                    : 'Aberto'}
+                  : 'Em aberto'}
           </strong>
         </div>
-        {latest && <span>Revisão {report?.revision ?? latest.revision}</span>}
+        {latest && (
+          <span>
+            Revisão {report?.revision ?? latest.revision} ·{' '}
+            {new Date((report ?? latest).generatedAt).toLocaleString('pt-BR')}
+          </span>
+        )}
         {stale && <p>Desatualizado — houve alteração nos dados de origem.</p>}
       </section>
+      </div>
       <p className="report-no-print">
         {inflationStatus}. Relatórios salvos mantêm a inflação registrada no
         fechamento.
       </p>
+      <div className="report-workspace">
+      {current ? (
+        <section className="report-preview" aria-labelledby="report-preview-title">
+          <div className="report-step-heading">
+            <span>Etapa 2</span>
+            <div>
+              <h2 id="report-preview-title">Revisar prévia</h2>
+              <p>
+                Valores consolidados até {current.through}. O fechamento não altera os lançamentos.
+              </p>
+            </div>
+          </div>
+          <div className="report-metrics" aria-label="Principais valores do mês">
+            <Metric label="Receitas" amount={current.incomeCents} />
+            <Metric label="Despesas" amount={current.expenseCents} />
+            <Metric label="Resultado" amount={current.netCashFlowCents} />
+            <Metric label="Patrimônio" amount={current.netWorthCents} />
+          </div>
+          <div className="report-preview-comparison">
+            {assessment?.previous && assessment.comparison ? (
+              <Compare
+                now={current}
+                before={assessment.previous}
+                title="Comparação com o fechamento anterior"
+                rate={current.inflationRate}
+                comparison={assessment.comparison}
+              />
+            ) : (
+              <p>
+                Ainda não há um fechamento anterior com base válida para comparação.
+              </p>
+            )}
+          </div>
+        </section>
+      ) : valid && !preview?.error ? (
+        <output className="report-loading">
+          Consolidando mês…
+        </output>
+      ) : null}
       {ready && preview.error && (
-        <p role="alert">
+        <p className="report-preview-error" role="alert">
           Pendência crítica: {preview.error} O fechamento está bloqueado;
           relatórios salvos permanecem disponíveis.
         </p>
       )}
       {assessment?.blockers.length ? (
-        <section className="report-issues report-blockers" aria-label="Bloqueios do fechamento" role="alert">
-          <h2>Resolva antes de fechar</h2>
-          <ul>
+        <section className="report-issues report-blockers" aria-labelledby="report-blockers-title">
+          <div className="report-step-heading">
+            <span>Etapa 3</span>
+            <div>
+              <h2 id="report-blockers-title">Resolva antes de fechar</h2>
+              <p>Estas pendências impedem o fechamento do mês.</p>
+            </div>
+          </div>
+          <ul className="report-issue-list">
             {assessment.blockers.map((blocker) => (
               <li key={blocker.id}>
-                <strong>{blocker.title}</strong> · {blocker.description}
+                <span aria-hidden="true">!</span>
+                <div>
+                  <strong>{blocker.title}</strong>
+                  <p>{blocker.description}</p>
+                </div>
               </li>
             ))}
           </ul>
         </section>
-      ) : null}
-      {assessment?.warnings.length ? (
-        <section className="report-issues report-warnings" aria-label="Avisos do fechamento">
-          <h2>Avisos</h2>
-          <ul>
-            {assessment.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-          </ul>
+      ) : current ? (
+        <section className="report-issues report-clear" aria-labelledby="report-clear-title">
+          <div className="report-step-heading">
+            <span>Etapa 3</span>
+            <div>
+              <h2 id="report-clear-title">Nenhum bloqueio crítico</h2>
+              <p>O mês pode avançar para a conferência final.</p>
+            </div>
+          </div>
         </section>
       ) : null}
-      {message && <output>{message}</output>}
+      {assessment?.warnings.length ? (
+        <section className="report-issues report-warnings" aria-labelledby="report-warnings-title">
+          <div className="report-step-heading">
+            <span>Etapa 4</span>
+            <div>
+              <h2 id="report-warnings-title">Avisos para revisar</h2>
+              <p>Estes avisos são informativos e não impedem o fechamento.</p>
+            </div>
+          </div>
+          <ul className="report-issue-list">
+            {assessment.warnings.map((warning) => (
+              <li key={warning}>
+                <span aria-hidden="true">i</span>
+                <p>{warning}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : current ? (
+        <section className="report-issues report-clear" aria-labelledby="report-warnings-clear-title">
+          <div className="report-step-heading">
+            <span>Etapa 4</span>
+            <div>
+              <h2 id="report-warnings-clear-title">Nenhum aviso adicional</h2>
+              <p>A prévia não apresenta observações informativas.</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+      <section className="report-close-step report-no-print" aria-labelledby="report-close-title">
+        <div className="report-step-heading">
+          <span>Etapa 5</span>
+          <div>
+            <h2 id="report-close-title">
+              {closed && stale ? 'Criar nova revisão' : 'Confirmar fechamento'}
+            </h2>
+            <p>
+              A confirmação cria uma revisão imutável. Nenhum lançamento será bloqueado ou apagado.
+            </p>
+          </div>
+        </div>
+        {current && closeState !== 'closed' && (
+          <>
+            <fieldset disabled={busy || inProgress}>
+              <legend>Checklist de conferência</legend>
+              {checklist.map((label) => (
+                <label className="report-check" key={label}>
+                  <input
+                    type="checkbox"
+                    checked={confirmed.includes(label)}
+                    onChange={(e) => {
+                      setCheckedSource(reviewKey);
+                      setChecked(
+                        e.target.checked
+                          ? [...confirmed, label]
+                          : confirmed.filter((value) => value !== label),
+                      );
+                    }}
+                  />
+                  Conferi {label.toLocaleLowerCase('pt-BR')}
+                </label>
+              ))}
+            </fieldset>
+            {current.dataCompleteness !== 'complete' && (
+              <label className="report-check">
+                <input
+                  type="checkbox"
+                  checked={allowPartial}
+                  onChange={(e) => setAllowPartial(e.target.checked)}
+                />
+                Confirmo o fechamento com dados parciais
+              </label>
+            )}
+            <label className="report-check report-final-confirmation">
+              <input
+                type="checkbox"
+                checked={closeConfirmed}
+                onChange={(e) =>
+                  setCloseConfirmationSource(e.target.checked ? reviewKey : '')
+                }
+              />
+              Entendi que este fechamento criará uma revisão imutável
+            </label>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                inProgress ||
+                closeState !== 'ready' ||
+                confirmed.length !== checklist.length ||
+                !closeConfirmed ||
+                (current.dataCompleteness !== 'complete' && !allowPartial)
+              }
+              onClick={() => void save()}
+            >
+              {busy ? 'Salvando fechamento…' : closed ? 'Criar nova revisão' : 'Fechar mês'}
+            </button>
+            {assessment?.blockers.length ? (
+              <p>Resolva os bloqueios acima para liberar o fechamento.</p>
+            ) : null}
+          </>
+        )}
+        {closeState === 'closed' && (
+          <p>Este mês já está fechado. A revisão atual permanece preservada.</p>
+        )}
+      </section>
+      {message && (
+        <output className="report-feedback" aria-live="polite">
+          {message}
+        </output>
+      )}
+      </div>
       {report ? (
         <>
-          <section className="report-summary" aria-label="Resumo mensal">
-            <h2>
-              {report.period} · {latest ? 'Relatório salvo' : 'Prévia'}
-            </h2>
+          <section className="report-summary" aria-labelledby="report-result-title">
+            <div className="report-step-heading">
+              <span>Etapa 6</span>
+              <div>
+                <h2 id="report-result-title">
+                  {latest ? 'Resultado fechado' : 'Detalhes da prévia'}
+                </h2>
+                <p>
+                  {latest
+                    ? `${report.period} · revisão ${report.revision} · somente leitura`
+                    : `${report.period} · valores ainda não fechados`}
+                </p>
+              </div>
+            </div>
             <p>
               {report.dataCompleteness === 'complete'
                 ? 'Base completa'
@@ -426,16 +629,12 @@ export function Reports({
                   : 'Base insuficiente'}{' '}
               · realizado até {report.through}
             </p>
-            <Metric label="Receitas" amount={report.incomeCents} />
-            <Metric
-              label="Despesas e manutenção"
-              amount={report.expenseCents}
-            />
-            <Metric
-              label="Resultado do caixa"
-              amount={report.netCashFlowCents}
-            />
-            <Metric label="Patrimônio final" amount={report.netWorthCents} />
+            <div className="report-metrics" aria-label="Valores da revisão">
+              <Metric label="Receitas" amount={report.incomeCents} />
+              <Metric label="Despesas" amount={report.expenseCents} />
+              <Metric label="Resultado" amount={report.netCashFlowCents} />
+              <Metric label="Patrimônio" amount={report.netWorthCents} />
+            </div>
             <p>
               Gerado em {new Date(report.generatedAt).toLocaleString('pt-BR')}
             </p>
@@ -625,7 +824,7 @@ export function Reports({
               preview de importação não fica pendente após sair da página.
             </p>
           </Disclosure>
-          <Disclosure title="Comparações e médias">
+          <section className="report-analytics" aria-labelledby="report-comparison-title"><h2 id="report-comparison-title">Comparações e médias</h2><div className="report-comparison-grid">
             <Compare
               now={report}
               before={assessment?.previous ?? undefined}
@@ -643,8 +842,9 @@ export function Reports({
                 period,
               )}
             />
+            </div>
             <h3>Médias móveis de fechamentos</h3>
-            {([3, 6, 12] as const).map((count) => {
+            <div className="report-moving-averages">{([3, 6, 12] as const).map((count) => {
               const avg = movingAverage(saved, period, count);
               return (
                 <section key={count}>
@@ -665,8 +865,8 @@ export function Reports({
                   )}
                 </section>
               );
-            })}
-          </Disclosure>
+            })}</div>
+          </section>
           <Disclosure title="Qualidade dos dados">
             <p>
               O fechamento registra a base disponível; não certifica registros
@@ -683,106 +883,49 @@ export function Reports({
             )}
           </Disclosure>
         </>
-      ) : valid && !preview?.error ? (
-        <output>Consolidando mês…</output>
       ) : null}
-      <section className="report-no-print" aria-label="Fechamento mensal">
-        <h2>{closed ? 'Revisar fechamento' : 'Fechar mês'}</h2>
-        {current && (
-          <>
-            <p>
-              Confira os dados atuais antes de salvar uma revisão. Nenhum
-              lançamento será bloqueado ou apagado.
-            </p>
-            <fieldset disabled={busy || inProgress}>
-              <legend>Checklist de conferência</legend>
-              {checklist.map((label) => (
-                <label className="report-check" key={label}>
-                  <input
-                    type="checkbox"
-                    checked={confirmed.includes(label)}
-                    onChange={(e) => {
-                      setCheckedSource(reviewKey);
-                      setChecked(
-                        e.target.checked
-                          ? [...confirmed, label]
-                          : confirmed.filter((v) => v !== label),
-                      );
-                    }}
-                  />
-                  Conferi {label.toLocaleLowerCase('pt-BR')}
-                </label>
-              ))}
-            </fieldset>
-            {current.dataCompleteness !== 'complete' && (
-              <label className="report-check">
-                <input
-                  type="checkbox"
-                  checked={allowPartial}
-                  onChange={(e) => setAllowPartial(e.target.checked)}
-                />
-                Confirmo o fechamento com dados parciais
-              </label>
-            )}
-            <button
-              type="button"
-              disabled={
-                busy ||
-                inProgress ||
-                closeState !== 'ready' ||
-                confirmed.length !== checklist.length ||
-                (current.dataCompleteness !== 'complete' && !allowPartial)
-              }
-              onClick={() => void save()}
-            >
-              {busy ? 'Salvando…' : closed ? 'Reprocessar mês' : 'Fechar mês'}
-            </button>
-            {inProgress && (
+      {closed && (
+        <section className="report-reopen-step report-no-print" aria-labelledby="report-reopen-title">
+          <div className="report-step-heading">
+            <span>Reabertura</span>
+            <div>
+              <h2 id="report-reopen-title">Reabrir este mês</h2>
               <p>
-                Em andamento. O fechamento estará disponível após o fim do mês.
+                O histórico permanece preservado. Se a origem mudar, um novo fechamento poderá criar outra revisão.
               </p>
-            )}
-          </>
-        )}
-        {closed && (
+            </div>
+          </div>
           <details>
-            <summary>Reabrir mês</summary>
-            <p>
-              Alterações posteriores podem mudar o relatório histórico. A
-              revisão salva será preservada.
-            </p>
+            <summary>Revisar consequência e reabrir</summary>
             <label className="report-check">
               <input
                 type="checkbox"
                 checked={confirmReopen}
                 onChange={(e) => setConfirmReopen(e.target.checked)}
               />
-              Entendi e quero reabrir
+              Entendi e quero reabrir {period}
             </label>
             <button
               type="button"
               disabled={!confirmReopen || busy}
-              onClick={reopen}
+              onClick={() => void reopen()}
             >
-              Confirmar reabertura
+              {busy ? 'Reabrindo mês…' : `Reabrir ${period}`}
             </button>
           </details>
-        )}
-        {closure && (
-          <p>
-            Última reabertura:{' '}
-            {closure.reopenedAt
-              ? new Date(closure.reopenedAt).toLocaleString('pt-BR')
-              : 'nenhuma'}{' '}
-            · último reprocessamento:{' '}
-            {closure.regeneratedAt
-              ? new Date(closure.regeneratedAt).toLocaleString('pt-BR')
-              : 'nenhum'}
-          </p>
-        )}
-      </section>
-      <div className="report-no-print">
-        <Disclosure title="Histórico de fechamentos">
+          {closure?.reopenedAt && (
+            <p>Última reabertura em {new Date(closure.reopenedAt).toLocaleString('pt-BR')}.</p>
+          )}
+        </section>
+      )}
+      <section className="report-history-step report-no-print" aria-labelledby="report-history-title">
+        <div className="report-step-heading">
+          <span>Etapa 7</span>
+          <div>
+            <h2 id="report-history-title">Histórico de fechamentos</h2>
+            <p>Revisões anteriores permanecem preservadas e disponíveis somente para consulta.</p>
+          </div>
+        </div>
           <label>
             Mês fechado
             <select
@@ -802,19 +945,30 @@ export function Reports({
           </label>
           {closure && (
             <ol className="report-revisions" aria-label="Revisões do mês">
-              {[...closure.revisions].reverse().map((item) => (
-                <li key={item.revision} className={item.revision === (report?.revision ?? latest?.revision) ? 'current' : undefined}>
-                  <button type="button" onClick={() => setRevision(item.revision)}>
-                    Revisão {item.revision}
-                  </button>
-                  <span>{new Date(item.generatedAt).toLocaleString('pt-BR')}</span>
-                </li>
-              ))}
+              {closure.revisions.map((item) => {
+                const isCurrent = item.revision === (report?.revision ?? latest?.revision);
+                return (
+                  <li key={item.revision} className={isCurrent ? 'current' : undefined}>
+                    <div>
+                      <button
+                        type="button"
+                        aria-current={isCurrent ? 'true' : undefined}
+                        onClick={() => setRevision(item.revision)}
+                      >
+                        Revisão {item.revision}
+                      </button>
+                      {isCurrent && <strong>Revisão atual</strong>}
+                    </div>
+                    <span>
+                      {new Date(item.generatedAt).toLocaleString('pt-BR')} · somente leitura
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           )}
           {!history.length && <p>Seu primeiro fechamento aparecerá aqui.</p>}
-        </Disclosure>
-      </div>
+      </section>
       <section
         className="report-timeline report-no-print"
         aria-label="Timeline financeira"

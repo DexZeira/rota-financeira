@@ -1,10 +1,6 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { categories, money, type Data } from '../model';
-import {
-  emptyOpenFinance,
-  type Connection,
-  type Institution,
-} from '../services/open-finance/types';
+import { emptyOpenFinance, type Connection, type Institution } from '../services/open-finance/types';
 import { MockOpenFinanceProvider } from '../services/open-finance/mock-provider';
 import { OpenFinanceSyncService } from '../services/open-finance/sync';
 import { errorCode, errorMessage } from '../services/open-finance/errors';
@@ -18,6 +14,9 @@ import type { Review } from '../services/import/types';
 import { recordDiagnostic } from '../services/app-diagnostics';
 import { transactionPage } from '../services/open-finance/state';
 import { createOpenFinanceProvider } from '../services/open-finance/provider.factory';
+import { PrivateValue } from './value-privacy';
+import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogCancel, AlertDialogAction, AlertDialogFooter } from '@/components/ui/alert-dialog';
+import './connected-accounts.css';
 
 const subscribeNetwork = (notify: () => void) => {
   window.addEventListener('online', notify);
@@ -33,8 +32,8 @@ const labels = {
   connected: 'Conectado',
   syncing: 'Sincronizando',
   expired: 'Consentimento expirado',
-  revoked: 'Revogado',
-  error: 'Erro',
+  revoked: 'Desconectado',
+  error: 'Precisa de atenção',
   reauthorization_required: 'Renovar acesso',
 };
 export function ConnectedAccounts({
@@ -45,6 +44,7 @@ export function ConnectedAccounts({
   data: Data;
   owner: string;
   onSave: (next: Data, base: Data) => Promise<void>;
+  resumeAuthorization?: boolean;
 }) {
   const online = useSyncExternalStore(
     subscribeNetwork,
@@ -56,19 +56,23 @@ export function ConnectedAccounts({
   >({});
   const mode = import.meta.env.VITE_OPEN_FINANCE_MODE || 'disabled';
   const realEnabled = import.meta.env.OPEN_FINANCE_REAL_ENABLED === 'true';
+  const meuPluggyEnabled = import.meta.env.VITE_MEU_PLUGGY_ENABLED === 'true';
+  const traditionalOpenFinanceEnabled = realEnabled && (mode === 'sandbox' || mode === 'production');
+  const bankingIntegrationEnabled = mode === 'mock' || traditionalOpenFinanceEnabled || meuPluggyEnabled;
   // Selecionar provider com base na configuração
   const provider = useMemo(() => {
     if (mode === 'mock') {
       return new MockOpenFinanceProvider();
-    } else if (realEnabled && mode === 'sandbox') {
+    } else if (traditionalOpenFinanceEnabled) {
       return createOpenFinanceProvider();
     }    return new MockOpenFinanceProvider();
-  }, [mode, realEnabled]);
+  }, [traditionalOpenFinanceEnabled, mode]);
   const sync = useMemo(() => new OpenFinanceSyncService(provider), [provider]);
   const [institutions, setInstitutions] = useState<Institution[]>([]),
     [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
+  const [disconnectId, setDisconnectId] = useState('');
   const [days, setDays] = useState<30 | 90 | 365>(30),
     [page, setPage] = useState(0);
   const state = data.openFinance || emptyOpenFinance();
@@ -146,28 +150,30 @@ export function ConnectedAccounts({
         data,
       );
     });
-  if (mode !== 'mock')
+  if (!bankingIntegrationEnabled)
     return (
       <p>
         Integração bancária desabilitada. Provider real e ambiente sandbox ainda
         não configurados. A importação CSV/OFX continua disponível.
       </p>
     );
-  return (
-    <section
-      className="connected-accounts"
-      aria-label="Contas conectadas"
-      aria-busy={busy}
-    >
-      <p>
-        <strong>Demonstração local — dados fictícios.</strong> Nenhum banco será
-        acessado. Os lançamentos confirmados entram no seu estado local; use um
-        perfil de teste.
-      </p>
+  // Mock mode - demo UI
+  if (mode === 'mock')
+    return (
+      <section
+        className="connected-accounts"
+        aria-label="Contas conectadas"
+        aria-busy={busy}
+      >
+        <p>
+          <strong>Demonstração local — dados fictícios.</strong> Nenhum banco será
+          acessado. Os lançamentos confirmados entram no seu estado local; use um
+          perfil de teste.
+        </p>
       {!online && (
         <output>Sem conexão — exibindo dados da última sincronização.</output>
       )}
-      <fieldset disabled={busy}>
+      <fieldset className="connected-accounts-workspace" disabled={busy}>
         <p aria-live="polite">
           {busy ? 'Sincronizando ou salvando alterações…' : ''}
         </p>
@@ -220,12 +226,12 @@ export function ConnectedAccounts({
           </select>
         </label>
         {own.map((c) => (
-          <article key={c.id}>
+          <article className="connected-institution" key={c.id}>
             <h3>{c.institutionName}</h3>
             <p>
               {labels[c.status]} ·{' '}
               {c.lastSuccessfulSyncAt
-                ? `Última sincronização:{new Date(c.lastSuccessfulSyncAt).toLocaleString('pt-BR')}`
+                ? `Última sincronização: ${new Date(c.lastSuccessfulSyncAt).toLocaleString('pt-BR')}`
                 : 'Nunca sincronizado'}
             </p>
             <p>
@@ -249,9 +255,7 @@ export function ConnectedAccounts({
                   pagamentos. Revogue quando quiser.
                 </p>
                 <button onClick={() => run(() => update(c, 'authorize'))}>
-                  {c.status === 'pending_authorization'
-                    ? 'Autorizar demonstração'
-                    : 'Renovar acesso'}
+                  Conectar
                 </button>
               </div>
             )}
@@ -265,7 +269,7 @@ export function ConnectedAccounts({
                   })
                 }
               >
-                Sincronizar agora
+                Sincronizar
               </button>
             )}
             {c.status === 'revoked' && (
@@ -289,20 +293,13 @@ export function ConnectedAccounts({
             )}
             {c.status !== 'revoked' && (
               <button
-                onClick={() =>
-                  run(async () => {
-                    if (
-                      window.confirm(
-                        'Revogar acesso? Os dados já importados serão preservados.',
-                      )
-                    )
-                      await update(c, 'revoke');
-                  })
-                }
+                aria-label={`Desconectar ${c.institutionName}`}
+                onClick={() => setDisconnectId(c.id)}
               >
-                Revogar acesso
+                Desconectar
               </button>
             )}
+            {c.status === 'revoked' && <p className="connection-note">Sem novas atualizações</p>}
             {state.accounts
               .filter((a) => a.connectionId === c.id)
               .map((a) => {
@@ -317,7 +314,7 @@ export function ConnectedAccounts({
                       {b?.current === null || b?.current === undefined
                         ? 'Indisponível'
                         : a.currency === 'BRL'
-                          ? money(b.current / 100)
+                          ? <PrivateValue>{money(b.current / 100)}</PrivateValue>
                           : `${b.current / 100} ${a.currency}`}
                     </p>
                     {b && (
@@ -339,6 +336,7 @@ export function ConnectedAccounts({
               })}
           </article>
         ))}
+        
         <h3>Revisar transações</h3>
         <p>
           {total} registros · Exibindo até 25 por página. Pendentes não geram
@@ -348,13 +346,13 @@ export function ConnectedAccounts({
           const p = previewsById.get(r.id);
           const account = state.accounts.find((a) => a.id === r.accountId);
           return (
-            <article key={r.id}>
+            <article className="connected-transaction-row" data-direction={r.transaction.direction} key={r.id}>
               <strong>{r.transaction.description}</strong>
-              <p>
+              <p className="transaction-state">
                 {r.transaction.date} ·{' '}
                 {r.transaction.direction === 'debit' ? 'Saída' : 'Entrada'}{' '}
                 {account?.currency === 'BRL'
-                  ? money(r.transaction.amountCents / 100)
+                  ? <PrivateValue>{money(r.transaction.amountCents / 100)}</PrivateValue>
                   : `${r.transaction.amountCents / 100} ${account?.currency}`}{' '}
                 · {r.status === 'pending' ? 'Pendente' : 'Efetivada'} ·{' '}
                 {r.kind === 'refund'
@@ -362,10 +360,10 @@ export function ConnectedAccounts({
                   : r.kind === 'reversal'
                     ? 'Estorno'
                     : 'Movimentação'}{' '}
-                · {r.reviewed ? 'Revisada' : 'Revisão necessária'}
+                · <span>{r.reviewed ? 'Revisada' : 'Revisão necessária'}</span>
               </p>
               {!r.reviewed && r.status === 'posted' && (
-                <div>
+                <details className="transaction-review-actions"><summary>Revisar e conciliar</summary><div>
                   {r.importLinkId && (
                     <p>
                       A fonte corrigiu um registro conciliado. Confira o
@@ -460,7 +458,7 @@ export function ConnectedAccounts({
                   <button onClick={() => review(r.id, 'ignore')}>
                     Ignorar
                   </button>
-                </div>
+                </div></details>
               )}
             </article>
           );
@@ -478,10 +476,17 @@ export function ConnectedAccounts({
           Próxima página
         </button>
       </fieldset>
+      <AlertDialog open={!!disconnectId} onOpenChange={open => { if (!open) setDisconnectId(''); }}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Desconectar instituição?</AlertDialogTitle>
+          <AlertDialogDescription>Não haverá novas atualizações. Os dados já importados e os lançamentos serão preservados.</AlertDialogDescription>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={() => { const connection = own.find(c => c.id === disconnectId); setDisconnectId(''); if (connection) void run(() => update(connection, 'revoke')); }}>Desconectar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <output>{busy ? 'Processando…' : message}</output>
       {/* Indicador de ambiente */}
       {mode === 'sandbox' && (
-        <div style={{ marginTop: '1rem', padding: '0.5rem', backgroundColor: '#e6f4ff', borderRadius: '4px' }}>
+        <div className="connected-accounts-mode">
           <p><strong>Conexão em modo sandbox</strong></p>
           <p>A integração com a Pluggy está configurada para ambiente de testes.</p>
         </div>

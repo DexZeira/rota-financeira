@@ -1,0 +1,153 @@
+.motorcycle-page {
+  min-width: 0;
+}
+.vehicle-console {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  min-width: 0;
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.vehicle-identity {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--secondary);
+  text-align: center;
+}
+.vehicle-identity > svg {
+  width: 160px;
+  height: 112px;
+  color: var(--foreground);
+  margin-bottom: 16px;
+}
+.vehicle-identity h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.vehicle-identity p {
+  margin: 8px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.vehicle-odometer {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+.vehicle-odometer h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.vehicle-odometer > strong {
+  font-size: 40px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.vehicle-odometer > strong small {
+  margin-left: 8px;
+  font-size: 16px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.vehicle-odometer p {
+  font-size: 13px;
+  margin: 12px 0 24px;
+}
+.vehicle-care-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+  margin-block: 24px;
+}
+.vehicle-services,
+.vehicle-documentation {
+  min-width: 0;
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 24px;
+  margin: 0;
+}
+.vehicle-care-grid h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vehicle-care-grid .section-heading {
+  flex-wrap: wrap;
+}
+.vehicle-documentation > .inline-note {
+  margin: 16px 0 0;
+}
+.vehicle-documentation-empty {
+  padding-block: 24px;
+  color: var(--muted-foreground);
+}
+.vehicle-documentation > button {
+  margin-top: 16px;
+}
+.motorcycle-page > .metrics {
+  background: var(--surface-default);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.motorcycle-page > .content-section .financial-item:last-child {
+  border-bottom: 0;
+}
+@media (max-width: 767px) {
+  .vehicle-console {
+    grid-template-columns: 1fr;
+  }
+  .vehicle-identity {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 16px;
+    text-align: left;
+  }
+  .vehicle-identity > svg {
+    flex-shrink: 0;
+    width: 96px;
+    height: 72px;
+    margin: 0;
+  }
+  .vehicle-identity h2 {
+    font-size: 16px;
+  }
+  .vehicle-odometer {
+    padding: 24px 16px;
+  }
+  .vehicle-odometer > strong {
+    font-size: 32px;
+  }
+  .vehicle-care-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .vehicle-services,
+  .vehicle-documentation {
+    padding: 16px;
+  }
+  .motorcycle-page > .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: var(--space-4);
+  }
+  .motorcycle-page > .metrics .metric:last-child {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
+  }
+}

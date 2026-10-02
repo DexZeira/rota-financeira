@@ -384,318 +384,336 @@ export function Simulations({ data }: ViewProps) {
         title="Simulações"
         description="Veja consequências antes de decidir. Nenhum dado real será alterado."
       />
-      <section aria-label="Cenário de decisão">
-        <fieldset>
-          <legend>1. O que você quer simular?</legend>
-          <div className="simulation-fields">
-            <label className="simulation-field">
-              <span>Tipo de decisão</span>
-              <select
-                aria-label="Tipo de decisão"
-                value={scenario.type}
-                onChange={(e) => {
-                  setScenario({
-                    ...emptyDecision(),
-                    type: e.target.value as DecisionScenario['type'],
-                  });
-                  setCompare(false);
-                }}
-              >
-                {Object.entries(decisionLabels).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="simulation-field">
-              <span>Nome do cenário</span>
-              <input
-                value={scenario.name}
-                maxLength={120}
-                onChange={(e) => set('name', e.target.value)}
-              />
-            </label>
-            <label className="simulation-field">
-              <span>Horizonte</span>
-              <select
-                aria-label="Horizonte"
-                value={scenario.horizonDays}
-                onChange={(e) => set('horizonDays', Number(e.target.value))}
-              >
-                {[
-                  [0, 'Agora'],
-                  [30, '30 dias'],
-                  [90, '90 dias'],
-                  [365, '1 ano'],
-                  [730, '2 anos'],
-                  [1825, '5 anos'],
-                ].map(([n, label]) => (
-                  <option key={n} value={n}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>2. Dados da decisão</legend>
-          <div className="simulation-fields">
-            {needsAmount && (
-              <NumberField
-                label={purchase ? 'Preço do bem (R$)' : 'Valor da decisão (R$)'}
-                value={scenario.amountCents}
-                onChange={(v) => set('amountCents', v)}
-              />
-            )}
-            {purchase && (
-              <>
-                <label className="simulation-field">
-                  <span>Forma de pagamento</span>
-                  <select
-                    aria-label="Forma de pagamento"
-                    value={scenario.payment}
-                    onChange={(e) =>
-                      set('payment', e.target.value as 'cash' | 'finance')
-                    }
-                  >
-                    <option value="cash">À vista</option>
-                    <option value="finance">Entrada + financiamento</option>
-                  </select>
-                </label>
-                <NumberField
-                  label="Custos imediatos de aquisição (R$)"
-                  value={scenario.acquisitionCostsCents}
-                  onChange={(v) => set('acquisitionCostsCents', v)}
+      <div className="simulation-workspace">
+        <section className="simulation-editor" aria-label="Cenário de decisão">
+          <fieldset>
+            <legend>1. O que você quer simular?</legend>
+            <div className="simulation-fields">
+              <label className="simulation-field">
+                <span>Tipo de decisão</span>
+                <select
+                  aria-label="Tipo de decisão"
+                  value={scenario.type}
+                  onChange={(e) => {
+                    setScenario({
+                      ...emptyDecision(),
+                      type: e.target.value as DecisionScenario['type'],
+                    });
+                    setCompare(false);
+                  }}
+                >
+                  {Object.entries(decisionLabels).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="simulation-field">
+                <span>Nome do cenário</span>
+                <input
+                  value={scenario.name}
+                  maxLength={120}
+                  onChange={(e) => set('name', e.target.value)}
                 />
-              </>
-            )}
-            {purchase && scenario.payment === 'finance' && (
-              <>
+              </label>
+              <label className="simulation-field">
+                <span>Horizonte</span>
+                <select
+                  aria-label="Horizonte"
+                  value={scenario.horizonDays}
+                  onChange={(e) => set('horizonDays', Number(e.target.value))}
+                >
+                  {[
+                    [0, 'Agora'],
+                    [30, '30 dias'],
+                    [90, '90 dias'],
+                    [365, '1 ano'],
+                    [730, '2 anos'],
+                    [1825, '5 anos'],
+                  ].map(([n, label]) => (
+                    <option key={n} value={n}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>2. Dados da decisão</legend>
+            <div className="simulation-fields">
+              {needsAmount && (
                 <NumberField
-                  label="Entrada (R$)"
-                  value={scenario.downPaymentCents}
-                  onChange={(v) => set('downPaymentCents', v)}
+                  label={
+                    purchase ? 'Preço do bem (R$)' : 'Valor da decisão (R$)'
+                  }
+                  value={scenario.amountCents}
+                  onChange={(v) => set('amountCents', v)}
                 />
-                <NumberField
-                  label="Parcelas"
-                  integer
-                  value={scenario.installments}
-                  onChange={(v) => set('installments', v ?? 0)}
-                />
-                <NumberField
-                  label="Juros mensais (%)"
-                  percent
-                  value={scenario.monthlyRate}
-                  onChange={(v) => set('monthlyRate', v)}
-                />
-                <NumberField
-                  label="CET anual efetivo (%; prevalece sobre juros)"
-                  percent
-                  value={scenario.annualCet}
-                  onChange={(v) => set('annualCet', v)}
-                />
-              </>
-            )}
-            {scenario.type === 'trade_vehicle' && (
-              <>
-                {select(
-                  'Veículo atual',
-                  'assetId',
-                  assetRows(data)
+              )}
+              {purchase && (
+                <>
+                  <label className="simulation-field">
+                    <span>Forma de pagamento</span>
+                    <select
+                      aria-label="Forma de pagamento"
+                      value={scenario.payment}
+                      onChange={(e) =>
+                        set('payment', e.target.value as 'cash' | 'finance')
+                      }
+                    >
+                      <option value="cash">À vista</option>
+                      <option value="finance">Entrada + financiamento</option>
+                    </select>
+                  </label>
+                  <NumberField
+                    label="Custos imediatos de aquisição (R$)"
+                    value={scenario.acquisitionCostsCents}
+                    onChange={(v) => set('acquisitionCostsCents', v)}
+                  />
+                </>
+              )}
+              {purchase && scenario.payment === 'finance' && (
+                <>
+                  <NumberField
+                    label="Entrada (R$)"
+                    value={scenario.downPaymentCents}
+                    onChange={(v) => set('downPaymentCents', v)}
+                  />
+                  <NumberField
+                    label="Parcelas"
+                    integer
+                    value={scenario.installments}
+                    onChange={(v) => set('installments', v ?? 0)}
+                  />
+                  <NumberField
+                    label="Juros mensais (%)"
+                    percent
+                    value={scenario.monthlyRate}
+                    onChange={(v) => set('monthlyRate', v)}
+                  />
+                  <NumberField
+                    label="CET anual efetivo (%; prevalece sobre juros)"
+                    percent
+                    value={scenario.annualCet}
+                    onChange={(v) => set('annualCet', v)}
+                  />
+                </>
+              )}
+              {scenario.type === 'trade_vehicle' && (
+                <>
+                  {select(
+                    'Veículo atual',
+                    'assetId',
+                    assetRows(data)
+                      .filter(
+                        (r) =>
+                          r.active === 'sim' &&
+                          ['motorcycle', 'car'].includes(String(r.type)),
+                      )
+                      .map((r) => ({ id: r.id, name: String(r.name) })),
+                  )}
+                  <NumberField
+                    label="Valor de venda (R$)"
+                    value={scenario.saleCents}
+                    onChange={(v) => set('saleCents', v)}
+                  />
+                </>
+              )}
+              {['pay_debt', 'amortize'].includes(scenario.type) &&
+                select(
+                  'Dívida',
+                  'debtId',
+                  data.debts.map((r) => ({ id: r.id, name: String(r.name) })),
+                )}
+              {['remove_expense', 'decrease_contribution'].includes(
+                scenario.type,
+              ) &&
+                select(
+                  'Previsão mensal a reduzir',
+                  'recurrenceId',
+                  data.recurrences
                     .filter(
                       (r) =>
-                        r.active === 'sim' &&
-                        ['motorcycle', 'car'].includes(String(r.type)),
+                        r.frequency === 'mensal' &&
+                        r.status === 'ativa' &&
+                        r.kind ===
+                          (scenario.type === 'remove_expense'
+                            ? 'despesa'
+                            : 'aporte'),
                     )
                     .map((r) => ({ id: r.id, name: String(r.name) })),
                 )}
+              {scenario.type === 'reduce_income' && (
                 <NumberField
-                  label="Valor de venda (R$)"
-                  value={scenario.saleCents}
-                  onChange={(v) => set('saleCents', v)}
+                  label="Redução da renda prevista (%)"
+                  value={scenario.incomeLossPercent}
+                  integer
+                  onChange={(v) => set('incomeLossPercent', v)}
                 />
-              </>
-            )}
-            {['pay_debt', 'amortize'].includes(scenario.type) &&
-              select(
-                'Dívida',
-                'debtId',
-                data.debts.map((r) => ({ id: r.id, name: String(r.name) })),
               )}
-            {['remove_expense', 'decrease_contribution'].includes(
-              scenario.type,
-            ) &&
-              select(
-                'Previsão mensal a reduzir',
-                'recurrenceId',
-                data.recurrences
-                  .filter(
-                    (r) =>
-                      r.frequency === 'mensal' &&
-                      r.status === 'ativa' &&
-                      r.kind ===
-                        (scenario.type === 'remove_expense'
-                          ? 'despesa'
-                          : 'aporte'),
-                  )
-                  .map((r) => ({ id: r.id, name: String(r.name) })),
+              {select(
+                scenario.type === 'increase_contribution'
+                  ? 'Investimento de destino do aporte (opcional)'
+                  : 'Investimento de origem (se houver retirada)',
+                'investmentId',
+                data.investments.map((r) => ({
+                  id: r.id,
+                  name: String(r.name),
+                })),
               )}
-            {scenario.type === 'reduce_income' && (
-              <NumberField
-                label="Redução da renda prevista (%)"
-                value={scenario.incomeLossPercent}
-                integer
-                onChange={(v) => set('incomeLossPercent', v)}
-              />
-            )}
-            {select(
-              scenario.type === 'increase_contribution'
-                ? 'Investimento de destino do aporte (opcional)'
-                : 'Investimento de origem (se houver retirada)',
-              'investmentId',
-              data.investments.map((r) => ({ id: r.id, name: String(r.name) })),
-            )}
-            {scenario.type !== 'withdrawal' && (
-              <NumberField
-                label="Retirada para financiar a decisão (R$; opcional)"
-                value={scenario.withdrawalCents}
-                onChange={(v) => set('withdrawalCents', v)}
-              />
-            )}
-          </div>
-          <p>
-            Campos vazios são desconhecidos. Informe zero apenas quando
-            confirmar ausência do custo. Custos de aquisição incluem
-            documentação, frete e taxas fora do CET.
-          </p>
-        </fieldset>
-        {purchase && (
-          <details className="disclosure">
-            <summary>Custos mensais do novo bem</summary>
-            <div className="disclosure-body simulation-fields">
-              {Object.entries(vehicleCostLabels).map(([key, label]) => (
+              {scenario.type !== 'withdrawal' && (
                 <NumberField
-                  key={key}
-                  label={label + ' (R$/mês)'}
-                  value={
-                    scenario.vehicleCosts[key as keyof typeof vehicleCostLabels]
-                  }
-                  onChange={(v) =>
-                    set('vehicleCosts', { ...scenario.vehicleCosts, [key]: v })
-                  }
-                />
-              ))}
-            </div>
-          </details>
-        )}
-        <details className="disclosure">
-          <summary>3. Hipóteses de retorno e inflação</summary>
-          <div className="disclosure-body">
-            <div className="simulation-fields">
-              <NumberField
-                label="Retorno esperado bruto (% a.a.)"
-                percent
-                value={scenario.annualReturn}
-                onChange={(v) => set('annualReturn', v)}
-              />
-              <NumberField
-                label="Inflação / correção do preço (% a.a.; 0 = sem correção)"
-                percent
-                value={scenario.annualInflation}
-                onChange={(v) => set('annualInflation', v)}
-              />
-              {purchase && (
-                <NumberField
-                  label="Depreciação projetada do novo bem (% a.a.)"
-                  percent
-                  value={scenario.annualDepreciation}
-                  onChange={(v) => set('annualDepreciation', v)}
+                  label="Retirada para financiar a decisão (R$; opcional)"
+                  value={scenario.withdrawalCents}
+                  onChange={(v) => set('withdrawalCents', v)}
                 />
               )}
             </div>
             <p>
-              Taxas não são garantias. Nenhum retorno de renda variável é
-              presumido. Use zero explicitamente para cenário sem rendimento ou
-              sem correção.
+              Campos vazios são desconhecidos. Informe zero apenas quando
+              confirmar ausência do custo. Custos de aquisição incluem
+              documentação, frete e taxas fora do CET.
             </p>
-            {(['cdi', 'selic', 'ipca'] as const).map((key) => {
-              const rate = economic.rates[key];
-              return rate ? (
-                <div className="setting-row" key={key}>
-                  <span>
-                    {key.toUpperCase()}: {dec(rate.value)}% · {rate.source} ·{' '}
-                    {brDate(rate.date)} ·{' '}
-                    {rate.status || 'status não informado'}
-                  </span>
-                  <button
-                    onClick={() =>
-                      set(
-                        key === 'ipca' ? 'annualInflation' : 'annualReturn',
-                        rate.value / 100,
-                      )
+          </fieldset>
+          {purchase && (
+            <details className="disclosure">
+              <summary>Custos mensais do novo bem</summary>
+              <div className="disclosure-body simulation-fields">
+                {Object.entries(vehicleCostLabels).map(([key, label]) => (
+                  <NumberField
+                    key={key}
+                    label={label + ' (R$/mês)'}
+                    value={
+                      scenario.vehicleCosts[
+                        key as keyof typeof vehicleCostLabels
+                      ]
                     }
-                  >
-                    Usar {key.toUpperCase()} como hipótese
-                  </button>
-                </div>
-              ) : (
-                <p key={key}>{key.toUpperCase()}: indisponível.</p>
-              );
-            })}
-          </div>
-        </details>
-        <div className="simulation-actions">
-          <button
-            onClick={() =>
-              setCopies((old) => [...old.slice(-2), structuredClone(scenario)])
-            }
-          >
-            Duplicar cenário na sessão
-          </button>
-          <button
-            onClick={() => {
-              setScenario(emptyDecision());
-              setCompare(false);
-            }}
-          >
-            Limpar simulação
-          </button>
-        </div>
-        {copies.length > 0 && (
+                    onChange={(v) =>
+                      set('vehicleCosts', {
+                        ...scenario.vehicleCosts,
+                        [key]: v,
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </details>
+          )}
           <details className="disclosure">
-            <summary>Cópias da sessão ({copies.length})</summary>
+            <summary>3. Hipóteses de retorno e inflação</summary>
             <div className="disclosure-body">
-              {copies.map((copy, i) => (
-                <div className="setting-row" key={i}>
-                  <span>
-                    {copy.name} · {decisionLabels[copy.type]}
-                  </span>
-                  <button onClick={() => setScenario(structuredClone(copy))}>
-                    Abrir cópia {i + 1}
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCopies((old) => old.filter((_, n) => n !== i))
-                    }
-                  >
-                    Excluir cópia {i + 1}
-                  </button>
-                </div>
-              ))}
+              <div className="simulation-fields">
+                <NumberField
+                  label="Retorno esperado bruto (% a.a.)"
+                  percent
+                  value={scenario.annualReturn}
+                  onChange={(v) => set('annualReturn', v)}
+                />
+                <NumberField
+                  label="Inflação / correção do preço (% a.a.; 0 = sem correção)"
+                  percent
+                  value={scenario.annualInflation}
+                  onChange={(v) => set('annualInflation', v)}
+                />
+                {purchase && (
+                  <NumberField
+                    label="Depreciação projetada do novo bem (% a.a.)"
+                    percent
+                    value={scenario.annualDepreciation}
+                    onChange={(v) => set('annualDepreciation', v)}
+                  />
+                )}
+              </div>
+              <p>
+                Taxas não são garantias. Nenhum retorno de renda variável é
+                presumido. Use zero explicitamente para cenário sem rendimento
+                ou sem correção.
+              </p>
+              {(['cdi', 'selic', 'ipca'] as const).map((key) => {
+                const rate = economic.rates[key];
+                return rate ? (
+                  <div className="setting-row" key={key}>
+                    <span>
+                      {key.toUpperCase()}: {dec(rate.value)}% · {rate.source} ·{' '}
+                      {brDate(rate.date)} ·{' '}
+                      {rate.status || 'status não informado'}
+                    </span>
+                    <button
+                      onClick={() =>
+                        set(
+                          key === 'ipca' ? 'annualInflation' : 'annualReturn',
+                          rate.value / 100,
+                        )
+                      }
+                    >
+                      Usar {key.toUpperCase()} como hipótese
+                    </button>
+                  </div>
+                ) : (
+                  <p key={key}>{key.toUpperCase()}: indisponível.</p>
+                );
+              })}
             </div>
           </details>
-        )}
-      </section>
-      <section aria-label="Resultado da simulação">
-        <h2>4. Impacto da decisão</h2>
-        {result.value ? (
-          <Metrics result={result.value} />
-        ) : (
-          <output>Simulação insuficiente: {result.error}</output>
-        )}
-      </section>
+          <div className="simulation-actions">
+            <button
+              onClick={() =>
+                setCopies((old) => [
+                  ...old.slice(-2),
+                  structuredClone(scenario),
+                ])
+              }
+            >
+              Duplicar cenário na sessão
+            </button>
+            <button
+              onClick={() => {
+                setScenario(emptyDecision());
+                setCompare(false);
+              }}
+            >
+              Limpar simulação
+            </button>
+          </div>
+          {copies.length > 0 && (
+            <details className="disclosure">
+              <summary>Cópias da sessão ({copies.length})</summary>
+              <div className="disclosure-body">
+                {copies.map((copy, i) => (
+                  <div className="setting-row" key={i}>
+                    <span>
+                      {copy.name} · {decisionLabels[copy.type]}
+                    </span>
+                    <button onClick={() => setScenario(structuredClone(copy))}>
+                      Abrir cópia {i + 1}
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCopies((old) => old.filter((_, n) => n !== i))
+                      }
+                    >
+                      Excluir cópia {i + 1}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
+        <section
+          className="simulation-output"
+          aria-label="Resultado da simulação"
+        >
+          <h2>4. Impacto da decisão</h2>
+          {result.value ? (
+            <Metrics result={result.value} />
+          ) : (
+            <output>Simulação insuficiente: {result.error}</output>
+          )}
+        </section>
+      </div>
       {purchase && (
         <details
           className="disclosure"

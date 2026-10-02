@@ -11,18 +11,18 @@ for (const flow of ['Trabalho', 'Gasto', 'Dívida', 'Manutenção']) {
       await page.getByText('Gerenciar intervalos e itens', { exact: true }).click();
       await page.getByRole('button', { name: 'Adicionar', exact: true }).first().click();
     } else {
-      const button = flow === 'Trabalho' ? '+ Registrar trabalho' : flow === 'Gasto' ? '+ Registrar gasto' : '+ Nova dívida';
+      const button = flow === 'Trabalho' ? 'Registrar trabalho' : flow === 'Gasto' ? '+ Registrar gasto' : '+ Nova dívida';
       await page.getByRole('button', { name: button, exact: true }).click();
     }
     const dialog = page.locator('.editor-dialog');
     if (flow === 'Trabalho') {
-      await dialog.getByLabel('Nome da atividade *').fill(name);
-      await dialog.getByLabel('Horas *', { exact: true }).fill('2');
+      await dialog.getByRole('textbox', { name: /^Nome da atividade/ }).fill(name);
+      await dialog.getByRole('spinbutton', { name: /^Horas/ }).fill('2');
     }
-    else await dialog.getByLabel('Nome *', { exact: true }).fill(name);
+    else await dialog.getByRole('textbox', { name: /^Nome \(obrigatório\)$/ }).fill(name);
     if (flow === 'Dívida') {
       await dialog.getByLabel('Total de parcelas', { exact: true }).fill('12');
-      await dialog.getByLabel('Valor da parcela (R$) *', { exact: true }).fill('100');
+      await dialog.getByRole('spinbutton', { name: /^Valor da parcela/ }).fill('100');
     }
     const input = dialog.locator('input[type=date]').first();
     const viewportBefore = await page.evaluate(() => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight, visualWidth: window.visualViewport?.width, visualHeight: window.visualViewport?.height }));

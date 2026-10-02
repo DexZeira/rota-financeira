@@ -1,0 +1,15 @@
+.accounts-workspace { display: grid; grid-template-columns: minmax(15rem,.65fr) minmax(0,1.65fr); gap: 24px; align-items: start; }
+.accounts-context { min-width: 0; padding: 24px; background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; }
+.accounts-context > svg { color: var(--primary); margin-bottom: 20px; }
+.accounts-context h2 { font-size: 14px; margin: 0 0 10px; }
+.accounts-context > strong { display: block; font-size: 32px; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.accounts-context p { color: var(--muted-foreground); font-size: 12px; line-height: 1.7; margin-top: 14px; }
+.accounts-context dl { border-top: 1px solid var(--border); margin: 24px 0 0; }
+.accounts-context dl > div { padding-top: 20px; }
+.accounts-context dt { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.accounts-context dd { margin: 6px 0 0; font-size: 12px; color: var(--muted-foreground); line-height: 1.7; }
+.accounts-connections { background: var(--surface-default); padding: clamp(.75rem, 2vw, 1.5rem); border: 1px solid var(--border); border-radius: var(--radius-surface); margin-bottom: 1.5rem; }
+.accounts-connections > h2 { font-size: var(--text-lg); margin: 0 0 .5rem; }
+.accounts-connections > .banking-integrations { padding: 0; }
+@media (max-width: 1000px) { .accounts-workspace { grid-template-columns: 1fr; } .accounts-context dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; } }
+@media (max-width: 430px) { .accounts-context { padding: 16px; } .accounts-context dl { grid-template-columns: 1fr; gap: 0; } }

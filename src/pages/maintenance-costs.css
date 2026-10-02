@@ -1,0 +1,57 @@
+.maintenance-cost-summary {
+  min-width: 0;
+}
+.maintenance-cost-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 16px 0 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.maintenance-cost-comparison .detail + .detail {
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.maintenance-cost-comparison .detail strong {
+  font-size: 24px;
+}
+.maintenance-component-costs .activity-card {
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.maintenance-component-costs .activity-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.maintenance-component-costs h3 {
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.maintenance-component-costs .work-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.maintenance-component-costs .detail strong {
+  font-size: 16px;
+}
+.maintenance-component-costs .detail span {
+  font-size: 12px;
+}
+@media (max-width: 767px) {
+  .maintenance-cost-comparison {
+    gap: 16px;
+  }
+  .maintenance-cost-comparison .detail + .detail {
+    padding-left: 16px;
+  }
+  .maintenance-cost-comparison .detail strong {
+    font-size: 18px;
+  }
+  .maintenance-component-costs .work-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

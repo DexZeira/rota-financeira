@@ -1,6 +1,6 @@
 import { validDate } from '../../model';
 import { normalizedTransaction } from '../import/transaction-normalizer';
-import { emptyOpenFinance, type OpenFinanceState } from './types';
+import { emptyOpenFinance, type OpenFinanceState, type ConnectionType } from './types';
 
 const text = (v: unknown, max = 200): string => {
   if (typeof v !== 'string' || v.length > max)
@@ -97,6 +97,12 @@ export function validateOpenFinance(value: unknown): OpenFinanceState {
     lastSuccessfulSyncAt: nullableDate(c.lastSuccessfulSyncAt),
     errorCode: error(c.errorCode),
     nextRetryAt: nullableDate(c.nextRetryAt ?? null),
+    externalItemId: (c as Record<string, unknown>).external_item_id
+      ? String((c as Record<string, unknown>).external_item_id)
+      : null,
+    connectionType: ((c as Record<string, unknown>).connection_type
+      ? String((c as Record<string, unknown>).connection_type)
+      : 'open_finance') as ConnectionType,
   }));
   result.accounts = raw.accounts.map((a) => {
     if (typeof a.active !== 'boolean') throw Error('Conta inválida.');

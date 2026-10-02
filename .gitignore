@@ -37,6 +37,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /.qa-artifacts/
+/.impeccable/review/
 /test-results/
 /playwright-report/
 /work/

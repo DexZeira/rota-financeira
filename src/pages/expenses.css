@@ -1,0 +1,30 @@
+.expenses-page { min-width: 0; }
+.expense-period-panel { background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 24px; padding: 24px; }
+.expense-total { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 20px; }
+.expense-total h2 { font-size: 16px; margin: 0 0 6px; }
+.expense-total p { color: var(--muted-foreground); font-size: 12px; margin: 0; }
+.expense-total strong { font-size: 36px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.expense-period-controls { border-top: 1px solid var(--border); padding-top: 20px; }
+.expense-period-controls .metrics { margin-top: 20px; }
+.expense-period-controls .period-tabs { margin-bottom: 16px; }
+.expense-reading-grid { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); gap: 24px; align-items: start; margin-bottom: 24px; }
+.expense-reading-grid > .content-section { min-width: 0; background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+.expense-reading-grid .section-heading { align-items: baseline; }
+.expense-reading-grid .section-heading > span { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+.expense-reading-grid h2 { font-size: 16px; }
+.expense-reading-grid .financial-item-name h3 { font-size: 13px; }
+.expense-reading-grid .financial-item-main { gap: 10px; }
+.expense-reading-grid .financial-item-value strong { font-size: 14px; }
+.expenses-page .category-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.expenses-page .category-row > span { text-transform: capitalize; }
+.expenses-page .category-row .progress-bar { grid-column: 1 / -1; margin: 0; }
+.expenses-page > .content-section { padding-block: var(--space-5); }
+@media (max-width: 767px) {
+  .expense-period-panel { padding: 16px; }
+  .expense-total { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .expense-total strong { font-size: 32px; }
+  .expense-reading-grid { grid-template-columns: 1fr; }
+  .expense-reading-grid > .content-section { padding: 16px; }
+  .expenses-page .period-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-1); }
+  .expenses-page .period-tabs button { padding-inline: var(--space-1); font-size: var(--text-xs); }
+}

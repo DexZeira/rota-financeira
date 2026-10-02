@@ -1,0 +1,176 @@
+.work-page {
+  min-width: 0;
+}
+.work-today {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 24px;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.work-today h2 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.work-today > div > strong {
+  font-size: 40px;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.work-today p {
+  margin: 8px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.work-today dl {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  margin: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.work-today dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.work-today dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.work-today dd {
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.work-page .work-filters {
+  margin-bottom: 24px;
+}
+.work-page .period-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 16px;
+}
+.work-page .period-tabs button {
+  font-size: 12px;
+  min-height: 36px;
+}
+.work-page .work-filter-controls {
+  align-items: end;
+}
+.work-period-results {
+  border-radius: var(--radius-surface);
+  background: var(--card);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.work-period-results > .metrics {
+  padding: 0;
+  margin: 16px 0 0;
+  gap: 0;
+  border: 0;
+  grid-template-columns: 1.3fr 1.3fr 1fr 1fr;
+}
+.work-period-results .metric {
+  padding: 0 16px;
+  border-left: 1px solid var(--border);
+}
+.work-period-results .metric:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.work-period-results .metric strong {
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.work-period-results .metric span,
+.work-period-results .metric small {
+  font-size: 12px;
+}
+.work-page .work-secondary,
+.work-page .work-note {
+  background: var(--card);
+  border: 0;
+  border-radius: var(--radius-surface);
+  padding: 0 24px;
+  margin: 12px 0;
+}
+.work-page .work-secondary > summary,
+.work-page .work-note > summary {
+  padding-block: 16px;
+}
+.work-journals {
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  padding: 24px;
+}
+.work-journals h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.work-journals .work-list {
+  gap: 0;
+}
+.work-journals .work-session {
+  padding: 20px 0;
+}
+.work-session-header h2 {
+  font-size: 14px;
+}
+.work-journals .work-session-primary {
+  align-items: baseline;
+  margin-block: 12px;
+}
+.work-journals .work-session-primary > span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.work-journals .work-session:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+@media (max-width: 767px) {
+  .work-today,
+  .work-period-results,
+  .work-journals {
+    padding: 16px;
+  }
+  .work-today {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .work-today dl {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 16px 0 0;
+  }
+  .work-today > div > strong {
+    font-size: 32px;
+  }
+  .work-period-results > .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 20px;
+  }
+  .work-period-results .metric:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .work-period-results .metric strong {
+    font-size: 20px;
+  }
+  .work-page .work-secondary,
+  .work-page .work-note {
+    padding-inline: 16px;
+  }
+}

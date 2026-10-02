@@ -1,29 +1,23 @@
-import { PageHeader, HeroMetric, FinancialItem } from '../components/finance-ui';
+import { PageHeader, FinancialItem, EmptyState } from '../components/finance-ui';
+import { PrivateValue } from '../components/value-privacy';
 import { DebtCards } from '../components/overview';
 import { useState } from 'react';
-import { Card, Metrics, Bar, NoData, Records, Choice } from '../components/common';
+import { Card, Bar, NoData, Records, Choice } from '../components/common';
 import { num, money, dec, brDate, today, id } from '../model';
 import { financial, targets, prioritized, debtState, sum } from '../calculations';
 import { type ViewProps, dateCol, amountCol } from './shared';
+import './debts.css';
 export function Debts(p: ViewProps) {
   const { data: d, edit } = p,
     [strategy, setStrategy] = useState('otimizada'),
     ranked = prioritized(d, strategy),
     all = d.debts.map((r) => debtState(d, r));
   return (
-    <>
-      <PageHeader title="Dívidas" description="Um compromisso de cada vez." />
-      <HeroMetric label="Total em dívidas" value={money(financial(d).debt)} context={money(targets(d).installments) + ' previstos neste mês'} action={<button className="primary" onClick={() => edit('debts')}>+ Nova dívida</button>} />
-      <section className="content-section"><h2>Próximos compromissos</h2>{[...all].filter((r) => r.balance > 0).sort((a,b) => String(a.due || '9999').localeCompare(String(b.due || '9999'))).map((r) => <FinancialItem key={r.id} title={String(r.name)} description={'Vencimento · ' + brDate(r.due)} value={money(r.balance)} context={String(r.remaining) + ' parcelas restantes'} action={<button onClick={() => edit('payments', { id: id(), debtId: r.id, date: today(), amount: 0, installments: 0, kind: 'normal', notes: '' })}>Pagar</button>}><Bar value={num(r.progress)} label={'Quitação de ' + r.name}/><small>{dec(num(r.progress))}% quitado</small></FinancialItem>)}</section>
-      <details className="disclosure"><summary>Estratégia e previsão de quitação</summary>
-      <Metrics
-        items={[
-          ['Dívidas restantes', money(financial(d).debt)],
-          ['Pagamentos realizados', money(sum(d.payments, 'amount'))],
-          ['Parcelas mensais', money(targets(d).installments)],
-          ['Dívidas ativas', String(ranked.length)],
-        ]}
-      />
+    <div className="debts-page">
+      <PageHeader title="Dívidas" description="Acompanhe compromissos, pagamentos e a ordem de quitação." action={<button className="primary" onClick={() => edit('debts')}>+ Nova dívida</button>} />
+      <section className="debt-position" aria-label="Resumo das dívidas"><div><span>Total em dívidas</span><strong><PrivateValue>{money(financial(d).debt)}</PrivateValue></strong></div><div><span>Parcelas previstas no mês</span><strong><PrivateValue>{money(targets(d).installments)}</PrivateValue></strong></div><div><span>Pagamentos realizados</span><strong><PrivateValue>{money(sum(d.payments, 'amount'))}</PrivateValue></strong></div></section>
+      <div className="debt-workspace"><section className="debt-commitments content-section"><div className="section-heading"><h2>Próximos compromissos</h2><span>{ranked.length} dívidas ativas</span></div>{[...all].filter((r) => r.balance > 0).sort((a,b) => String(a.due || '9999').localeCompare(String(b.due || '9999'))).map((r) => <FinancialItem key={r.id} title={String(r.name)} description={'Vencimento · ' + brDate(r.due)} value={money(r.balance)} context={String(r.remaining) + ' parcelas restantes'} action={<button onClick={() => edit('payments', { id: id(), debtId: r.id, date: today(), amount: 0, installments: 0, kind: 'normal', notes: '' })}>Pagar</button>}><Bar value={num(r.progress)} label={'Quitação de ' + r.name}/><small>{dec(num(r.progress))}% quitado</small></FinancialItem>)}{!ranked.length && <EmptyState title="Nenhuma dívida ativa" description="Seus compromissos quitados continuam disponíveis no histórico abaixo."/>}</section>
+      <aside className="debt-strategy">
       <Card
         title="Ordem de pagamento"
         action={
@@ -63,7 +57,7 @@ export function Debts(p: ViewProps) {
           <NoData text="Nenhuma dívida ativa." />
         )}
       </Card>
-      <DebtCards data={d} edit={edit} /></details>
+      </aside></div><details className="disclosure"><summary>Estratégia e previsão de quitação</summary><DebtCards data={d} edit={edit} /></details>
       <details className="history-disclosure"><summary>Ver todas as dívidas</summary><Records
         {...p}
         kind="debts"
@@ -125,6 +119,6 @@ export function Debts(p: ViewProps) {
         ]}
         filterKey="kind"
       /></details>
-    </>
+    </div>
   );
 }

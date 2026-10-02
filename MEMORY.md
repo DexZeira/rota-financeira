@@ -1,575 +1,167 @@
-\# MEMORY.md
+# MEMORY.md
 
+Última revisão: 2026-09-29
 
+Este arquivo contém apenas decisões persistentes e relevantes do Rota Financeira.  
+Não é histórico de conversas, changelog ou documentação completa.
 
-Última revisão: 2026-09-11
+## Arquitetura e persistência
 
-Layout de overlays (2026-09-14): validar editores no build de produção com Playwright. A compilação CSS converteu `transform: none; translate: none` em `transform: translate(0)`, deixando o `translate: -50% -50%` das utilities Tailwind ativo apenas no build. DialogContent agora posiciona via `transform` em CSS, sem utilities independentes de translate; manter uma única propriedade para centralização e reset mobile. Regressão coberta em `tests/e2e/editor-layout.spec.ts`.
- 
-Decisão de 2026-09-12: login e sincronização opcionais via Supabase Auth + snapshot completo do backup (schema atual) em `user_app_state`, com RLS e gravação condicional atômica por `updated_at`. Persistência permanece local-first; nenhuma fórmula financeira foi alterada. Divergências exigem escolha, contas têm cópias locais isoladas e logout conserva dados. Usuário confirmou produção configurada e sincronizando em `ad920cf`; nunca colocar chaves administrativas no frontend.
+- Aplicação React + TypeScript + Vite.
+- Persistência é local-first.
+- Login e sincronização são opcionais via Supabase Auth.
+- Snapshot remoto completo é armazenado em `user_app_state`.
+- RLS deve permanecer ativo.
+- Sincronização usa gravação condicional/atômica por `updated_at`.
+- Divergências entre local e remoto exigem resolução explícita.
+- Logout preserva dados locais.
+- Nunca expor chaves administrativas no frontend.
+- Telemetria externa não é utilizada.
+- Diagnósticos são locais e não devem registrar dados financeiros, tokens, emails ou backups.
 
-Decisão de 2026-09-13: telemetria externa não será usada por privacidade. Diagnósticos ficam locais e não registram dados financeiros, tokens, emails ou backups. Valores monetários persistidos usam centavos inteiros a partir do schema5, arredondados por registro; taxas, percentuais, preço por litro, distâncias e razões mantêm precisão original. Antes da primeira migração é preservada uma cópia protegida; backups legados continuam importáveis.
+## Dados financeiros
 
-Integridade de sincronização: estado zerado com base anterior representa edição/reset e não dispositivo novo; deve subir ou conflitar. Eventos de Auth mais recentes prevalecem sobre restauração atrasada. Versão do snapshot remoto deve ser comparada antes da migração, conservando o timestamp CAS literal.
+- Valores monetários persistidos usam centavos inteiros a partir do schema5.
+- Taxas, percentuais, preço por litro, distâncias e razões mantêm precisão original.
+- Dados desconhecidos ou indisponíveis não devem ser convertidos silenciosamente para zero.
+- Alterações de schema devem preservar backups antigos, importações e compatibilidade sempre que possível.
+- Antes de migrações relevantes, preservar uma cópia protegida do estado anterior.
 
+## Sincronização
 
+- Estado zerado com base anterior representa edição/reset, não dispositivo novo.
+- Eventos de Auth mais recentes prevalecem sobre restauração atrasada.
+- Comparar versão do snapshot remoto antes de migrar.
+- Preservar literalmente o timestamp usado em CAS.
+- Clientes incompatíveis com uma versão de snapshot devem rejeitá-la, não descartar metadados silenciosamente.
 
-Este arquivo contém somente decisões persistentes e relevantes do projeto FinControl.
+## Dívidas
 
-
-
-Não deve funcionar como histórico completo de conversas.
-
-
-
-\---
-
-
-
-\# Projeto
-
-
-
-Nome:
-
-
-
-FinControl
-
-
-
-Stack atual:
-
-
-
-\* React
-
-\* TypeScript
-
-\* Vite
-
-
-
-Persistência principal atualmente:
-
-
-
-\* armazenamento local
-
-
-
-\---
-
-
-
-\# Navegação
-
-
-
-As áreas principais do sistema são:
-
-
-
-\* Dashboard
-
-\* Finanças
-
-\* Investimentos
-
-\* Dívidas
-
-\* Veículos
-
-\* Manutenção
-
-\* Impostos
-
-\* Configurações
-
-
-
-A estrutura de rotas deve utilizar corretamente o sistema de rotas e layouts existente.
-
-
-
-Não duplicar estruturas de `<Routes>` dentro do layout quando o projeto estiver utilizando `<Outlet />`.
-
-
-
-\---
-
-
-
-\# Dívidas
-
-
-
-\## Decisão atual
-
-
-
-Para dívidas parceladas, foi removido o campo manual:
-
-
-
-`valorOriginal`
-
-
-
-O usuário não deve digitar esse valor.
-
-
-
-Dados utilizados:
-
-
-
-\* nome;
-
-\* quantidade total de parcelas;
-
-\* valor da parcela;
-
-\* parcelas já pagas;
-
-\* vencimento;
-
-\* juros, se houver;
-
-\* observações.
-
-
-
-\---
-
-
-
-\## Valor total
-
-
-
-Calcular automaticamente:
-
-
+Para dívidas parceladas:
 
 ```text
-
-valorTotal =
-
-quantidadeTotalParcelas × valorParcela
-
+valorTotal = totalParcelas × valorParcela
+parcelasRestantes = totalParcelas - parcelasPagas
+saldoRestante = parcelasRestantes × valorParcela
 ```
 
-
-
-Exemplo:
-
-
-
-```text
-
-12 × R$ 500 = R$ 6.000
-
-```
-
-
-
-Pode ser exibido como:
-
-
-
-```text
-
-Total calculado: R$ 6.000,00
-
-```
-
-
-
-Não deve existir campo editável correspondente.
-
-
-
-\---
-
-
-
-\## Parcelas restantes
-
-
-
-```text
-
-parcelasRestantes =
-
-quantidadeTotalParcelas - parcelasPagas
-
-```
-
-
-
-\---
-
-
-
-\## Saldo restante
-
-
-
-```text
-
-saldoRestante =
-
-parcelasRestantes × valorParcela
-
-```
-
-
-
-Exemplo:
-
-
-
-```text
-
-12 parcelas
-
-1 paga
-
-R$ 500 por parcela
-
-
-
-11 parcelas restantes
-
-Saldo restante: R$ 5.500
-
-```
-
-
-
-Essa regra deve ser usada como fonte de verdade para evitar o bug anterior de saldo zerado ou inconsistente.
-
-
-
-\---
-
-
-
-\# Investimentos
-
-
-
-A área de investimentos deve permitir trabalhar com referência de rentabilidade.
-
-
-
-Exemplo:
-
-
-
-\* CDI;
-
-\* percentual do CDI;
-
-\* rentabilidade anual;
-
-\* estimativas de rendimento.
-
-
-
-Taxas econômicas podem mudar.
-
-
-
-Evitar gravar uma taxa atual como constante permanente da aplicação quando houver intenção de atualização automática.
-
-
-
-\---
-
-
-
-\# Veículos
-
-
-
-Veículo de referência atual:
-
-
-
-Honda XRE 190 2025.
-
-
-
-A área de veículos deve permitir integração com:
-
-
-
-\* manutenção;
-
-\* impostos;
-
-\* despesas;
-
-\* quilometragem;
-
-\* custo por quilômetro;
-
-\* depreciação.
-
-
-
-O sistema deve continuar preparado para possuir mais de um veículo.
-
-
-
-\---
-
-
-
-# Metas
-
-
-
-As metas diárias usam a mesma fonte de custos e obrigações do sistema. A meta mínima cobre despesas recorrentes, custos operacionais obrigatórios e parcelas de dívidas pendentes. As metas Ideal e Acelerada aplicam percentuais configuráveis sobre a mínima, sem somar novamente provisões, planos ou aportes já exibidos no detalhamento.
-
-
-
-As configurações padrão são 20% para Ideal e 40% para Acelerada, preservando esses valores ao migrar dados antigos.
-
-
-
-\---
-
-
-
-\# Manutenção
-
-
-
-A manutenção deve considerar:
-
-
-
-\* quilometragem;
-
-\* tempo;
-
-\* histórico;
-
-\* próxima manutenção;
-
-\* custo;
-
-\* prioridade.
-
-
-
-Não apagar histórico ao atualizar recomendações futuras.
-
-
-
-\---
-
-
-
-\# Impostos
-
-
-
-O sistema deve possuir suporte a informações como:
-
-
-
-\* IPVA;
-
-\* licenciamento.
-
-
-
-Esses valores podem mudar com o tempo.
-
-
-
-Não inventar valores quando a informação atual não estiver disponível.
-
-
-
-\---
-
-
-
-\# Persistência
-
-
-
-Antes de modificar chaves ou estruturas persistidas:
-
-
-
-\* verificar implementação atual;
-
-\* avaliar dados existentes;
-
-\* preservar compatibilidade;
-
-\* utilizar migração quando necessário.
-
-
-
-Não causar perda silenciosa de dados.
-
-
-
-\---
-
-
-
-\# Interface
-
-
-
-Manter:
-
-
-
-\* interface simples;
-
-\* aparência moderna;
-
-\* responsividade;
-
-\* consistência visual.
-
-
-
-Evitar campos desnecessários.
-
-
-
-Tema deve continuar suportando:
-
-
-
-\* claro;
-
-\* escuro;
-
-\* sistema;
-
-
-
-quando já estiver implementado.
-
-
-
-\---
-
-
-
-\# Desenvolvimento
-
-
-
-Preferências permanentes:
-
-
-
-\* investigar antes de alterar;
-
-\* mudanças pequenas;
-
-\* não modificar áreas não relacionadas;
-
-\* corrigir a causa dos bugs;
-
-\* preservar funcionalidades existentes;
-
-\* reutilizar código;
-
-\* evitar dependências desnecessárias;
-
-\* validar alterações.
-
-
-
-Após mudanças relevantes, executar build.
-
-
-
-Nunca considerar uma tarefa concluída apenas porque o código parece correto.
-
-
-
-\---
-
-
-
-\# Memória
-
-
-
-Somente adicionar novas memórias quando forem úteis em sessões futuras.
-
-
-
-Boas memórias:
-
-
-
-\* decisão de arquitetura;
-
-\* regra de negócio;
-
-\* causa de bug importante;
-
-\* mudança definitiva;
-
-\* comportamento obrigatório.
-
-
-
-Não registrar:
-
-
-
-\* toda alteração realizada;
-
-\* logs;
-
-\* mensagens do usuário;
-
-\* tentativas fracassadas sem importância;
-
-\* raciocínio temporário.
-
-
-
-Quando uma decisão antiga deixar de valer, atualizá-la ou removê-la para evitar instruções conflitantes.
-
-Camada de inteligência financeira (2026-09): cálculos de poder de compra, retorno real, projeções, concentração e comparações vivem em `src/services/purchasing-power.ts` e `src/services/financial-intelligence.ts`. Indicadores públicos usam `indicator-cache.ts`, preservam data/status e não convertem indisponibilidade em zero. Metas corrigidas são sempre derivadas do valor-base; `intelligenceVersion: 1` é metadado aditivo compatível com backups anteriores.
-
-Planejamento financeiro: Hoje e Planejamento consultam `FinancialQueryService`. Recorrências geram somente previsões; conferências explícitas vinculam realizados ou ignoram ocorrências sem lançar pagamentos. Alocações de planos não são novas saídas de caixa. Envelope v6, runtime v4, `planningVersion: 5` (Fase 5); vigências preservam o passado em edições/pausas e a retomada não repõe dias pausados. Dias inexistentes usam o último dia do mês, preservando a âncora. Migrações guardam cópia protegida; clientes incompatíveis devem rejeitar o snapshot. Não há alteração de tabela/RLS/RPC. Saldo-base do forecast é o caixa realizado, não o disponível após reserva.
-
-
-
-
-Fase 2: orçamento, meta dinâmica, custo de vida e reserva são motores puros separados. Coleções aditivas no snapshot v6: budgets, categoryPolicies, planningSettings e reserveAllocations; campos *Cents já são inteiros e não recebem dupla conversão. Migração p2→p3 preserva bytes em backup protegido. Meta dinâmica é opt-in por agenda explícita; estimativa fraca é cenário. Reserva e liquidez exigem marcação explícita, preservando a categoria legada. Detalhes e hipóteses em docs/planning-phase-2.md.
-
-Fase 3: patrimônio usa assets, assetValuations, assetCostLinks e netWorthSnapshots; planningVersion 4 + assetVersion 1, envelope v6 preservado. Moto é projeção única asset:primary-bike; valores desconhecidos não são zero. Compra/venda só movimentam caixa por escolha explícita; TCO exclui capital e principal financiado. Posições diárias são imutáveis e não equivalem a fechamento mensal. Detalhes em docs/planning-phase-3.md.
-
-Fase 4: Simulações usa cópia lógica, sem aplicar decisões nem persistir cenários. PRICE/CET e custo de oportunidade são motores isolados; taxas ausentes não viram zero. Forecast detalhado mantém limite de 366 dias; horizontes maiores mostram somente impacto incremental conhecido. Meta simulada refere-se ao próximo mês. Detalhes e hipóteses em docs/planning-phase-4.md.
-
-Fase 5: importação CSV/OFX é local, com preview e confirmação atômica. `importVersion: 1`, `imports` e `bankReceipts`; envelope v6/runtime v4 preservados. `planningVersion: 5` impede clientes antigos de descartar metadados; migração guarda bytes anteriores. Receitas bancárias aumentam caixa sem virar Trabalho. FITID usa origem+conta, duplicatas exigem revisão, transferência confirmada não gera receita/despesa. Arquivo bruto nunca é persistido/enviado; metadados normalizados seguem o snapshot existente. Detalhes em docs/planning-phase-5.md.
-
-Fase 6 (2026-09-25): fechamentos mensais usam reportingVersion 1 e planningVersion 6 (barreira contra clientes anteriores), mantendo envelope monetário 6. Revisões preservam snapshots; alterações nas fontes exigem reprocessamento explícito. A ponte patrimonial não infere juros nem trata aportes como ganho. IPCA real requer cobertura observada do período; metas/orçamentos históricos sem versão são reconstruções estimadas. Reset financeiro limpa os fechamentos.
-
-Fase 7: Alertas, Auditoria, Busca Universal e Minha Situação são derivados locais, sem nova versão persistida. Auditoria nunca corrige dados automaticamente; vínculos importados após exclusão são históricos informativos. Busca usa índice por revisão, ranking determinístico e 30 resultados. Minha Situação reutiliza motores existentes e meta selecionada, respeitando agenda opt-in. Quota estimada pelo navegador é da origem, não do localStorage. Detalhes em docs/planning-phase-7.md.
-
-Fase 8: investimentos usam investmentVersion 1 / planningVersion 7, mantendo envelope 6. `investment-ledger` centraliza posição/custo/caixa; `rendimento` legado continua reinvestido e somente `paidOut: sim` gera recebimento. Compra/venda usam quantidade com oito casas e custo médio proporcional em centavos; custo inicial ausente não é inferido do saldo. Avaliação manual datada altera patrimônio sem caixa/custo; cotação consultiva não reescreve histórico. Migração preserva bytes e distingue currentValue legado em reais do novo campo codificado em centavos. Comparação exige períodos iguais; último CDI/Selic não equivale a histórico realizado. Detalhes em docs/planning-phase-8.md.
-
-
-Fase 9: notificações locais são opt-in por perfil/dispositivo, somente botão explícito pede permissão; privadas por padrão, quiet hours, até 3/dia e 200 hashes locais. Sem promessa de background/push; verifica abertura/foco, preserva SW network-first. Preferências seguem snapshot v6 com notificationVersion 1 / planningVersion 8 e backup protegido. FinancialQueryService.answer consolida envelopes available/partial/unavailable; provider determinístico só recebe capacidade de consulta. Histórico usa revisão fechada, nunca recalcula silenciosamente com dados atuais. Assistente sem IA/rede, respostas não persistidas. Detalhes em docs/planning-phase-9.md.
-
-Fase 10: commits locais assíncronos usam Web Locks e comparam bytes/proprietário; sem locks, exclusão é best effort. Multiaba preserva rascunho e exige atualização explícita. Último snapshot válido protegido, backup de emergência SHA-256 e recovery confirmado, sem mudar schema financeiro. Diagnóstico estritamente técnico local (100 eventos), sem mensagens/stacks/dados pessoais. Retry de sync limitado no app, desabilitado no SDK; PWA atualiza só por ação explícita e mantém HTML/chunks da mesma versão. Cópias locais expostas apenas ao proprietário conhecido. Testes remotos leem exclusivamente as seis variáveis dedicadas de `.env.test.local`; ausência significa skipped/PENDENTE, nunca usar produção. E2E usa build separado com envDir false e credenciais fictícias. Detalhes em docs/planning-phase-10.md.
+Não existe campo manual `valorOriginal`.
+
+## Planejamento
+
+- Metas diárias usam a mesma fonte de custos e obrigações do sistema.
+- Meta mínima cobre despesas recorrentes, custos operacionais obrigatórios e parcelas pendentes.
+- Ideal e Acelerada aplicam percentuais configuráveis sobre a mínima sem duplicar provisões, planos ou aportes.
+- Padrões preservados em migrações: Ideal 20%, Acelerada 40%.
+- Planejamento usa `FinancialQueryService`.
+- Recorrências geram previsões; não devem criar pagamentos automaticamente.
+- Alocações de planos não representam nova saída de caixa.
+- Saldo-base do forecast é o caixa realizado.
+- Dias inexistentes usam o último dia do mês preservando a âncora original.
+
+## Inteligência financeira
+
+- Cálculos de poder de compra, retorno real, projeções, concentração e comparações vivem em:
+  - `src/services/purchasing-power.ts`
+  - `src/services/financial-intelligence.ts`
+- Indicadores públicos usam `indicator-cache.ts`.
+- Indisponibilidade de indicador não equivale a zero.
+- Metas corrigidas são derivadas do valor-base.
+
+## Patrimônio e ativos
+
+- Patrimônio usa `assets`, `assetValuations`, `assetCostLinks` e `netWorthSnapshots`.
+- Moto principal é projeção única `asset:primary-bike`.
+- Valores desconhecidos não devem ser inferidos como zero.
+- Compra/venda só movimenta caixa quando explicitamente definido.
+- TCO exclui capital e principal financiado.
+- Posições diárias são imutáveis e não equivalem a fechamento mensal.
+
+## Simulações
+
+- Simulações operam sobre cópia lógica e não alteram dados reais.
+- PRICE/CET e custo de oportunidade são motores isolados.
+- Taxas ausentes não viram zero.
+- Forecast detalhado mantém limite de 366 dias.
+- Horizontes maiores mostram apenas impacto incremental conhecido.
+
+## Importações
+
+- CSV/OFX são processados localmente.
+- Importação exige preview e confirmação atômica.
+- Arquivo bruto nunca é persistido ou enviado.
+- Receitas bancárias aumentam caixa sem virar renda de Trabalho.
+- Transferência confirmada não gera receita nem despesa.
+- FITID considera origem + conta.
+- Duplicatas exigem revisão.
+
+## Fechamentos e relatórios
+
+- Fechamentos mensais preservam snapshots.
+- Alteração nas fontes exige reprocessamento explícito.
+- Ponte patrimonial não infere juros.
+- Aportes não são tratados como ganho.
+- IPCA real exige cobertura observada do período.
+- Reconstruções históricas sem versão devem ser marcadas como estimativas.
+
+## Investimentos
+
+- `investment-ledger` é a fonte central para posição, custo e caixa.
+- Compra/venda usam quantidade com até oito casas decimais.
+- Custo médio é proporcional e armazenado em centavos.
+- Custo inicial ausente não deve ser inferido do saldo atual.
+- Avaliação manual altera patrimônio sem alterar caixa/custo.
+- Cotação consultiva não reescreve histórico.
+- Comparações de rentabilidade exigem períodos equivalentes.
+- Último CDI/Selic disponível não representa automaticamente rentabilidade histórica realizada.
+
+## Notificações e assistente
+
+- Notificações são locais e opt-in por perfil/dispositivo.
+- Permissão só pode ser solicitada por ação explícita do usuário.
+- Privadas por padrão.
+- Quiet hours e limite de até 3 notificações por dia.
+- Não prometer background/push quando a plataforma não garante.
+- Assistente financeiro atual é determinístico, sem IA/rede.
+- Respostas do assistente não são persistidas.
+- Histórico fechado nunca deve ser recalculado silenciosamente usando dados atuais.
+
+## Concorrência, recuperação e PWA
+
+- Commits locais assíncronos usam Web Locks quando disponíveis.
+- Multiaba preserva rascunhos e exige atualização explícita.
+- Manter último snapshot válido protegido.
+- Backup de emergência usa SHA-256 e recuperação confirmada.
+- Diagnóstico técnico local é limitado e não deve conter mensagens, stacks ou dados pessoais.
+- Retry de sync é limitado no app e desabilitado no SDK.
+- Atualização PWA ocorre apenas por ação explícita e deve manter HTML/chunks da mesma versão.
+
+## Testes remotos
+
+- Testes remotos usam exclusivamente as variáveis dedicadas de `.env.test.local`.
+- Ausência dessas variáveis significa teste skipped/pendente.
+- Nunca usar credenciais de produção em testes.
+- E2E usa build separado com `envDir: false` e credenciais fictícias.
+
+## Referências detalhadas
+
+Quando uma tarefa depender de uma fase específica, consultar os documentos em `docs/`:
+
+- `planning-phase-2.md`
+- `planning-phase-3.md`
+- `planning-phase-4.md`
+- `planning-phase-5.md`
+- `planning-phase-7.md`
+- `planning-phase-8.md`
+- `planning-phase-9.md`
+- `planning-phase-10.md`
+
+Não carregar esses documentos sem necessidade.
+
+## Identidade e interface Rota Financeira 2.0
+
+- A direção visual permanente é “Direção clara”: Manrope local, petróleo/lima e marca vetorial de duas rotas. Consultar `DESIGN.md` e `app/design-tokens.css` para novas interfaces; não replicar manualmente paletas concorrentes.
+- As 23 rotas `?view=` e os contratos financeiros/auth existentes permanecem. Configurações usa `settings=` para suas sete seções; navegação móvel é própria, sem depender da sidebar desktop.
+- Nome amigável usa `settings.profileName` aditivo e compatível com o Row existente; não altera metadados de autenticação. Primeiro passo pode ser dispensado por preferência local de UI, sem mudar dados financeiros.
+- Dashboard distingue caixa, patrimônio e mês. Histórico usa somente posições/fechamentos salvos; o gráfico exclui principal transferido e reutiliza `movementCashCents` para custos e rendimentos líquidos. Não criar histórico financeiro fictício.
+- Logo SVG, ícones PNG derivados e fonte local entram no pacote público/PWA; APIs, auth, segredos e imagens de exploração não entram no cache. Relatório de escopo em `docs/rota-financeira-2-redesign.md`.

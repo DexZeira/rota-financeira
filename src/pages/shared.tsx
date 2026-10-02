@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { PrivateValue } from '../components/value-privacy';
 import { type Column } from '../components/common';
 import { type Data, type Collection, type Row, num, money, brDate } from '../model';
 export type ViewProps = {
@@ -12,7 +13,7 @@ export type ViewProps = {
 export const value = (label: string, v: ReactNode) => (
   <div className="detail" key={label}>
     <span>{label}</span>
-    <strong>{v}</strong>
+    <strong><PrivateValue>{v}</PrivateValue></strong>
   </div>
 );
 export const dateCol: Column = { label: 'Data', render: (r) => brDate(r.date) };

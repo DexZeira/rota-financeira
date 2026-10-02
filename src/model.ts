@@ -1,4 +1,6 @@
 import type { OpenFinanceState } from './services/open-finance/types';
+import { validDate } from './services/import/statement-values';
+export { validDate } from './services/import/statement-values';
 import { defaultNotificationPreferences, type NotificationPreferences } from './services/notification-preferences';
 import { investmentOperations, incomeOperations, quantityUnits } from './services/investment-ledger';
 import { emptyReporting, type ReportingState } from './services/reporting-state';
@@ -546,21 +548,21 @@ export function defaults(): Data {
 }
 export const num = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) ? v : 0;
-export const money = (v: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-    v,
-  );
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+export const money = (v: number, currency: 'BRL' | 'USD' | 'EUR' = 'BRL') => {
+  let formatter = currencyFormatters.get(currency);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency });
+    currencyFormatters.set(currency, formatter);
+  }
+  return formatter.format(v);
+};
 export const dec = (v: number, digits = 2) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: digits }).format(v);
 export const brDate = (v: unknown) =>
   typeof v === 'string' && v
     ? v.split('-').reverse().join('/')
     : 'Não definida';
-export function validDate(v: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-  const d = new Date(v + 'T12:00:00Z');
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === v;
-}
 // Read both the current debt form and older saved records without changing balances.
 export function debtTerms(r: Row) {
   const installment = num(r.installmentAmount) || num(r.installment);

@@ -1,0 +1,24 @@
+.manio-integration { min-width: 0; margin-block: var(--space-5); }
+.manio-heading, .manio-connection { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-4); align-items: start; }
+.manio-connection, .manio-transaction { border-block-end: 1px solid var(--border); padding-block: var(--space-4); overflow-wrap: anywhere; }
+.manio-heading h3, .manio-connection h4 { margin: 0; }
+.manio-connection p, .manio-transaction p { margin-block: var(--space-2); }
+.manio-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.manio-connection > .manio-actions { max-width: 18rem; }
+.manio-integration button { min-height: 2.75rem; white-space: normal; }
+.manio-dialog { width: min(38rem, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.manio-dialog fieldset { min-width: 0; display: grid; gap: var(--space-3); }
+.manio-dialog .manio-tab { border: 1px solid var(--border); padding: var(--space-3); }
+.manio-dialog input:not([type=checkbox]), .manio-dialog select { width: 100%; min-width: 0; }
+.manio-reader-email { overflow-wrap: anywhere; }
+.manio-review { margin-block: var(--space-5); }
+.manio-integration { padding-block: 24px; border-bottom: 1px solid var(--border); }
+.manio-heading { margin-bottom: 24px; }
+.manio-heading h3 { font-size: 18px; }
+.manio-heading p { font-size: 13px; max-width: 60ch; }
+.manio-connection { background: var(--surface-default); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.manio-connection h4 { font-size: 16px; }
+.manio-connection p { font-size: 12px; }
+.manio-connection > .manio-actions { gap: 8px; }
+.manio-connection button { font-size: 12px; }
+@media (max-width: 640px) { .manio-heading, .manio-connection { grid-template-columns: minmax(0, 1fr); } .manio-connection > .manio-actions { max-width: none; } .manio-actions button { flex: 1 1 auto; } }

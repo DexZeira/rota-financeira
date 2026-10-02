@@ -1,4 +1,5 @@
 import { openDatePicker } from './native-input';
+import { PrivateValue } from './value-privacy';
 import { incomeOperations } from '../services/investment-ledger';
 import { toCents } from '../services/money-codec';
 import { assetRows } from '../services/assets';
@@ -28,8 +29,9 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Field as FieldContainer, FieldLabel } from '@/components/ui/field';
 import { activityForWorkType, workTypeForActivity, type WorkType } from '../services/work-type';
-import { EmptyState, ActionsMenu } from './finance-ui';
+import { EmptyState, ActionsMenu, Feedback } from './finance-ui';
 
 import {
   type Row,
@@ -117,7 +119,7 @@ export function Metrics({ items }: { items: [string, string, string?][] }) {
       {items.map(([label, value, note]) => (
         <article className="metric" key={label}>
           <span>{label}</span>
-          <strong>{value}</strong>
+          <strong><PrivateValue>{value}</PrivateValue></strong>
           {note && <small>{note}</small>}
         </article>
       ))}
@@ -213,11 +215,13 @@ export function Fields({
         if (['costId', 'workSessionId', 'componentId'].includes(f.key))
           options = [{ value: '', label: 'Nenhuma' }, ...options];
         return (
-          <label htmlFor={`${prefix}-${f.key}`} className={f.type === 'textarea' ? 'wide' : ''} key={f.key}>
+          <FieldContainer className={f.type === 'textarea' ? 'wide' : ''} key={f.key}>
+            <FieldLabel htmlFor={`${prefix}-${f.key}`}>
               <span>
               {isAssetSearch ? (assetType === 'Criptomoeda' ? 'Buscar criptomoeda' : 'Buscar ativo') : f.label}
-              {f.required ? ' *' : ''}
+              {f.required && <><span aria-hidden="true"> *</span><span className="sr-only"> (obrigatório)</span></>}
             </span>
+            </FieldLabel>
             {isAssetSearch ? (
               <AssetSearch inputId={`${prefix}-${f.key}`} value={value} setValue={setValue} crypto={assetType === 'Criptomoeda'} />
             ) : f.type === 'select' ? (
@@ -237,6 +241,8 @@ export function Fields({
                 id={`${prefix}-${f.key}`}
                 name={f.key}
                 autoComplete="off"
+                required={f.required}
+                aria-required={f.required || undefined}
                 value={String(value[f.key] ?? '')}
                 onChange={(e) =>
                   setValue({ ...value, [f.key]: e.target.value })
@@ -249,6 +255,7 @@ export function Fields({
                   name={f.key}
                   autoComplete="off"
                   required={f.required}
+                  aria-required={f.required || undefined}
                   type={f.type || 'text'}
                   onClick={openDatePicker}
                   min={f.type === 'number' && !f.signed ? 0 : undefined}
@@ -282,7 +289,7 @@ export function Fields({
                 )}
               </>
             )}
-          </label>
+          </FieldContainer>
         );
       })}
     </div>
@@ -303,7 +310,7 @@ function AssetSearch({ inputId, value, setValue, crypto }: { inputId: string; va
     return () => clearTimeout(timer);
   }, [query, crypto]);
   const choose = (item: AssetSuggestion) => { setValue({ ...value, name: item.name, ticker: item.symbol, coinGeckoId: item.id || value.coinGeckoId || '' }); setQuery(item.symbol); setItems([]); };
-  return <div className="asset-search"><input id={inputId} role="combobox" aria-expanded={items.length > 0} aria-controls="asset-search-results" aria-autocomplete="list" value={query} onChange={(e) => { setQuery(e.target.value); setValue({ ...value, ticker: e.target.value }); }} onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setActive((x) => Math.min(x + 1, items.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((x) => Math.max(x - 1, 0)); } else if (e.key === 'Enter' && items[active]) { e.preventDefault(); choose(items[active]); } else if (e.key === 'Escape' && items.length > 0) { e.preventDefault(); e.stopPropagation(); setItems([]); } }} />{loading && <small>Buscando ativos...</small>}{message && <small>{message}</small>}{items.length > 0 && <div id="asset-search-results">{items.map((item, index) => <button type="button" className="asset-option" key={item.id || item.symbol} aria-current={index === active ? 'true' : undefined} onMouseDown={() => choose(item)}><strong>{item.symbol}</strong><span>{item.name}</span></button>)}</div>}</div>;
+  return <div className="asset-search" aria-busy={loading}><input id={inputId} role="combobox" aria-expanded={items.length > 0} aria-controls="asset-search-results" aria-autocomplete="list" value={query} onChange={(e) => { const next = e.target.value; setQuery(next); setLoading(Boolean(next.trim())); setMessage(''); if (!next.trim()) setItems([]); setValue({ ...value, ticker: next }); }} onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setActive((x) => Math.min(x + 1, items.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((x) => Math.max(x - 1, 0)); } else if (e.key === 'Enter' && items[active]) { e.preventDefault(); choose(items[active]); } else if (e.key === 'Escape' && items.length > 0) { e.preventDefault(); e.stopPropagation(); setItems([]); } }} />{loading && <output>Buscando ativos…</output>}{message && <output>{message}</output>}{items.length > 0 && <div id="asset-search-results">{items.map((item, index) => <button type="button" className="asset-option" key={item.id || item.symbol} aria-current={index === active ? 'true' : undefined} onMouseDown={() => choose(item)}><strong>{item.symbol}</strong><span>{item.name}</span></button>)}</div>}</div>;
 }
 export function Editor({
   kind,
@@ -322,6 +329,9 @@ export function Editor({
     row ? { ...emptyRow(kind), ...row } : { ...emptyRow(kind), id: id() },
   );
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useId();
   const [automaticRevenue, setAutomaticRevenue] = useState(
     !row ||
       (calculateWorkRevenues(row).expected !== null &&
@@ -338,8 +348,8 @@ export function Editor({
         ? 'Dados da moto'
         : labels[kind];
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="editor-dialog" showCloseButton={false}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="editor-dialog" showCloseButton={false} initialFocus={() => !row && ['expenses', 'bankReceipts', 'movements'].includes(kind) ? form.current?.querySelector<HTMLInputElement>('input[name="amount"],input[name="amountCents"]') || true : true}>
         <DialogTitle>
           {row ? 'Editar' : 'Adicionar'} · {title}
         </DialogTitle>
@@ -355,8 +365,14 @@ export function Editor({
                 : 'Preencha os dados. As alterações serão salvas neste navegador.'}
         </DialogDescription>
         <form
+          ref={form}
+          aria-busy={saving}
+          aria-describedby={error ? errorId : undefined}
           onSubmit={async (e) => {
             e.preventDefault();
+            if (saving) return;
+            setSaving(true);
+            setError('');
             try {
               const cleaned = { ...value };
               for (const f of schemas[kind])
@@ -364,7 +380,13 @@ export function Editor({
                   cleaned[f.key] = f.nullable ? null : 0;
               await onSave(cleaned);
             } catch (e) {
-              setError((e as Error).message);
+              setError(
+                e instanceof Error
+                  ? e.message
+                  : 'Não foi possível salvar. Revise os campos e tente novamente.',
+              );
+            } finally {
+              setSaving(false);
             }
           }}
         >
@@ -374,7 +396,7 @@ export function Editor({
             <div className="segmented-choice" role="radiogroup" aria-label="Tipo de trabalho">
               {([['uber', 'Uber', 'Corridas', Bike], ['cards', 'Cartões', 'Entregas', CreditCard], ['other', 'Outro', 'Atividade personalizada', BriefcaseBusiness]] as const).map(([type, label, description, Icon]) => <label key={type} className={workType === type ? 'selected' : ''}><input type="radio" name="work-type" value={type} checked={workType === type} onChange={() => setValue({ ...value, activity: activityForWorkType(type, String(value.activity || '')) })} /><Icon size={22}/><span>{label}</span><small>{description}</small></label>)}
             </div>
-            {workType === 'other' && <label htmlFor="work-activity-name"><span>Nome da atividade *</span><input id="work-activity-name" required value={String(value.activity || '')} onChange={(e) => setValue({ ...value, activity: e.target.value })} placeholder="Ex.: Corrida particular" /></label>}
+            {workType === 'other' && <label htmlFor="work-activity-name"><span>Nome da atividade (obrigatório)</span><input id="work-activity-name" required aria-required="true" value={String(value.activity || '')} onChange={(e) => setValue({ ...value, activity: e.target.value })} placeholder="Ex.: Corrida particular" /></label>}
           </fieldset>}
           <Fields
             kind={kind}
@@ -515,17 +537,17 @@ export function Editor({
             ['Lucro econômico', money(preview.profit), 'Estimado'], ['Receita por hora', money(preview.revenueHour)],
           ]}/><p className="inline-note">Estimativa por km. Despesas pagas e atribuídas são exibidas separadamente no resultado de caixa.</p></section>}
           {error && (
-            <p className="error" role="alert">
+            <Feedback id={errorId} tone="error" title="Não foi possível salvar" announce>
               {error}
-            </p>
+            </Feedback>
           )}
           </div>
           <div className="form-actions">
-            <button type="button" onClick={onClose}>
+            <button type="button" disabled={saving} onClick={onClose}>
               Cancelar
             </button>
-            <button className="primary" type="submit">
-              Salvar
+            <button className="primary" type="submit" disabled={saving}>
+              {saving ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
         </form>
@@ -678,7 +700,7 @@ export function Records({
                 <button className="danger" aria-label={'Excluir ' + String(r.name || r.activity || brDate(r.date))} onClick={() => del(kind, r)}><Trash2 size={15}/>Excluir</button>
               </ActionsMenu>
             </div>
-            <dl className="record-values">{cols.map((c) => <div key={c.label}><dt>{c.label}</dt><dd>{c.render(r)}</dd></div>)}</dl>
+            <dl className="record-values">{cols.map((c) => <div key={c.label}><dt>{c.label}</dt><dd><PrivateValue>{c.render(r)}</PrivateValue></dd></div>)}</dl>
           </article>)}
           {virtual.enabled && virtual.bottom > 0 && <div aria-hidden="true" style={{ height: virtual.bottom }} />}
         </section>

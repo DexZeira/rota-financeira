@@ -30,7 +30,12 @@ self.addEventListener('notificationclick', event => {
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.search) return;
+  // Only a recognized local page selector is public. Auth/filter/token queries bypass the worker.
+  const publicSettings = url.searchParams.size === 2 && url.searchParams.get('view') === 'Configurações' &&
+    ['perfil','aparencia','financas','integracoes','notificacoes','dados','seguranca'].includes(url.searchParams.get('settings'));
+  const publicView = event.request.mode === 'navigate' && url.pathname === '/' && (url.searchParams.size === 1 || publicSettings) &&
+    ['Hoje','Dashboard','Transações','Contas','Orçamentos','Trabalho','Gastos','Dívidas','Investimentos','Planos','Planejamento','Patrimônio','Simulações','Importar','Moto','Manutenção','Assistente','Minha Situação','Alertas','Auditoria','Relatórios','Análises','Configurações'].includes(url.searchParams.get('view'));
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || (url.search && !publicView)) return;
   if (event.request.mode === 'navigate') {
     // Network first. Keep the installed shell paired with its installed chunks;
     // never overwrite this version's offline HTML with the next deployment.

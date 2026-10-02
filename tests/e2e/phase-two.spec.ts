@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { defaults, emptyRow, today } from '../../src/model';
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 
 test('fase 2: orçamento, gasto, meta, custo, reserva e recarga', async ({
   page,
@@ -136,8 +136,8 @@ test('fase 2: orçamento, gasto, meta, custo, reserva e recarga', async ({
     page.getByText('600,25', { exact: false }).first(),
   ).toBeVisible();
   await navigate(page, 'Configurações');
-  await page.getByRole('combobox', { name: 'Tema', exact: true }).click();
-  await page.getByRole('option', { name: 'escuro', exact: true }).click();
+  await selectSettingsSection(page, 'Aparência');
+  await page.locator('.theme-choices').getByRole('button', { name: 'Escuro', exact: true }).click();
   await navigate(page, 'Planejamento');
   await page.getByText('Custo de vida e reserva', { exact: true }).click();
   await page.getByText('Simular emergência', { exact: true }).click();

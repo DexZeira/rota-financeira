@@ -7,12 +7,13 @@ import { AuthProvider } from '../src/components/auth-provider';
 import './globals.css';
 import { installDiagnostics } from '../src/services/app-diagnostics';
 import { PageBoundary } from '../src/components/page-boundary';
+import { ValuePrivacy } from '../src/components/value-privacy';
 installDiagnostics();
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <PageBoundary>
     <AuthProvider>
-      {window.location.hash === '#recovery' ? <RecoveryMode /> : <Home />}
+      <ValuePrivacy>{window.location.hash === '#recovery' ? <RecoveryMode /> : <Home />}</ValuePrivacy>
       <OfflineStatus />
     </AuthProvider>
     </PageBoundary>

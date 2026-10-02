@@ -1,6 +1,9 @@
 import { PurchasingPowerTools, PortfolioComparison } from '../components/purchasing-power-tools';
 import { InvestmentPortfolioDetails } from '../components/investment-portfolio-details';
-import { PageHeader, HeroMetric, FinancialItem, EmptyState } from '../components/finance-ui';
+import { PageHeader, EmptyState } from '../components/finance-ui';
+import { PrivateValue } from '../components/value-privacy';
+import { Search } from 'lucide-react';
+import { normalizeSearch } from '../services/universal-search';
 import { Card, Metrics, Bar, Records } from '../components/common';
 import { num, money, dec, today } from '../model';
 import { investmentPortfolio, type PositionQuote } from '../services/investment-portfolio';
@@ -14,6 +17,8 @@ import { InvestmentIntelligence } from '../components/investment-intelligence';
 import { loadQuote, type Quote } from '../services/market-quotes';
 import { estimateSavingsYield, normalizeAnniversaryDay, reconstructSavingsMinimumBalance, savingsPeriod } from '../services/savings-yield';
 import { useEffect, useState, useMemo } from 'react';
+import './investments.css';
+const classOf = (category: string) => category === 'Criptomoeda' ? 'Cripto' : ['Ação','ETF','FII'].includes(category) ? 'Renda variável' : ['CDB','LCI','LCA','Poupança','Conta remunerada','reserva de emergência'].includes(category) || category.startsWith('Tesouro') ? 'Renda fixa' : 'Outros';
 export function Investments(p: ViewProps) {
   const d = p.data;
   const economic = useEconomicIndicators();
@@ -21,7 +26,9 @@ export function Investments(p: ViewProps) {
   const [simValue, setSimValue] = useState(5000), [simMonths, setSimMonths] = useState(12), [simRate, setSimRate] = useState(10), [simType, setSimType] = useState('Prefixado');
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [visibleCount, setVisibleCount] = useState(30);
-  const visibleInvestments = useMemo(() => d.investments.slice(0, visibleCount), [d.investments, visibleCount]);
+  const [assetClass, setAssetClass] = useState('Todas'), [assetQuery, setAssetQuery] = useState('');
+  const filteredInvestments = useMemo(() => d.investments.filter(row => (assetClass === 'Todas' || assetClass === classOf(String(row.category))) && normalizeSearch(`${row.name} ${row.ticker || ''}`).includes(normalizeSearch(assetQuery))), [d.investments, assetClass, assetQuery]);
+  const visibleInvestments = useMemo(() => filteredInvestments.slice(0, visibleCount), [filteredInvestments, visibleCount]);
   const at = today();
   const positions = useMemo(() => {
     const observations = new Map<string, PositionQuote>(Object.entries(quotes).map(([id,q]) => [id,{price:q.price,currency:q.currency,date:q.updatedAt.slice(0,10)}]));
@@ -49,13 +56,11 @@ export function Investments(p: ViewProps) {
     savings = d.investments.filter((r) => String(r.category) === 'Poupança'),
     savingsMonthlyRate = rates.tr && rates.selicTarget ? estimateSavingsYield({ balance: simValue, anniversaryDay: 1, trPercent: rates.tr.rawValue, targetSelicAnnualPercent: rates.selicTarget.value }).totalRatePercent : undefined;
   return (
-    <>
-      <PageHeader title="Investimentos" description="Construa o seu próximo capítulo." />
-      <HeroMetric label="Patrimônio registrado" value={money(f.investments)} context={money(f.contributions) + ' em aportes registrados'} action={<button className="primary" onClick={() => p.edit('investments')}>+ Novo investimento</button>} />
-      <details className="disclosure"><summary>Resultado e movimentações da carteira</summary>
+    <div className="investments-page">
+      <PageHeader title="Investimentos" description="Posições, movimentações e resultado da sua carteira." action={<button className="primary" onClick={() => p.edit('investments')}>+ Novo investimento</button>} />
+      <section className="investment-position"><div className="investment-position-total"><div><h2>Patrimônio registrado</h2><p>Valores registrados no aplicativo</p></div><strong><PrivateValue>{money(f.investments)}</PrivateValue></strong></div>
       <Metrics
         items={[
-          ['Total investido', money(f.investments)],
           ['Aportes', money(f.contributions)],
           [
             'Rendimentos registrados',
@@ -75,18 +80,16 @@ export function Investments(p: ViewProps) {
           ['Disponível após reserva da moto', money(f.available)],
         ]}
       />
-      </details><EconomicIndicatorsPanel economic={economic} />
-      <InvestmentPortfolioDetails data={d} inflation={economic.inflation?.months || []} configure={() => p.edit('settings', d.settings)}/>
-      <section className="content-section"><div className="section-heading"><h2>Sua carteira</h2><button onClick={() => p.edit('movements')}>Registrar movimentação</button></div>
+      </section>
+      <section className="portfolio-terminal content-section"><div className="section-heading"><div><h2>Sua carteira</h2><p>{d.investments.length} ativos registrados</p></div><button onClick={() => p.edit('movements')}>Registrar movimentação</button></div>
+      <div className="portfolio-controls"><fieldset className="portfolio-class-tabs"><legend className="sr-only">Classe de investimento</legend>{['Todas', 'Renda fixa', 'Renda variável', 'Cripto', 'Outros'].map(group => <button key={group} aria-pressed={assetClass === group} onClick={() => setAssetClass(group)}>{group}</button>)}</fieldset><label className="portfolio-search"><Search size={16} aria-hidden="true"/><input type="search" aria-label="Buscar investimento" placeholder="Nome ou ticker" value={assetQuery} onChange={event => setAssetQuery(event.target.value)}/></label></div>
       {!d.investments.length && <EmptyState title="Seu patrimônio começa aqui" description="Adicione um investimento para acompanhar seu saldo e suas movimentações." action={<button onClick={() => p.edit('investments')}>Adicionar investimento</button>} />}
       {['Renda fixa', 'Renda variável', 'Cripto', 'Outros'].map((group) => {
-        const groupRows = visibleInvestments.filter((r) => {
-          const type = String(r.category);
-          const bucket = type === 'Criptomoeda' ? 'Cripto' : ['Ação','ETF','FII'].includes(type) ? 'Renda variável' : ['CDB','LCI','LCA','Poupança','Conta remunerada','reserva de emergência'].includes(type) || type.startsWith('Tesouro') ? 'Renda fixa' : 'Outros';
-          return bucket === group;
-        });
-        return groupRows.length > 0 && <section className="portfolio-group" key={group}><h2>{group}</h2>{groupRows.map((r) => <FinancialItem key={r.id} title={String(r.name)} description={String(r.indexer) === 'CDI' ? dec(num(r.indexerPercent)) + '% CDI' : String(r.ticker || r.category)} value={positions.get(r.id)?.valueCents == null ? 'Indisponível' : money(positions.get(r.id)!.valueCents! / 100)} context={positions.get(r.id)?.valuation === 'cotação' ? 'Cotação disponível · ' + quotes[r.id]?.updatedAt.slice(0,10) : 'Saldo registrado'} action={<button aria-label={'Editar ' + r.name} onClick={() => p.edit('investments', r)}>Editar</button>}><InvestmentIntelligence data={d} row={r} economic={economic}/></FinancialItem>)}</section>;
-      })}{visibleCount < d.investments.length && <button onClick={() => setVisibleCount(count => count + 30)}>Mostrar mais investimentos</button>}</section>
+        const matchingRows = visibleInvestments.filter(row => classOf(String(row.category)) === group);
+        return (assetClass === 'Todas' || assetClass === group) && matchingRows.length > 0 && <section className="portfolio-group" key={group}><h3>{group}<span>{matchingRows.length} ativos</span></h3><div className="portfolio-column-head" aria-hidden="true"><span>Ativo / indexador</span><span>Quantidade</span><span>Valor atual</span><span>Avaliação</span><span/></div>{matchingRows.map((r) => { const position = positions.get(r.id); return <article className="portfolio-asset" key={r.id}><div className="portfolio-asset-row"><div className="portfolio-asset-name"><strong>{String(r.name)}</strong><small>{String(r.indexer) === 'CDI' ? dec(num(r.indexerPercent)) + '% CDI' : String(r.ticker || r.category)}</small></div><span className="portfolio-quantity">{position?.quantity == null ? 'Não informada' : dec(position.quantity, 8)}</span><strong className="portfolio-asset-value"><PrivateValue>{position?.valueCents == null ? 'Indisponível' : money(position.valueCents / 100)}</PrivateValue></strong><span className="portfolio-valuation">{position?.valuation === 'cotação' ? 'Cotação disponível' : 'Saldo registrado'}<small>{position?.valuation === 'cotação' ? quotes[r.id]?.updatedAt.slice(0,10) : String(r.valuationDate || r.date || '')}</small></span><button aria-label={'Editar ' + r.name} onClick={() => p.edit('investments', r)}>Editar</button></div><details className="portfolio-intelligence"><summary>Analisar {String(r.name)}</summary><InvestmentIntelligence data={d} row={r} economic={economic}/></details></article>; })}</section>;
+      })}{d.investments.length > 0 && !filteredInvestments.length && <p className="portfolio-empty">Nenhum investimento corresponde a este filtro.</p>}{visibleCount < filteredInvestments.length && <button onClick={() => setVisibleCount(count => count + 30)}>Mostrar mais investimentos</button>}</section>
+      <EconomicIndicatorsPanel economic={economic} />
+      <InvestmentPortfolioDetails data={d} inflation={economic.inflation?.months || []} configure={() => p.edit('settings', d.settings)}/>
       <PortfolioComparison data={d} economic={economic}/><PurchasingPowerTools economic={economic}/><details className="disclosure"><summary>Poupança · rendimento e aniversário</summary>{savings.map((r) => { const day = num(r.anniversaryDay) || (r.date ? normalizeAnniversaryDay(Number(String(r.date).slice(-2))) : 0); const period = day ? savingsPeriod(day) : undefined; const linked = d.movements.filter((m) => m.investmentId === r.id && !paidIncome(m) && !cashCharge(m)); const startBalance = period ? linked.filter((m) => String(m.date) < period.start).reduce((balance, m) => balance + num(m.amount) * (['retirada', 'perda'].includes(String(m.kind)) ? -1 : 1), String(r.date) <= period.start ? num(r.balance) : 0) : undefined; const minimum = period && startBalance !== undefined && period.complete && (!r.valuationDate || String(r.valuationDate) > period.end) ? reconstructSavingsMinimumBalance(startBalance, linked.map((m) => ({ id: m.id, date: String(m.date), amount: num(m.amount), kind: String(m.kind) })), period.start, period.end) : undefined; const result = day && rates.tr && rates.selicTarget ? estimateSavingsYield({ balance: investmentBalance(d, r), anniversaryDay: day, trPercent: rates.tr.rawValue, targetSelicAnnualPercent: rates.selicTarget.value, actualMinimumBalance: minimum, periodComplete: period?.complete }) : undefined; return <Card key={r.id} title="Poupança"><div className="inline-stats"><div className="detail"><span>Regra atual</span><strong>{rates.selicTarget && rates.selicTarget.value > 8.5 ? 'TR + 0,5% a.m.' : 'TR + 70% da Meta Selic'}</strong></div><div className="detail"><span>Meta Selic atual</span><strong>{rates.selicTarget ? `${dec(rates.selicTarget.value)}% a.a.` : 'Indisponível'}</strong></div><div className="detail"><span>TR</span><strong>{rates.tr ? `${dec(rates.tr.rawValue, 4)}% a.m.` : 'Indisponível'}</strong></div><div className="detail"><span>Período do aniversário</span><strong>{period ? `${period.start} a ${period.end}` : 'Complete os dados'}</strong></div>{result?.minimumBalance !== undefined && <div className="detail"><span>Menor saldo do período</span><strong>{money(result.minimumBalance)}</strong><small>{result.status === 'actual' ? 'Atual' : 'Estimado'}</small></div>}</div>{result?.estimatedYieldCents !== undefined ? <p className="inline-note">Rendimento no aniversário: <strong>{money(result.estimatedYieldCents / 100)}</strong> · {result.status === 'actual' ? 'calculado pelo menor saldo realizado.' : 'estimativa baseada nos indicadores atuais.'}</p> : <p className="inline-note">Complete os dados para ativar o cálculo automático da poupança.</p>}</Card>; })}
       </details><details className="disclosure"><summary>Simular rendimento</summary><Card title="Quanto pode render?">
         <div className="form-grid compact-form">
@@ -167,6 +170,6 @@ export function Investments(p: ViewProps) {
           amountCol,
         ]}
       />
-    </details></>
+    </details></div>
   );
 }

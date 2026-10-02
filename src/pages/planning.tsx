@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { type Row, emptyRow, id, today, money, brDate, labels } from '../model';
 import {
   PageHeader,
-  HeroMetric,
   FinancialItem,
   EmptyState,
 } from '../components/finance-ui';
@@ -13,6 +12,8 @@ import { realizedCollections, recurrenceAt } from '../services/recurrences';
 import { type ViewProps, value } from './shared';
 import './planning.css';
 import { LivingReserveSection } from '../components/planning-phase-two';
+import { PrivateValue } from '../components/value-privacy';
+import { ArrowDownLeft, ArrowUpRight, CalendarDays } from 'lucide-react';
 
 const sources: Record<string, string> = {
   recurrences: 'Regra cadastrada',
@@ -165,7 +166,7 @@ export function Planning(p: ViewProps) {
     p.edit('recurrences', row);
   }
   return (
-    <>
+    <div className="planning-page">
       <PageHeader
         title="Planejamento"
         description="Compromissos e caixa futuro, com hipóteses à vista."
@@ -175,7 +176,6 @@ export function Planning(p: ViewProps) {
           </button>
         }
       />
-      <LivingReserveSection {...p}/>
       <nav className="planning-tabs" aria-label="Seções do planejamento">
         {['Fluxo', 'Calendário', 'Recorrências'].map((s) => (
           <button
@@ -203,16 +203,43 @@ export function Planning(p: ViewProps) {
               </button>
             ))}
           </div>
-          <HeroMetric
-            label={`Saldo de caixa projetado · ${brDate(forecast.end)}`}
-            value={amount(forecast.projectedBalance)}
-            context={
-              forecast.complete
-                ? 'Previsão condicionada às ocorrências abaixo; não é renda garantida.'
-                : 'Existem valores desconhecidos ou projeção incompleta.'
-            }
-          />
-          <div className="inline-stats">
+          <section className="forecast-overview" aria-label="Projeção de caixa">
+            <div className="forecast-balance">
+              <h2>Caixa em {brDate(forecast.end)}</h2>
+              <strong>
+                <PrivateValue>{amount(forecast.projectedBalance)}</PrivateValue>
+              </strong>
+              <p>
+                {forecast.complete
+                  ? 'Previsão condicionada às ocorrências abaixo; não é renda garantida.'
+                  : 'Existem valores desconhecidos ou projeção incompleta.'}
+              </p>
+            </div>
+            <div className="forecast-movements">
+              <dl>
+                <div>
+                  <dt>
+                    <ArrowDownLeft size={18} aria-hidden="true" /> Entradas
+                    previstas
+                  </dt>
+                  <dd>
+                    <PrivateValue>{money(forecast.income)}</PrivateValue>
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    <ArrowUpRight size={18} aria-hidden="true" /> Saídas
+                    previstas
+                  </dt>
+                  <dd>
+                    <PrivateValue>{money(forecast.outflow)}</PrivateValue>
+                  </dd>
+                </div>
+              </dl>
+              <p>Somente valores conhecidos no horizonte.</p>
+            </div>
+          </section>
+          <div className="inline-stats forecast-checkpoints">
             {value('Caixa realizado atual', money(forecast.initialBalance))}
             {value('Menor saldo projetado', amount(forecast.minimumBalance))}
             {value(
@@ -220,14 +247,6 @@ export function Planning(p: ViewProps) {
               forecast.minimumDate
                 ? brDate(forecast.minimumDate)
                 : 'Indisponível',
-            )}
-            {value(
-              'Entradas previstas · valores conhecidos',
-              money(forecast.income),
-            )}
-            {value(
-              'Saídas previstas · valores conhecidos',
-              money(forecast.outflow),
             )}
           </div>
           <details className="disclosure">
@@ -250,38 +269,53 @@ export function Planning(p: ViewProps) {
               saldos independentes.
             </p>
           </details>
-          <h2>Ocorrências do horizonte</h2>
-          <p className="inline-note">
-            {forecast.complete
-              ? 'Projeção com valores conhecidos'
-              : 'Projeção parcial'}
-            {` · ${forecast.forecastCompleteness.knownCount}/${forecast.forecastCompleteness.totalCount} compromissos de caixa com data e valor conhecidos.`}
-            {forecast.forecastCompleteness.unknownAmountCount > 0 &&
-              ` ${forecast.forecastCompleteness.unknownAmountCount} sem valor definido.`}
-            {forecast.forecastCompleteness.missingDateCount > 0 &&
-              ` ${forecast.forecastCompleteness.missingDateCount} sem data ou parcela definida.`}
-          </p>
-          {!forecast.events.length && (
-            <EmptyState
-              title="Nenhuma ocorrência identificada"
-              description="Cadastre receita prevista, conta, assinatura ou outro compromisso com data."
-              action={
-                <button onClick={() => editRule()}>Planejar compromisso</button>
-              }
-            />
-          )}
-          {forecast.events.slice(0, limit).map((event) => (
-            <EventItem key={event.id} event={event} at={at}>
-              {event.recurrenceId && (
-                <ReconcileOccurrence {...p} event={event} />
-              )}
-            </EventItem>
-          ))}
-          {forecast.events.length > limit && (
-            <button onClick={() => setLimit((n) => n + 30)}>
-              Mostrar mais ocorrências
-            </button>
-          )}
+          <section
+            className="forecast-events"
+            aria-label="Ocorrências do horizonte"
+          >
+            <div className="section-heading">
+              <h2>
+                <CalendarDays size={18} aria-hidden="true" /> Ocorrências do
+                horizonte
+              </h2>
+              <span className="supporting-text">
+                {forecast.events.length} ocorrências
+              </span>
+            </div>
+            <p className="inline-note">
+              {forecast.complete
+                ? 'Projeção com valores conhecidos'
+                : 'Projeção parcial'}
+              {` · ${forecast.forecastCompleteness.knownCount}/${forecast.forecastCompleteness.totalCount} compromissos de caixa com data e valor conhecidos.`}
+              {forecast.forecastCompleteness.unknownAmountCount > 0 &&
+                ` ${forecast.forecastCompleteness.unknownAmountCount} sem valor definido.`}
+              {forecast.forecastCompleteness.missingDateCount > 0 &&
+                ` ${forecast.forecastCompleteness.missingDateCount} sem data ou parcela definida.`}
+            </p>
+            {!forecast.events.length && (
+              <EmptyState
+                title="Nenhuma ocorrência identificada"
+                description="Cadastre receita prevista, conta, assinatura ou outro compromisso com data."
+                action={
+                  <button onClick={() => editRule()}>
+                    Planejar compromisso
+                  </button>
+                }
+              />
+            )}
+            {forecast.events.slice(0, limit).map((event) => (
+              <EventItem key={event.id} event={event} at={at}>
+                {event.recurrenceId && (
+                  <ReconcileOccurrence {...p} event={event} />
+                )}
+              </EventItem>
+            ))}
+            {forecast.events.length > limit && (
+              <button onClick={() => setLimit((n) => n + 30)}>
+                Mostrar mais ocorrências
+              </button>
+            )}
+          </section>
         </>
       )}
       {section === 'Calendário' && calendar && (
@@ -314,60 +348,62 @@ export function Planning(p: ViewProps) {
               Próximo
             </button>
           </div>
-          <div className="planning-calendar" aria-label="Dias do calendário">
-            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((d) => (
-              <span key={d}>{d}</span>
-            ))}
-            {Array.from(
-              { length: new Date(month + '-01T12:00:00Z').getUTCDay() },
-              (_, i) => (
-                <span key={'blank-' + i} aria-hidden="true" />
-              ),
-            )}
-            {calendar.days.map((d) => {
-              const events = calendar.events.filter((e) => e.date === d.date);
-              const count = events.length;
-              const statuses = [
-                ...new Set(
-                  events.map((e) => (e.overdue ? 'atrasado' : e.status)),
-                ),
-              ].join(', ');
-              return (
-                <button
-                  key={d.date}
-                  aria-pressed={selectedDate === d.date}
-                  aria-label={`${brDate(d.date)}, ${count} ocorrências${statuses ? `: ${statuses}` : ''}`}
-                  onClick={() => setSelectedDate(d.date)}
-                >
-                  <span>{Number(d.date.slice(-2))}</span>
-                  {count > 0 && <small>{count}</small>}
-                </button>
-              );
-            })}
-          </div>
-          <section aria-label="Detalhes do dia">
-            <h3>{brDate(selectedDate)}</h3>
-            <p>
-              {chosenDay?.status === 'realizado'
-                ? 'Caixa realizado no fim do dia'
-                : 'Caixa projetado no fim do dia'}
-              : <strong>{amount(chosenDay?.balance ?? null)}</strong>
-            </p>
-            {chosenDay?.outsideHorizon && (
-              <p>
-                Previsões disponíveis somente até 90 dias; esta data está fora
-                do horizonte.
-              </p>
-            )}
-            {calendar.events
-              .filter((e) => e.date === selectedDate)
-              .map((e) => (
-                <EventItem key={e.id} event={e} at={at} />
+          <div className="planning-calendar-layout">
+            <div className="planning-calendar" aria-label="Dias do calendário">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((d) => (
+                <span key={d}>{d}</span>
               ))}
-            {!calendar.events.some((e) => e.date === selectedDate) && (
-              <p>Nenhuma ocorrência identificada para este dia.</p>
-            )}
-          </section>
+              {Array.from(
+                { length: new Date(month + '-01T12:00:00Z').getUTCDay() },
+                (_, i) => (
+                  <span key={'blank-' + i} aria-hidden="true" />
+                ),
+              )}
+              {calendar.days.map((d) => {
+                const events = calendar.events.filter((e) => e.date === d.date);
+                const count = events.length;
+                const statuses = [
+                  ...new Set(
+                    events.map((e) => (e.overdue ? 'atrasado' : e.status)),
+                  ),
+                ].join(', ');
+                return (
+                  <button
+                    key={d.date}
+                    aria-pressed={selectedDate === d.date}
+                    aria-label={`${brDate(d.date)}, ${count} ocorrências${statuses ? `: ${statuses}` : ''}`}
+                    onClick={() => setSelectedDate(d.date)}
+                  >
+                    <span>{Number(d.date.slice(-2))}</span>
+                    {count > 0 && <small>{count}</small>}
+                  </button>
+                );
+              })}
+            </div>
+            <section aria-label="Detalhes do dia">
+              <h3>{brDate(selectedDate)}</h3>
+              <p>
+                {chosenDay?.status === 'realizado'
+                  ? 'Caixa realizado no fim do dia'
+                  : 'Caixa projetado no fim do dia'}
+                : <strong>{amount(chosenDay?.balance ?? null)}</strong>
+              </p>
+              {chosenDay?.outsideHorizon && (
+                <p>
+                  Previsões disponíveis somente até 90 dias; esta data está fora
+                  do horizonte.
+                </p>
+              )}
+              {calendar.events
+                .filter((e) => e.date === selectedDate)
+                .map((e) => (
+                  <EventItem key={e.id} event={e} at={at} />
+                ))}
+              {!calendar.events.some((e) => e.date === selectedDate) && (
+                <p>Nenhuma ocorrência identificada para este dia.</p>
+              )}
+            </section>
+          </div>
         </>
       )}
       {section === 'Recorrências' && (
@@ -391,43 +427,45 @@ export function Planning(p: ViewProps) {
               }
             />
           )}
-          {p.data.recurrences.filter((r) => !r.archived).map((r) => (
-            <FinancialItem
-              key={r.id}
-              title={String(r.name)}
-              value={
-                typeof r.amount === 'number'
-                  ? money(r.amount)
-                  : 'Valor desconhecido'
-              }
-              description={`${r.frequency} · ${r.status} · ${brDate(r.startDate)}`}
-              context={`${r.kind}${r.account ? ` · ${r.account}` : ''}`}
-              action={
-                <button
-                  aria-label={'Editar recorrência ' + r.name}
-                  onClick={() => editRule(r)}
-                >
-                  Editar
-                </button>
-              }
-            >
-              <div className="row-actions">
-                <button
-                  onClick={() =>
-                    p.update('recurrences', {
-                      ...r,
-                      status: r.status === 'ativa' ? 'pausada' : 'ativa',
-                    })
-                  }
-                >
-                  {r.status === 'ativa' ? 'Pausar' : 'Ativar'}
-                </button>
-                <button onClick={() => p.del('recurrences', r)}>
-                  Excluir regra
-                </button>
-              </div>
-            </FinancialItem>
-          ))}
+          {p.data.recurrences
+            .filter((r) => !r.archived)
+            .map((r) => (
+              <FinancialItem
+                key={r.id}
+                title={String(r.name)}
+                value={
+                  typeof r.amount === 'number'
+                    ? money(r.amount)
+                    : 'Valor desconhecido'
+                }
+                description={`${r.frequency} · ${r.status} · ${brDate(r.startDate)}`}
+                context={`${r.kind}${r.account ? ` · ${r.account}` : ''}`}
+                action={
+                  <button
+                    aria-label={'Editar recorrência ' + r.name}
+                    onClick={() => editRule(r)}
+                  >
+                    Editar
+                  </button>
+                }
+              >
+                <div className="row-actions">
+                  <button
+                    onClick={() =>
+                      p.update('recurrences', {
+                        ...r,
+                        status: r.status === 'ativa' ? 'pausada' : 'ativa',
+                      })
+                    }
+                  >
+                    {r.status === 'ativa' ? 'Pausar' : 'Ativar'}
+                  </button>
+                  <button onClick={() => p.del('recurrences', r)}>
+                    Excluir regra
+                  </button>
+                </div>
+              </FinancialItem>
+            ))}
           <details className="disclosure">
             <summary>
               Ocorrências conferidas · {p.data.forecastResolutions.length}
@@ -465,6 +503,7 @@ export function Planning(p: ViewProps) {
           </details>
         </>
       )}
-    </>
+      <LivingReserveSection {...p} />
+    </div>
   );
 }

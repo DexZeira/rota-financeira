@@ -1,0 +1,4 @@
+name: manio-sheets-sync
+route: /manio/sheets/sync
+runtime: deno
+main: index.ts

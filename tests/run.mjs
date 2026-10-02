@@ -14,7 +14,8 @@ function compileTestFile(file) {
     })
     .outputText.replace(
       /from (['"])(\.[^'"]+)\1/g,
-      (_, q, path) => 'from ' + q + path + '.js' + q,
+      (_, q, path) =>
+        'from ' + q + (path.endsWith('.ts') ? path.slice(0, -3) : path) + '.js' + q,
     );
   const dest = '.test-output/' + file.replace(/\.ts$/, '.js');
   mkdirSync(dirname(dest), { recursive: true });
@@ -22,6 +23,13 @@ function compileTestFile(file) {
 }
 
 for (const file of [
+  'tests/frontend-workspace.test.ts', 'src/services/transaction-view.ts', 'src/services/profile-identity.ts',
+  'tests/manio-sheets.test.ts',
+  'src/services/manio-sheet-parser.ts',
+  'src/services/manio-import.ts',
+  'src/services/import/statement-values.ts',
+  'supabase/functions/_shared/manio-sheets.ts',
+  'supabase/functions/_shared/manio-handlers.ts',
   'tests/open-finance.test.ts',
   'src/services/open-finance/types.ts', 'src/services/open-finance/errors.ts', 'src/services/open-finance/provider.ts', 'src/services/open-finance/mock-provider.ts', 'src/services/open-finance/state.ts', 'src/services/open-finance/sync.ts', 'src/services/open-finance/reconciliation.ts',
   'src/services/app-diagnostics.ts', 'src/services/storage-health.ts', 'src/services/emergency-backup.ts', 'src/services/tab-coordination.ts', 'src/services/recovery.ts', 'tests/phase-ten.test.ts',
@@ -99,6 +107,8 @@ for (const file of [
 // Agora compilando os arquivos específicos de Open Finance
 for (const file of [
   'supabase/functions/_shared/open-finance.ts',
+  'supabase/functions/_shared/open-finance-webhook.ts',
+  'src/services/open-finance/widget.ts',
   'src/services/open-finance/pluggy-provider.ts',
   'tests/open-finance-real.test.ts',
   'tests/open-finance-deduplication.test.ts',
@@ -113,6 +123,8 @@ const result = spawnSync(
   process.execPath,
   [
     '--test',
+    '.test-output/tests/frontend-workspace.test.js',
+    '.test-output/tests/manio-sheets.test.js',
     '.test-output/tests/phase-nine.test.js',
     '.test-output/tests/phase-eight.test.js',
     '.test-output/tests/phase-seven.test.js',

@@ -1,0 +1,19 @@
+.rota-data-chart { min-width: 0; }
+.rota-chart-canvas { width: 100%; height: 240px; min-width: 0; }
+.rota-chart-legend { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--muted-foreground); }
+.rota-chart-mark { width: 10px; height: 10px; background: var(--chart-1); border-radius: 3px; flex-shrink: 0; }
+.rota-chart-data { margin-top: 16px; border-top: 1px solid var(--border); }
+.rota-chart-data > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 12px; color: var(--muted-foreground); }
+.rota-chart-data > summary:hover { color: var(--primary); }
+.rota-chart-data > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 6px; }
+.rota-chart-data[open] > summary { color: var(--foreground); }
+.rota-chart-table { max-height: 280px; overflow: auto; }
+.rota-chart-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rota-chart-table th, .rota-chart-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.rota-chart-table thead th { font-weight: 500; color: var(--muted-foreground); }
+.rota-chart-table tbody th { font-weight: 500; }
+.rota-chart-table td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rota-trend-chart .choice { min-height: 44px; }
+.analysis-question:first-child .rota-chart-canvas { height: 460px; }
+@media (max-width: 1000px) { .analysis-question:first-child .rota-chart-canvas { height: 300px; } }
+@media (max-width: 767px) { .rota-chart-canvas { height: 220px; } .rota-trend-chart > .section-heading { flex-wrap: wrap; } .analysis-question:first-child .rota-chart-canvas { height: 260px; } }

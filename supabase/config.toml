@@ -1,0 +1,23 @@
+[functions.open-finance-connect]
+verify_jwt = false
+
+[functions.open-finance-confirm]
+verify_jwt = false
+
+[functions.open-finance-reconnect]
+verify_jwt = false
+
+[functions.open-finance-sync]
+verify_jwt = false
+
+[functions.open-finance-disconnect]
+verify_jwt = false
+
+[functions.open-finance-webhook]
+verify_jwt = false
+
+[functions.manio-sheets-test]
+verify_jwt = false
+
+[functions.manio-sheets-sync]
+verify_jwt = false

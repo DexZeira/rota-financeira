@@ -1,0 +1,7 @@
+.market-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-6); padding: var(--space-5) 0; border-block: 1px solid var(--border); margin-bottom: var(--space-6); }
+.market-strip strong { font-size: var(--text-xl); }
+.market-strip small { font-size: var(--text-xs); }
+@media (max-width: 430px) {
+  .market-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .market-strip strong { font-size: var(--text-lg); }
+}

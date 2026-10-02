@@ -19,6 +19,7 @@ export type ErrorCode =
   | 'INVALID_RESPONSE';
 export type ConsentStatus = 'pending' | 'authorized' | 'expired' | 'revoked';
 export type Institution = { id: string; name: string };
+export type ConnectionType = 'open_finance' | 'meu_pluggy';
 export type Connection = {
   id: string;
   userId: string;
@@ -35,6 +36,8 @@ export type Connection = {
   lastSuccessfulSyncAt: string | null;
   errorCode: ErrorCode | null;
   nextRetryAt?: string | null;
+  externalItemId?: string | null;
+  connectionType?: ConnectionType;
 };
 export type ConnectedAccount = {
   id: string;

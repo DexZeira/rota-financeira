@@ -2,7 +2,7 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { defaults } from '../../src/model';
 import { backup } from '../../src/services/storage';
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 const key = 'rota-financeira-v1';
 test('falha de renderização preserva dados e permite voltar a Configurações', async ({ page, context }) => {
   await localOnly(context); await page.goto('/'); await navigate(page, 'Hoje');
@@ -34,8 +34,8 @@ async function settings(page: Page) {
 }
 async function theme(page: Page, value = 'escuro') {
   await settings(page);
-  await page.getByRole('combobox', { name: 'Tema', exact: true }).click();
-  await page.getByRole('option', { name: value, exact: true }).click();
+  await selectSettingsSection(page, 'Aparência');
+  await page.locator('.theme-choices').getByRole('button', { name: value === 'escuro' ? 'Escuro' : 'Claro', exact: true }).click();
 }
 async function editor(page: Page) {
   await navigate(page, 'Trabalho');
@@ -93,10 +93,7 @@ test('backup de emergência recupera estado após reset controlado, offline', as
   );
   await page.goto('/');
   await settings(page);
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Dados e Segurança/ })
-    .click();
+  await selectSettingsSection(page, 'Segurança');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Baixar backup de emergência' }).click(),
@@ -177,10 +174,7 @@ test('diagnóstico exporta somente metadados e nunca o conteúdo do erro', async
       }),
     ),
   );
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Dados e Segurança/ })
-    .click();
+  await selectSettingsSection(page, 'Segurança');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Baixar diagnóstico' }).click(),
@@ -228,8 +222,10 @@ test('PWA anuncia atualização sem recarregar ou interromper editor', async ({
     await page.evaluate(() => sessionStorage.getItem('update-requested')),
   ).toBeNull();
   await page.keyboard.press('Escape');
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Atualizar aplicativo' }).click();
+  const confirmation = page.getByRole('alertdialog', { name: 'Atualizar aplicativo agora?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Atualizar e recarregar', exact: true }).click();
   expect(
     await page.evaluate(() => sessionStorage.getItem('update-requested')),
   ).toBe('yes');
@@ -344,12 +340,13 @@ async function backend(context: BrowserContext) {
 }
 async function login(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  await page.getByRole('button', { name: /^Abrir menu de/ }).click();
+  await page.getByRole('menuitem', { name: 'Entrar ou criar conta', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog
-    .getByLabel('Email', { exact: true })
+    .getByLabel('Email (obrigatório)', { exact: true })
     .fill('fixture@test.invalid');
-  await dialog.getByLabel('Senha', { exact: true }).fill('fixture-password');
+  await dialog.getByLabel('Senha (obrigatória)', { exact: true }).fill('fixture-password');
   await dialog.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.account-status')).toHaveAttribute(
     'title',
@@ -409,12 +406,9 @@ test('retry tem limite, mantém dados locais e permite nova tentativa explícita
   await page.clock.fastForward(180_000);
   expect(control.attempts).toBe(3);
   await settings(page);
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Conta e sincronização/ })
-    .click();
+  await selectSettingsSection(page, 'Perfil');
   control.fail = false;
-  await page.getByRole('button', { name: 'Sincronizar agora' }).click();
+  await page.getByRole('button', { name: 'Sincronizar agora', exact: true }).click();
   await expect(page.locator('.account-status')).toHaveAttribute(
     'title',
     'Sincronizado',
@@ -458,19 +452,16 @@ test('logout A e login B isolam os dados locais e mantêm cópia privada de A', 
     )
     .toBe(90000);
   await settings(page);
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Conta e sincronização/ })
-    .click();
+  await selectSettingsSection(page, 'Perfil');
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
   await page
     .getByRole('button', { name: 'Entrar / Criar conta', exact: true })
     .click();
   const dialog = page.getByRole('dialog');
   await dialog
-    .getByLabel('Email', { exact: true })
+    .getByLabel('Email (obrigatório)', { exact: true })
     .fill('fixture-b@test.invalid');
-  await dialog.getByLabel('Senha', { exact: true }).fill('fixture-password');
+  await dialog.getByLabel('Senha (obrigatória)', { exact: true }).fill('fixture-password');
   await dialog.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.account-status')).toHaveAttribute(
     'title',

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   activateNotifications,
   browserNotifications,
@@ -8,6 +8,7 @@ import {
   validateNotificationPreferences,
   type NotificationPreferences,
 } from '../services/notification-preferences';
+import { Feedback } from './finance-ui';
 export const notificationDeviceKey = (owner: string) =>
   `rota-notifications-opt-in:${owner}`;
 export function NotificationSettings({
@@ -24,7 +25,9 @@ export function NotificationSettings({
   const [draft, setDraft] = useState(preferences),
     [permission, setPermission] = useState(browserNotifications.permission),
     [message, setMessage] = useState(''),
-    [busy, setBusy] = useState(false);
+    [messageTone, setMessageTone] = useState<'success' | 'warning' | 'error'>('success'),
+    [activating, setActivating] = useState(false),
+    [saving, setSaving] = useState(false);
   const [deviceEnabled, setDeviceEnabled] = useState(() => {
     try {
       return localStorage.getItem(notificationDeviceKey(owner)) === 'enabled';
@@ -32,6 +35,9 @@ export function NotificationSettings({
       return false;
     }
   });
+  const feedbackId = useId();
+  const privacyHelpId = useId();
+  const quietHelpId = useId();
   const status =
     permission === 'unsupported'
       ? 'Não suportadas'
@@ -46,7 +52,9 @@ export function NotificationSettings({
     return () => window.removeEventListener('focus', refresh);
   }, []);
   async function activate() {
-    setBusy(true);
+    if (activating || saving) return;
+    setActivating(true);
+    setMessage('');
     try {
       const result = await activateNotifications();
       setPermission(result);
@@ -57,32 +65,45 @@ export function NotificationSettings({
         setMessage(
           'Permissão concedida. Salve as preferências para ativar a entrega.',
         );
-      } else
+        setMessageTone('success');
+      } else {
         setMessage(
           result === 'denied'
             ? 'As notificações estão bloqueadas pelo navegador.'
             : 'Permissão não concedida. Nenhuma notificação será enviada.',
         );
+        setMessageTone('warning');
+      }
     } catch {
       setMessage(
         'Não foi possível ativar neste navegador. Os alertas continuam disponíveis no app.',
       );
+      setMessageTone('error');
     } finally {
-      setBusy(false);
+      setActivating(false);
     }
   }
   return (
     <form
       className="notification-settings"
+      aria-busy={saving || activating}
+      aria-describedby={message ? feedbackId : undefined}
       onSubmit={async (e) => {
         e.preventDefault();
+        if (saving || activating) return;
+        setSaving(true);
+        setMessage('');
         try {
           await onSave(validateNotificationPreferences(draft));
           setMessage('Preferências de notificações salvas.');
+          setMessageTone('success');
         } catch {
           setMessage(
             'Não foi possível salvar as preferências. Tente novamente.',
           );
+          setMessageTone('error');
+        } finally {
+          setSaving(false);
         }
       }}
     >
@@ -102,17 +123,17 @@ export function NotificationSettings({
       <button
         type="button"
         disabled={
-          busy || permission === 'denied' || permission === 'unsupported'
+          activating || saving || permission === 'denied' || permission === 'unsupported'
         }
         onClick={() => void activate()}
       >
-        Ativar notificações
+        {activating ? 'Ativando notificações…' : 'Ativar notificações'}
       </button>
       <label>
         <input
           type="checkbox"
           checked={draft.enabled}
-          disabled={!draft.enabled}
+          disabled={!draft.enabled || saving}
           onChange={() => {
             setDraft((p) => ({ ...p, enabled: false }));
           }}
@@ -128,6 +149,7 @@ export function NotificationSettings({
               checked={
                 draft.categories[key as keyof typeof notificationCategories]
               }
+              disabled={saving}
               onChange={(e) =>
                 setDraft((p) => ({
                   ...p,
@@ -142,6 +164,7 @@ export function NotificationSettings({
       <label>
         Antecedência
         <select
+          disabled={saving}
           value={draft.leadDays}
           onChange={(e) =>
             setDraft((p) => ({
@@ -163,17 +186,21 @@ export function NotificationSettings({
         <input
           type="checkbox"
           checked={draft.showValues}
+          disabled={saving}
+          aria-describedby={privacyHelpId}
           onChange={(e) =>
             setDraft((p) => ({ ...p, showValues: e.target.checked }))
           }
         />
         Mostrar valores e detalhes na tela bloqueada
       </label>
-      <p>Desativado: conteúdo genérico, sem valores ou nomes de registros.</p>
+      <p id={privacyHelpId}>Desativado: conteúdo genérico, sem valores ou nomes de registros.</p>
       <label>
         <input
           type="checkbox"
           checked={draft.quietEnabled}
+          disabled={saving}
+          aria-describedby={quietHelpId}
           onChange={(e) =>
             setDraft((p) => ({ ...p, quietEnabled: e.target.checked }))
           }
@@ -182,9 +209,11 @@ export function NotificationSettings({
       </label>
       <div className="assistant-controls">
         <label>
-          Início do silêncio
+          Início do silêncio (obrigatório)
           <input
             type="time"
+            disabled={saving}
+            aria-describedby={quietHelpId}
             value={draft.quietStart}
             onChange={(e) =>
               setDraft((p) => ({ ...p, quietStart: e.target.value }))
@@ -193,9 +222,11 @@ export function NotificationSettings({
           />
         </label>
         <label>
-          Fim do silêncio
+          Fim do silêncio (obrigatório)
           <input
             type="time"
+            disabled={saving}
+            aria-describedby={quietHelpId}
             value={draft.quietEnd}
             onChange={(e) =>
               setDraft((p) => ({ ...p, quietEnd: e.target.value }))
@@ -204,7 +235,7 @@ export function NotificationSettings({
           />
         </label>
       </div>
-      <p>
+      <p id={quietHelpId}>
         Horário local do dispositivo. Horários iguais silenciam o dia inteiro.
       </p>
       <p>
@@ -212,8 +243,14 @@ export function NotificationSettings({
         com o app fechado. A autorização do navegador é individual por
         dispositivo.
       </p>
-      <button type="submit">Salvar preferências de notificações</button>
-      <output>{message || diagnostic}</output>
+      <button type="submit" disabled={saving || activating}>
+        {saving ? 'Salvando preferências…' : 'Salvar preferências de notificações'}
+      </button>
+      {message ? (
+        <Feedback id={feedbackId} tone={messageTone} announce>{message}</Feedback>
+      ) : diagnostic ? (
+        <Feedback tone="info">{diagnostic}</Feedback>
+      ) : null}
     </form>
   );
 }

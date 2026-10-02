@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { defaults, emptyRow, today } from '../../src/model';
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 async function seed(page: Page) {
   const d = defaults(),
     at = today();
@@ -171,10 +171,7 @@ test('notificações exigem ação explícita, persistem, respeitam privacidade 
     );
   await page.goto('/');
   await navigate(page, 'Configurações');
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Notificações/ })
-    .click();
+  await selectSettingsSection(page, 'Notificações');
   await expect(page.getByText('Desativadas', { exact: true })).toBeVisible();
   expect((await mock()).requests).toBe(0);
   await page
@@ -205,10 +202,7 @@ test('notificações exigem ação explícita, persistem, respeitam privacidade 
   expect((await mock()).bodies).toEqual(bodies);
   await page.reload();
   await navigate(page, 'Configurações');
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Notificações/ })
-    .click();
+  await selectSettingsSection(page, 'Notificações');
   await expect(
     page.getByRole('combobox', { name: 'Antecedência', exact: true }),
   ).toHaveValue('15');

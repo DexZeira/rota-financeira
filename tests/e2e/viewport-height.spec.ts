@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 
 test('importação mantém preview e revisão acessíveis nas alturas móveis', async ({ page }) => {
   await page.goto('/'); await navigate(page, 'Importar');
@@ -321,7 +321,7 @@ test('editor respeita a visual viewport em alturas móveis', async ({
   await expect(
     dialog.getByRole('button', { name: 'Salvar', exact: true }),
   ).toBeVisible();
-  await dialog.getByLabel('Nome *', { exact: true }).fill('Altura QA');
+  await dialog.getByRole('textbox', { name: /^Nome \(obrigatório\)$/ }).fill('Altura QA');
   await dialog.locator('input[type=date]').first().scrollIntoViewIfNeeded();
   await expect(dialog.locator('input[type=date]').first()).toBeVisible();
 });
@@ -360,7 +360,7 @@ test('assistente e preferências de notificações cabem nas alturas móveis', a
   const question=page.getByRole('combobox',{name:'Pergunta',exact:true});
   await question.selectOption('RESERVE');await question.press('Tab');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await navigate(page,'Configurações');await page.locator('summary').filter({hasText:/^Notificações/}).click();
+  await navigate(page,'Configurações');await selectSettingsSection(page, 'Notificações');
   const save=page.getByRole('button',{name:'Salvar preferências de notificações',exact:true});
   await save.scrollIntoViewIfNeeded();await expect(save).toBeInViewport();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -369,10 +369,10 @@ test('assistente e preferências de notificações cabem nas alturas móveis', a
 
 test('Contas conectadas mantém autorização e controles dentro da viewport', async ({page}) => {
   await page.goto('/'); await navigate(page,'Configurações');
-  await page.locator('summary').filter({hasText:'Contas conectadas'}).click();
+  await selectSettingsSection(page, 'Integrações');
   await page.getByRole('button',{name:'Conectar instituição',exact:true}).click();
   await page.getByRole('button',{name:'Instituição demonstração',exact:true}).click();
-  const authorize=page.getByRole('button',{name:'Autorizar demonstração'});
+  const authorize=page.getByRole('button',{name:'Conectar',exact:true});
   await authorize.scrollIntoViewIfNeeded(); await expect(authorize).toBeInViewport();
   const bounds=await authorize.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);

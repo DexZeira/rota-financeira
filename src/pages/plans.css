@@ -1,0 +1,146 @@
+.goals-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  padding: 24px;
+  gap: 24px;
+  background: var(--card);
+  border-radius: var(--radius-surface);
+  margin-bottom: 24px;
+}
+.goals-overview h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.goals-overview > div > strong {
+  font-size: 36px;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.goals-overview p {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin: 12px 0 0;
+}
+.goals-overview-note {
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.goals-overview-note h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.goals-overview-note p {
+  max-width: 48ch;
+  margin: 0 0 16px;
+}
+.goal-portfolio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+.plans-page > .goal-portfolio > .financial-item {
+  background: var(--card);
+  border: 0;
+  border-radius: var(--radius-surface);
+  padding: 24px;
+  min-width: 0;
+}
+.goal-portfolio > .empty-state {
+  grid-column: 1 / -1;
+  background: var(--card);
+  border-radius: var(--radius-surface);
+}
+.goal-portfolio .financial-item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.goal-portfolio .financial-item-value {
+  text-align: left;
+  grid-row: 2;
+}
+.goal-portfolio .financial-item-value strong {
+  font-size: 24px;
+}
+.goal-portfolio .financial-item-main > button {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+}
+.plans-page #plan-history {
+  background: var(--card);
+  border: 0;
+  border-radius: var(--radius-surface);
+  padding: 24px;
+  margin-top: 24px;
+}
+.plans-page .goal-next-step {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 767px) {
+  .goals-overview,
+  .goal-portfolio {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .goals-overview,
+  .plans-page > .goal-portfolio > .financial-item,
+  .plans-page #plan-history {
+    padding: 16px;
+  }
+  .goals-overview > div > strong {
+    font-size: 28px;
+  }
+  .goals-overview-note {
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+.plans-page .goal-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-block: var(--space-4);
+}
+.goal-progress .progress-bar {
+  flex: 1;
+  margin: 0;
+}
+.goal-progress > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.goal-next-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+.goal-next-step > span {
+  color: var(--muted-foreground);
+}
+.goal-next-step > button {
+  margin-left: auto;
+  font-size: var(--text-xs);
+}
+.plans-page .financial-item > .disclosure {
+  margin-top: var(--space-4);
+}
+@media (max-width: 430px) {
+  .goal-next-step > button {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .plans-page .section-heading > [data-slot] {
+    width: 100%;
+  }
+}

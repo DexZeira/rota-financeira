@@ -55,7 +55,7 @@ export function validateImports(value: unknown): ImportState {
   }
   for (const s of state.sessions) {
     if (
-      !['csv', 'ofx', 'open_finance'].includes(s.source) ||
+      !['csv', 'ofx', 'open_finance', 'manio'].includes(s.source) ||
       typeof s.fileName !== 'string' ||
       s.fileName.length > 200 ||
       !/^\d{4}-\d\d-\d\dT/.test(s.createdAt) ||
@@ -99,7 +99,7 @@ export function validateImports(value: unknown): ImportState {
       throw Error('Vínculo de importação inválido.');
     if (
       !t ||
-      !['csv', 'ofx', 'open_finance'].includes(t.source) ||
+      !['csv', 'ofx', 'open_finance', 'manio'].includes(t.source) ||
       !['credit', 'debit'].includes(t.direction) ||
       !Number.isInteger(t.line) ||
       t.line < 1 ||

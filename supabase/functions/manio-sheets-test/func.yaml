@@ -1,0 +1,4 @@
+name: manio-sheets-test
+route: /manio/sheets/test
+runtime: deno
+main: index.ts

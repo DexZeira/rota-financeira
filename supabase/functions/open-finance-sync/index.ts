@@ -1,371 +1,119 @@
 import { serve } from 'https://deno.land/std@0.194.0/http/server.ts';
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   canSyncOpenFinanceConnection,
+  createOpenFinanceSyncResponse,
   getOpenFinanceConfiguration,
-  logOpenFinanceEvent,
+  isOpenFinanceUuid,
+  logOpenFinanceSyncEvent,
   openFinanceErrorResponse,
 } from '../_shared/open-finance.ts';
+import { syncOpenFinanceConnection } from '../_shared/open-finance-sync-core.ts';
 
-// Tipos para dados da Pluggy
-interface PluggyAccount {
-  id: string;
-  name: string;
-  type: string;
-  number: string;
-  currency: string;
-  balance?: {
-    current?: number;
-    available?: number;
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+
+  for (const [key, value] of Object.entries(corsHeaders)) {
+    headers.set(key, value);
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
-interface PluggyTransaction {
-  id: string;
-  accountId: string;
-  date: string;
-  description: string;
-  amount: number;
-  currency: string;
-  status: string;
-  category?: string;
-  merchant?: string;
-  type?: string;
-}
-
-interface PluggyBalance {
-  accountId: string;
-  current?: number;
-  available?: number;
-  asOf: string;
-}
-
-interface PluggyTransactionsPage {
-  transactions: PluggyTransaction[];
-  nextCursor?: string;
-  nextPage?: boolean;
-}
-
-interface ProcessedAccount {
-  id: string;
-  external_account_id: string;
+function requestConnectionId(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const connectionId = (value as Record<string, unknown>).connection_id;
+  return typeof connectionId === 'string' && isOpenFinanceUuid(connectionId)
+    ? connectionId
+    : null;
 }
 
 serve(async (req: Request) => {
+  // IMPORTANTE: preflight deve ser tratado antes de configuração/JWT.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+
+  if (req.method !== 'POST') {
+    return withCors(
+      openFinanceErrorResponse(405, ''),
+    );
+  }
+
   const configurationResult = getOpenFinanceConfiguration(true);
-  if (!configurationResult.ok) return configurationResult.response;
+  if (!configurationResult.ok) {
+    return withCors(configurationResult.response);
+  }
 
   const { configuration, correlationId } = configurationResult;
+  let accountsCount = 0;
+  let transactionsCount = 0;
   try {
-    // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+    if (!authHeader?.startsWith('Bearer ')) {
+      logOpenFinanceSyncEvent('sync.authenticate', 401, correlationId, 0, 0);
+      return withCors(openFinanceErrorResponse(401, correlationId));
     }
-
-    const token = authHeader.substring(7); // Remove "Bearer "
-    // Validar token e obter usuário
+    const token = authHeader.slice(7);
     const userClient = createClient(configuration.supabaseUrl, configuration.supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: userError } = await userClient.auth.getUser(token);
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+      logOpenFinanceSyncEvent('sync.authenticate', 401, correlationId, 0, 0);
+      return withCors(openFinanceErrorResponse(401, correlationId));
     }
 
-    const userId = user.id;
-
-    // Obter dados do corpo da requisição
-    const body = await req.json();
-    const connectionId = body.connectionId;
+    const body: unknown = await req.json();
+    const connectionId = requestConnectionId(body);
     if (!connectionId) {
-      return new Response(
-        JSON.stringify({ error: 'Connection ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      logOpenFinanceSyncEvent('sync.validate_request', 400, correlationId, 0, 0);
+      return withCors(openFinanceErrorResponse(400, correlationId));
     }
 
-    // Verificar se a conexão pertence ao usuário
-    const { data: connectionData, error: connectionError } = await userClient
+    const { data: connection, error: connectionError } = await userClient
       .from('open_finance_connections')
-      .select('*')
+      .select('id,user_id,provider,status,external_item_id,external_execution_status')
       .eq('id', connectionId)
-      .eq('user_id', userId)
-      .single();
-    if (connectionError || !connectionData) {
-      return new Response(
-        JSON.stringify({ error: 'Connection not found or unauthorized' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (
+      connectionError ||
+      !connection ||
+      connection.provider !== 'pluggy' ||
+      !canSyncOpenFinanceConnection(connection, user.id)
+    ) {
+      logOpenFinanceSyncEvent('sync.connection_unavailable', 404, correlationId, 0, 0);
+      return withCors(openFinanceErrorResponse(404, correlationId));
     }
-
-    if (!canSyncOpenFinanceConnection(connectionData, userId)) {
-      logOpenFinanceEvent('open_finance.sync_connection_unavailable', 409, correlationId);
-      return openFinanceErrorResponse(409, correlationId);
-    }
-
-    // Autenticar na Pluggy
-    const authResponse = await fetch('https://api.pluggy.ai/auth', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        clientId: configuration.pluggyClientId,
-        clientSecret: configuration.pluggyClientSecret
-      })
-    });
-
-    if (!authResponse.ok) {
-      throw new Error(`Pluggy Auth error:{authResponse.status}`);
-    }
-
-    const authData = await authResponse.json();
-    const accessToken = authData.accessToken;
-
-    // Baixar contas
-    const accountsResponse = await fetch(`https://api.pluggy.ai/items/${connectionData.external_item_id}/accounts`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    if (!accountsResponse.ok) {
-      throw new Error(`Pluggy Accounts error: ${accountsResponse.status}`);
-    }
-
-    const accountsData = (await accountsResponse.json()) as { accounts: PluggyAccount[] };
-
-    // Baixar saldos
-    const balancesData: PluggyBalance[] = [];
-    for (const account of accountsData.accounts) {
-      if (account.id) {
-        const balanceResponse = await fetch(`https://api.pluggy.ai/accounts/${account.id}/balance`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
-
-        if (balanceResponse.ok) {
-          const balance = (await balanceResponse.json()) as PluggyBalance;
-          balancesData.push({
-            ...balance
-          });
-        }
-      }
-    }
-
-    // Baixar transações para cada conta
-    let allTransactions: PluggyTransaction[] = [];
-    for (const account of accountsData.accounts) {
-      if (account.id) {
-        // Baixar transações com paginação
-        let cursor: string | null = null;
-        do {
-          const transactionsUrl = cursor            ? `https://api.pluggy.ai/accounts/${account.id}/transactions?cursor=${cursor}`
-            : `https://api.pluggy.ai/accounts/${account.id}/transactions`;
-          const transactionsResponse = await fetch(transactionsUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
-
-          if (!transactionsResponse.ok) {
-            throw new Error(`Pluggy Transactions error: ${transactionsResponse.status}`);
-          }
-
-          const transactionsPage = (await transactionsResponse.json()) as PluggyTransactionsPage;
-          allTransactions = allTransactions.concat(transactionsPage.transactions || []);
-          cursor = transactionsPage.nextCursor || null;
-        } while (cursor);
-      }
-    }
-
-    // Mapear e persistir dados
-    // Processar contas
-    const accountUpsertPromises = accountsData.accounts.map(async (account: PluggyAccount) => {
-      if (!account.id || !account.name) return null;
-      const { data: existingAccount, error } = await userClient
-        .from('open_finance_accounts')
-        .select('*')
-        .eq('external_account_id', account.id)
-        .eq('connection_id', connectionId)
-        .single();
-      if (error && error.code !== 'PGRST116') {  // Se for "no rows returned", não é erro
-        throw new Error(`Account lookup error: ${error.message}`);
-      }
-      if (existingAccount) {
-        // Atualizar conta existente
-        const { data: updatedData, error: updateError } = await userClient
-          .from('open_finance_accounts')
-          .update({
-            name: account.name,
-            type: account.type,
-            number: account.number,
-            currency: account.currency,
-            balance_current: account.balance?.current,
-            balance_available: account.balance?.available,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingAccount.id)
-          .select().single();
-        if (updateError) {
-          throw new Error(`Failed to update account: ${updateError.message}`);
-        }
-        return updatedData;
-      } else {
-        // Inserir nova conta
-        const { data: insertedData, error: insertError } = await userClient
-          .from('open_finance_accounts')
-          .insert([{
-            connection_id: connectionId,
-            external_account_id: account.id,
-            name: account.name,
-            type: account.type,
-            number: account.number,
-            currency: account.currency,
-            balance_current: account.balance?.current,
-            balance_available: account.balance?.available,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-          .select().single();
-        if (insertError) {
-          throw new Error(`Failed to insert account: ${insertError.message}`);
-        }
-        return insertedData;
-      }
-    });
-
-    const processedAccounts = (await Promise.all(accountUpsertPromises)).filter((a): a is ProcessedAccount => a !== null);
-    // Processar saldos
-    for (const balance of balancesData) {
-      // Para os saldos, precisamos encontrar a conta correspondente
-      const account = accountsData.accounts.find((acc) => acc.id === balance.accountId);
-      if (account && account.id) {
-        const { data: existingBalanceRecord, error } = await userClient
-          .from('open_finance_accounts')
-          .select('*')
-          .eq('external_account_id', balance.accountId)
-          .eq('connection_id', connectionId)
-          .single();
-
-        if (!error && existingBalanceRecord) {
-          // Atualizar saldo com upsert (usando o external_account_id como identificador único para a conta)
-          const { error: updateError } = await userClient
-            .from('open_finance_accounts')
-            .update({
-              balance_current: balance.current,
-              balance_available: balance.available,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingBalanceRecord.id);
-          if (updateError) {
-            throw new Error(`Failed to update balance: ${updateError.message}`);
-          }
-        }
-      }
-    }
-
-    // Processar transações
-    const transactionUpsertPromises = allTransactions.map(async (transaction: PluggyTransaction) => {
-      if (!transaction.id || !transaction.accountId) return;
-      const accountData = processedAccounts.find((acc) => acc.external_account_id === transaction.accountId);
-      if (!accountData) {
-        throw new Error(`Account not found for transaction: ${transaction.id}`);
-      }
-
-      const { data: existingTransaction, error } = await userClient
-        .from('open_finance_transactions')
-        .select('*')
-        .eq('external_transaction_id', transaction.id)
-        .eq('account_id', accountData.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {  // Se for "no rows returned", não é erro
-        throw new Error(`Transaction lookup error: ${error.message}`);
-      }
-
-      if (existingTransaction) {
-        // Atualizar transação existente
-        const { error: updateError } = await userClient
-          .from('open_finance_transactions')
-          .update({
-            date: transaction.date,
-            description: transaction.description,
-            amount: transaction.amount,
-            currency: transaction.currency,
-            status: transaction.status,
-            category: transaction.category,
-            merchant: transaction.merchant,
-            type: transaction.type,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingTransaction.id);
-        if (updateError) {
-          throw new Error(`Failed to update transaction: ${updateError.message}`);
-        }
-        return;
-      } else {
-        // Inserir nova transação
-        const { error: insertError } = await userClient
-          .from('open_finance_transactions')
-          .insert([{
-            account_id: accountData.id,
-            external_transaction_id: transaction.id,
-            date: transaction.date,
-            description: transaction.description,
-            amount: transaction.amount,
-            currency: transaction.currency,
-            status: transaction.status,
-            category: transaction.category,
-            merchant: transaction.merchant,
-            type: transaction.type,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-        if (insertError) {
-          throw new Error(`Failed to insert transaction: ${insertError.message}`);
-        }
-        return;
-      }
-    });
-
-    await Promise.all(transactionUpsertPromises);
-
-    // Atualizar data de última sincronização
-    const { error } = await userClient
-      .from('open_finance_connections')
-      .update({
-        last_sync_at: new Date().toISOString()
-      })
-      .eq('id', connectionId);
-    if (error) {
-      throw new Error(`Failed to update last sync: ${error.message}`);
-    }
-
-    return new Response(
-      JSON.stringify({        success: true,
-        accounts_imported: accountsData.accounts.length,
-        transactions_imported: allTransactions.length
-      }),
-      { headers: { 'Content-Type': 'application/json' } }
+    const result = await syncOpenFinanceConnection(userClient, configuration, connection);
+    accountsCount = result.accounts;
+    transactionsCount = result.transactions;
+    logOpenFinanceSyncEvent(
+      'sync.complete', 200, correlationId, accountsCount, transactionsCount,
+    );
+    return withCors(
+      createOpenFinanceSyncResponse(
+        connectionId, accountsCount, transactionsCount, result.partial, result.syncedAt,
+      ),
     );
   } catch {
-    logOpenFinanceEvent('open_finance.sync_failed', 500, correlationId);
-    return openFinanceErrorResponse(500, correlationId);
+    logOpenFinanceSyncEvent(
+      'sync.failed', 500, correlationId, accountsCount, transactionsCount,
+    );
+    return withCors(openFinanceErrorResponse(500, correlationId));
   }
 });

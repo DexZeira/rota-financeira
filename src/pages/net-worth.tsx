@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react';
 import { type ViewProps, value } from './shared';
 import { today, emptyRow, id, num, dec, brDate } from '../model';
-import {
-  PageHeader,
-  HeroMetric,
-  FinancialItem,
-} from '../components/finance-ui';
+import { PageHeader, FinancialItem } from '../components/finance-ui';
 import { Records } from '../components/common';
 import {
   OwnershipPanel,
@@ -22,6 +18,9 @@ import {
   observedAssetInflation,
 } from '../services/depreciation';
 import { useEconomicIndicators } from '../hooks/use-economic-indicators';
+import { PrivateValue } from '../components/value-privacy';
+import { Scale } from 'lucide-react';
+import './net-worth.css';
 export function NetWorth(p: ViewProps) {
   const at = today(),
     { inflation } = useEconomicIndicators(),
@@ -65,7 +64,7 @@ export function NetWorth(p: ViewProps) {
       )
     : null;
   return (
-    <>
+    <div className="net-worth-page">
       <PageHeader
         title="Patrimônio"
         description="O que você possui, o que deve e como isso muda."
@@ -75,22 +74,39 @@ export function NetWorth(p: ViewProps) {
           </button>
         }
       />
-      <HeroMetric
-        label={
-          result.partial
-            ? 'Patrimônio líquido conhecido · parcial'
-            : 'Patrimônio líquido'
-        }
-        value={money(result.netCents)}
-        context={
-          result.estimated
-            ? 'Inclui avaliações estimadas. Bens não são dinheiro disponível.'
-            : 'Ativos menos passivos. Bens não são dinheiro disponível.'
-        }
-      />
-      <div className="inline-stats">
-        {value('Patrimônio bruto conhecido', money(result.grossCents))}
-        {value('Passivos', money(result.liabilitiesCents))}
+      <section className="wealth-overview" aria-label="Balanço patrimonial">
+        <div className="wealth-net">
+          <h2>
+            <Scale size={18} aria-hidden="true" />{' '}
+            {result.partial
+              ? 'Patrimônio líquido conhecido · parcial'
+              : 'Patrimônio líquido'}
+          </h2>
+          <strong>
+            <PrivateValue>{money(result.netCents)}</PrivateValue>
+          </strong>
+          <p>
+            {result.estimated
+              ? 'Inclui avaliações estimadas. Bens não são dinheiro disponível.'
+              : 'Ativos menos passivos. Bens não são dinheiro disponível.'}
+          </p>
+        </div>
+        <dl className="wealth-equation">
+          <div>
+            <dt>Ativos conhecidos</dt>
+            <dd>
+              <PrivateValue>{money(result.grossCents)}</PrivateValue>
+            </dd>
+          </div>
+          <div>
+            <dt>Passivos</dt>
+            <dd>
+              <PrivateValue>{money(result.liabilitiesCents)}</PrivateValue>
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <div className="inline-stats wealth-liquidity">
         {value('Líquido financeiro', money(result.financialNetCents))}
         {value('Líquido rapidamente disponível', money(result.quickNetCents))}
       </div>
@@ -134,50 +150,60 @@ export function NetWorth(p: ViewProps) {
           </p>
         </div>
       </details>
-      <Records
-        {...p}
-        kind="assets"
-        rows={result.assets.map((r) => r.asset)}
-        columns={[
-          { label: 'Bem', render: (r) => String(r.name) },
-          {
-            label: 'Valor patrimonial',
-            render: (r) =>
-              money(assetIndex.get(r.id)?.valueCents ?? null) +
-              (assetIndex.get(r.id)?.source === 'estimated'
-                ? ' · Estimado'
-                : ''),
-          },
-          {
-            label: 'Estado',
-            render: (r) =>
-              r.active === 'sim' ? 'Ativo' : r.soldAt ? 'Vendido' : 'Arquivado',
-          },
-        ]}
-        extra={(row) => (
-          <>
-            <button
-              onClick={() => {
-                setSelected(row.id);
-              }}
-            >
-              Detalhes de {String(row.name)}
-            </button>
-            <button
-              onClick={() =>
-                p.edit('assetValuations', {
-                  ...emptyRow('assetValuations'),
-                  id: id(),
-                  assetId: row.id,
-                  date: at,
-                })
-              }
-            >
-              Avaliar {String(row.name)}
-            </button>
-          </>
-        )}
-      />
+      <section className="wealth-assets" aria-label="Bens cadastrados">
+        <div className="section-heading">
+          <h2>Seus bens</h2>
+          <span className="supporting-text">Avaliações e liquidez</span>
+        </div>
+        <Records
+          {...p}
+          kind="assets"
+          rows={result.assets.map((r) => r.asset)}
+          columns={[
+            { label: 'Bem', render: (r) => String(r.name) },
+            {
+              label: 'Valor patrimonial',
+              render: (r) =>
+                money(assetIndex.get(r.id)?.valueCents ?? null) +
+                (assetIndex.get(r.id)?.source === 'estimated'
+                  ? ' · Estimado'
+                  : ''),
+            },
+            {
+              label: 'Estado',
+              render: (r) =>
+                r.active === 'sim'
+                  ? 'Ativo'
+                  : r.soldAt
+                    ? 'Vendido'
+                    : 'Arquivado',
+            },
+          ]}
+          extra={(row) => (
+            <>
+              <button
+                onClick={() => {
+                  setSelected(row.id);
+                }}
+              >
+                Detalhes de {String(row.name)}
+              </button>
+              <button
+                onClick={() =>
+                  p.edit('assetValuations', {
+                    ...emptyRow('assetValuations'),
+                    id: id(),
+                    assetId: row.id,
+                    date: at,
+                  })
+                }
+              >
+                Avaliar {String(row.name)}
+              </button>
+            </>
+          )}
+        />
+      </section>
       <p>
         O cadastro não estima valor de mercado. Use uma avaliação. Só escolha
         movimentar caixa se a compra/venda ainda não foi lançada; informe apenas
@@ -370,6 +396,6 @@ export function NetWorth(p: ViewProps) {
           />
         </div>
       </details>
-    </>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
-import { navigate } from './navigation';
+import { navigate, selectSettingsSection } from './navigation';
 import { test, expect } from '@playwright/test';
 
-const pages = ['Alertas', 'Auditoria', 'Minha Situação', 'Hoje', 'Planejamento', 'Patrimônio', 'Simulações', 'Importar', 'Relatórios', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações'];
+const pages = ['Alertas', 'Auditoria', 'Minha Situação', 'Hoje', 'Planejamento', 'Patrimônio', 'Simulações', 'Importar', 'Relatórios', 'Dashboard', 'Trabalho', 'Gastos', 'Dívidas', 'Investimentos', 'Planos', 'Moto', 'Manutenção', 'Análises', 'Configurações', 'Transações', 'Contas', 'Orçamentos', 'Assistente'];
 
 let runtimeErrors: string[] = [];
 test.beforeEach(async ({ page }) => {
@@ -43,19 +43,20 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(() => { expect(runtimeErrors, 'erros de console/rede internos').toEqual([]); });
 
-test('todas as páginas carregam sem overflow horizontal no tema claro e escuro', async ({ page }, testInfo) => {
+for (const theme of ['claro', 'escuro']) {
+test(`todas as páginas carregam sem overflow horizontal no tema ${theme}`, async ({ page }, testInfo) => {
   await page.goto('/');
-  for (const theme of ['claro', 'escuro']) {
     await navigate(page, 'Configurações');
-    await page.getByRole('combobox', { name: 'Tema', exact: true }).click();
-    await page.getByRole('option', { name: theme, exact: true }).click();
+  await selectSettingsSection(page, 'Aparência');
+    await page.getByRole('button', { name: theme === 'claro' ? 'Claro' : 'Escuro', exact: true }).click();
     for (const name of pages) {
       await navigate(page, name);
       await expect(page.locator('main')).toBeVisible();
+      await expect(page.locator('main h1'), `${name}: um título principal`).toHaveCount(1);
       const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: window.innerWidth }));
       expect(overflow.scroll, `${name} ${theme} overflow`).toBeLessThanOrEqual(overflow.width);
-      const active = page.locator('[data-slot=sidebar-menu-button][data-active]').filter({ hasText: name }).first();
-      if (await active.isVisible()) {
+      if ((page.viewportSize()?.width ?? 0) >= 1024) {
+        const active = page.locator('[data-slot=sidebar-menu-button][data-active]').filter({ hasText: name }).first();
         await active.hover();
         await expect.poll(() => active.evaluate((element) => {
           const style = getComputedStyle(element);
@@ -71,10 +72,35 @@ test('todas as páginas carregam sem overflow horizontal no tema claro e escuro'
         }), { message: `${name} ${theme}: contraste do item ativo sob hover` }).toBeGreaterThanOrEqual(4.5);
       }
     }
-  }
   if (['390', '1366'].includes(testInfo.project.name)) {
-    await page.screenshot({ path: `.qa-artifacts/${testInfo.project.name}-light-dark.png`, fullPage: true });
+    await page.screenshot({ path: `.qa-artifacts/${testInfo.project.name}-${theme}.png`, fullPage: true });
   }
+});
+}
+
+test('shell móvel mantém navegação compacta, foco e conteúdo prioritário legível', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1024) > 767, 'auditoria exclusiva do shell móvel');
+  await page.goto('/');
+  const mobileNav = page.getByRole('navigation', { name: 'Navegação móvel' });
+  await expect(mobileNav).toBeVisible();
+  expect((await mobileNav.boundingBox())?.height).toBeLessThanOrEqual(80);
+  const more = page.getByRole('button', { name: 'Mais', exact: true });
+  await more.focus();
+  await more.press('Enter');
+  await expect(page.locator('[data-mobile=true]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-mobile=true]')).toHaveCount(0);
+  await expect(more).toBeFocused();
+  const commitment = page.locator('.today-horizon .financial-item-name h3');
+  if (await commitment.count()) {
+    expect((await commitment.first().boundingBox())?.width).toBeGreaterThanOrEqual(100);
+  }
+});
+
+test('movimento reduzido remove transições não essenciais', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expect(page.locator('.profile-trigger')).toHaveCSS('transition-duration', '0s');
 });
 
 test('fluxo Trabalho alterna Uber, Cartões, Outro e volta a Uber', async ({ page }) => {
@@ -94,7 +120,9 @@ test('fluxo Trabalho alterna Uber, Cartões, Outro e volta a Uber', async ({ pag
   await expect(dialog.getByLabel('Quantidade de cartões')).toBeVisible();
   await other.locator("..").click();
   await expect(other).toBeChecked();
-  await dialog.getByLabel('Nome da atividade *').fill('Corrida particular');
+  await dialog
+    .getByLabel('Nome da atividade (obrigatório)')
+    .fill('Corrida particular');
   await uber.locator("..").click();
   await expect(uber).toBeChecked();
   await expect(dialog.getByLabel('Quantidade de cartões')).toHaveCount(0);

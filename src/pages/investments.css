@@ -1,0 +1,54 @@
+.investments-page { min-width: 0; }
+.investment-position { background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+.investment-position-total { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 24px; }
+.investment-position-total h2 { margin: 0 0 6px; font-size: 16px; }
+.investment-position-total p { margin: 0; font-size: 12px; color: var(--muted-foreground); }
+.investment-position-total > strong { font-size: 36px; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.investment-position .metrics { padding: 16px 0 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; margin-bottom: 0; }
+.investment-position .metrics strong { font-size: 16px; }
+.portfolio-terminal { background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+.portfolio-terminal > .section-heading { margin-bottom: 20px; }
+.portfolio-terminal > .section-heading h2 { font-size: 18px; margin: 0 0 4px; }
+.portfolio-terminal > .section-heading p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+.portfolio-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.portfolio-class-tabs { display: flex; gap: 4px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; min-width: 0; }
+.portfolio-class-tabs button { background: transparent; border: 0; min-height: 36px; padding: 8px 12px; font-size: 12px; }
+.portfolio-class-tabs button[aria-pressed='true'] { background: var(--accent); color: var(--accent-foreground); }
+.portfolio-search { position: relative; }
+.portfolio-search svg { position: absolute; left: 12px; top: 14px; color: var(--muted-foreground); }
+.portfolio-search input { padding-left: 36px; font-size: 12px; width: min(100%,16rem); }
+.portfolio-group { margin-top: 24px; min-width: 0; }
+.portfolio-group > h3 { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; margin: 0 0 12px; }
+.portfolio-group > h3 > span { font-size: 11px; color: var(--muted-foreground); font-weight: 400; }
+.portfolio-column-head, .portfolio-asset-row { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1fr) auto; align-items: center; gap: 16px; }
+.portfolio-column-head { background: var(--muted); padding: 10px 12px; font-size: 11px; color: var(--muted-foreground); border-radius: 6px; }
+.portfolio-column-head > span:nth-child(3) { text-align: right; }
+.portfolio-asset { padding: 16px 12px; border-bottom: 1px solid var(--border); }
+.portfolio-asset-row { font-size: 13px; }
+.portfolio-asset-name { min-width: 0; }
+.portfolio-asset-name > strong { font-size: 13px; overflow-wrap: anywhere; }
+.portfolio-asset-row small { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 4px; }
+.portfolio-quantity { font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.portfolio-asset-value { text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.portfolio-valuation { color: var(--muted-foreground); font-size: 11px; }
+.portfolio-asset-row > button { min-height: 32px; background: transparent; font-size: 12px; padding: 5px 8px; }
+.portfolio-intelligence { margin-top: 10px; }
+.portfolio-intelligence > summary { cursor: pointer; color: var(--muted-foreground); font-size: 11px; min-height: 24px; }
+.portfolio-intelligence[open] > summary { color: var(--primary); margin-bottom: 16px; }
+.portfolio-empty { padding: 24px 0; color: var(--muted-foreground); }
+.investments-page .compact-form { margin-bottom: 24px; }
+@media (max-width: 1000px) { .portfolio-column-head, .portfolio-asset-row { grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto; } .portfolio-quantity, .portfolio-column-head > span:nth-child(2) { display: none; } }
+@media (max-width: 767px) {
+  .investment-position, .portfolio-terminal { padding: 16px; }
+  .investment-position-total { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .investment-position-total > strong { font-size: 32px; }
+  .portfolio-controls { align-items: stretch; }
+  .portfolio-search { width: 100%; }
+  .portfolio-search input { width: 100%; }
+  .portfolio-column-head { display: none; }
+  .portfolio-asset { padding-inline: 0; }
+  .portfolio-asset-row { grid-template-columns: minmax(0,1fr) auto; gap: 8px 12px; }
+  .portfolio-asset-value { grid-column: 2; grid-row: 1; max-width: 9rem; }
+  .portfolio-valuation { grid-column: 1; grid-row: 2; }
+  .portfolio-asset-row > button { grid-column: 2; grid-row: 2; justify-self: end; }
+}

@@ -1,4 +1,4 @@
-export type Source = 'csv' | 'ofx' | 'open_finance';
+export type Source = 'csv' | 'ofx' | 'open_finance' | 'manio';
 export type Direction = 'credit' | 'debit';
 export type Transaction = {
   line: number;

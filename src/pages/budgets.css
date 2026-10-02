@@ -1,0 +1,21 @@
+.budget-workspace { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(15rem,.8fr); gap: 24px; align-items: start; }
+.budget-categories { min-width: 0; background: var(--surface-default); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+.budget-categories > .disclosure { margin: 0; border: 0; }
+.budget-categories > .disclosure > summary { font-weight: 650; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+.budget-categories .section-heading h2 { font-size: 16px; }
+.budget-categories .financial-item-main { align-items: baseline; }
+.budget-categories .financial-item .inline-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.budget-categories .financial-item .inline-stats .detail { min-width: 0; }
+.budget-categories .financial-item .inline-stats strong { font-size: 14px; }
+.budget-categories .financial-item > p { font-size: 12px; line-height: 1.6; }
+.budget-context { min-width: 0; background: var(--muted); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+.budget-context h2 { font-size: 16px; margin: 0 0 20px; }
+.budget-context dl { margin: 0; }
+.budget-context dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; padding-block: 14px; border-bottom: 1px solid var(--border); }
+.budget-context dt { font-size: 12px; color: var(--muted-foreground); }
+.budget-context dd { margin: 0; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.budget-context p { font-size: 12px; line-height: 1.7; margin-block: 20px; }
+.budgets-page .budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.budgets-page .disclosure-body { padding-top: 1rem; }
+@media (max-width: 1000px) { .budget-workspace { grid-template-columns: 1fr; } .budget-context { order: -1; } }
+@media (max-width: 767px) { .budget-context, .budget-categories { padding: 16px; } .budget-categories .financial-item .inline-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }

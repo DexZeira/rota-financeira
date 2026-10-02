@@ -20,6 +20,10 @@ import {
 import { workCashResult } from '../work-results';
 import { Card, Metrics, Bar, Choice, Fields } from './common';
 import type { ViewProps } from '../pages/views';
+import { Bar as ChartBar, BarChart, CartesianGrid, Rectangle, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { EmptyState } from './finance-ui';
+import { PrivateValue, useValuePrivacy } from './value-privacy';
+import './data-chart.css';
 
 export function SelectedGoal({
   data: d,
@@ -340,13 +344,14 @@ export function TrendChart({ data: d }: { data: Data }) {
       result: 'Resultado de caixa',
       km: 'Quilometragem',
     };
-  const values = rows.map(
-      (r) => r[metric as 'revenue' | 'expenses' | 'result' | 'km'],
-    ),
-    max = Math.max(1, ...values.map(Math.abs));
+  const { hidden } = useValuePrivacy();
+  const monetary = metric !== 'km';
+  const format = (value: number) => monetary ? money(value) : dec(value) + ' km';
+  const points = rows.map(row => ({ label: row.month.slice(5) + '/' + row.month.slice(2,4), month: row.month, value: row[metric as 'revenue' | 'expenses' | 'result' | 'km'] }));
   return (
     <Card
       title="Evolução mensal"
+      className="rota-data-chart rota-trend-chart"
       action={
         <Choice
           label="Métrica do gráfico"
@@ -359,33 +364,22 @@ export function TrendChart({ data: d }: { data: Data }) {
         />
       }
     >
-      <div
-        className="trend-bars"
-        aria-label={
-          labels[metric] +
-          ': ' +
-          rows.map((r, i) => `${r.month} ${dec(values[i])}`).join(', ')
-        }
-      >
-        {rows.map((r, i) => (
-          <div className="trend-column" key={r.month}>
-            <strong>
-              {metric === 'km' ? dec(values[i]) + ' km' : money(values[i])}
-            </strong>
-            <div className="trend-track">
-              <i
-                className={values[i] < 0 ? 'negative-bar' : ''}
-                style={{
-                  height: Math.max(2, (Math.abs(values[i]) / max) * 100) + '%',
-                }}
-              />
-            </div>
-            <span>
-              {r.month.slice(5)}/{r.month.slice(2, 4)}
-            </span>
-          </div>
-        ))}
-      </div>
+      {!points.some(point => point.value !== 0) ? <EmptyState title={'Sem valores de ' + labels[metric].toLocaleLowerCase('pt-BR') + ' neste período'} description="Este gráfico mostra os seis meses mais recentes; o mês atual é parcial."/> : <>
+        <div className="rota-chart-legend"><span className="rota-chart-mark"/><span>{labels[metric]} · {monetary ? 'R$' : 'km'}</span></div>
+        <div className="rota-chart-canvas" aria-hidden="true">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={points} accessibilityLayer={false} margin={{ top: 16, right: 8, bottom: 8, left: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5"/>
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} minTickGap={16}/>
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} width={52} tickFormatter={value => hidden && monetary ? '••••' : new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value))}/>
+              <ReferenceLine y={0} stroke="var(--border-strong)"/>
+              <Tooltip cursor={{ fill: 'var(--muted)' }} content={({ active, payload, label }) => active && payload?.length ? <div className="rota-chart-tooltip"><strong>{String(label)}</strong><span>{labels[metric]}<b>{hidden && monetary ? '••••' : format(Number(payload[0].value))}</b></span></div> : null}/>
+              <ChartBar dataKey="value" name={labels[metric]} maxBarSize={36} isAnimationActive={false} shape={props => <Rectangle {...props} radius={Number(props.value) < 0 ? [0,0,4,4] : [4,4,0,0]} fill={Number(props.value) < 0 ? 'var(--destructive)' : 'var(--chart-1)'}/>}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <details className="rota-chart-data"><summary>Consultar dados de {labels[metric]}</summary><div className="rota-chart-table"><table><caption className="sr-only">{labels[metric]} nos seis meses mais recentes</caption><thead><tr><th scope="col">Mês</th><th scope="col">{labels[metric]}</th></tr></thead><tbody>{points.map(point => <tr key={point.month}><th scope="row">{point.label}</th><td><PrivateValue>{format(point.value)}</PrivateValue></td></tr>)}</tbody></table></div></details>
+      </>}
       <p className="inline-note">
         Mês atual parcial. Resultado = receitas − gastos − dívidas pagas −
         aportes em investimentos + retiradas. Não desconta novamente aportes dos

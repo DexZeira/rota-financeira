@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
 import { recordDiagnostic } from '../services/app-diagnostics';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Feedback } from './finance-ui';
 
 export function OfflineStatus() {
   const [status, setStatus] = useState('');
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const [confirmUpdate, setConfirmUpdate] = useState(false);
   useEffect(() => {
     if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
     let active = true;
@@ -47,16 +59,29 @@ export function OfflineStatus() {
       worker?.removeEventListener('statechange', update);
     };
   }, []);
+  function applyUpdate() {
+    if (!waiting) return;
+    const updated = () => {
+      if (waiting.state === 'activated') {
+        waiting.removeEventListener('statechange', updated);
+        window.location.reload();
+      }
+    };
+    waiting.addEventListener('statechange', updated);
+    waiting.postMessage({ type: 'ROTA_ACTIVATE_UPDATE' });
+  }
   return status ? (
     <aside
       className="muted pwa-status"
       aria-label="Estado do aplicativo offline"
     >
-      <output>{status}</output>
+      <Feedback tone={waiting ? 'warning' : 'offline'} announce>{status}</Feedback>
       {waiting && (
-        <button
-          onClick={() => {
+        <AlertDialog
+          open={confirmUpdate}
+          onOpenChange={(open) => {
             if (
+              open &&
               document.querySelector(
                 '[role="dialog"], [role="alertdialog"], [aria-busy="true"], form:focus-within',
               )
@@ -64,24 +89,21 @@ export function OfflineStatus() {
               setStatus('Feche o formulário aberto antes de atualizar.');
               return;
             }
-            if (
-              !window.confirm(
-                'Atualizar e recarregar esta aba? Salve suas edições antes de continuar.',
-              )
-            )
-              return;
-            const updated = () => {
-              if (waiting.state === 'activated') {
-                waiting.removeEventListener('statechange', updated);
-                window.location.reload();
-              }
-            };
-            waiting.addEventListener('statechange', updated);
-            waiting.postMessage({ type: 'ROTA_ACTIVATE_UPDATE' });
+            setConfirmUpdate(open);
           }}
         >
-          Atualizar aplicativo
-        </button>
+          <AlertDialogTrigger render={<button aria-label="Atualizar aplicativo" />}>Atualizar aplicativo</AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogTitle>Atualizar aplicativo agora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta aba será recarregada. Salve suas edições antes de continuar.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={applyUpdate}>Atualizar e recarregar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </aside>
   ) : null;

@@ -6,7 +6,7 @@ import { workerSource } from './pwa-worker.mjs';
 // Only public build artifacts enter the offline cache. Never cache API requests.
 const outDir = process.argv[2] || 'dist';
 const files = (await readdir(outDir, { recursive: true })).filter((file) =>
-  /^(?:assets\/.*\.(?:js|css|woff2?)|index\.html|favicon\.svg|manifest\.webmanifest)$/.test(file.replaceAll('\\', '/')),
+  /^(?:assets\/.*\.(?:js|css|woff2?)|fonts\/.*\.(?:ttf|woff2?)|icon-(?:192|512)\.png|index\.html|favicon\.svg|manifest\.webmanifest)$/.test(file.replaceAll('\\', '/')),
 );
 const digest = createHash('sha256');
 for (const file of files.sort()) digest.update(await readFile(join(outDir, file)));
