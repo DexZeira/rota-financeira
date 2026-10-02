@@ -209,7 +209,9 @@ test('23 superfícies com registros reais da fixture cabem em ambos os temas', a
         const shortcuts = page.locator('.dashboard-actions .quick-action');
         await expect(shortcuts).toHaveCount(3);
         expect(await shortcuts.evaluateAll((buttons) => buttons.every((button) => getComputedStyle(button).whiteSpace === 'nowrap'))).toBe(true);
-        const axisLabels = await page.locator('.wealth-line-chart .recharts-yAxis .recharts-cartesian-axis-tick-value').allTextContents();
+        const axis = page.locator('.wealth-line-chart .recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value');
+        await expect(axis.first()).toBeVisible();
+        const axisLabels = await axis.allTextContents();
         expect(axisLabels.length).toBeGreaterThan(1);
         expect(new Set(axisLabels).size).toBe(axisLabels.length);
         await expect(page.locator('.dashboard-wealth-trend')).toContainText(

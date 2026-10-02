@@ -90,6 +90,8 @@ A worktree continha alterações prévias extensas, inclusive Supabase/Manio e s
 
 ## Revisão e correções finais
 
+Verdict final independente após recaptura: `disposition: ship`; sem finding material remanescente da revisão. Resultado e adaptações registrados também em DESIGN.md. O card separado QUALITY BAR não estava disponível; nenhum critério dele foi inventado.
+
 Revisões independentes de código e acabamento confirmaram a direção, sem necessidade de reconstrução. A rodada de correções removeu palavras partidas dos atalhos em tablet, aumentou a precisão do eixo patrimonial, eliminou o card dentro do card em Investimentos e corrigiu o contraste do rodapé da sidebar. A revisão de código também identificou e corrigiu custos omitidos no gráfico e resumos financeiros não mascarados em Configurações.
 
 O gráfico de caixa exclui o principal de aporte/resgate, mas inclui o efeito líquido dos rendimentos e os custos pagos, reutilizando `movementCashCents`. Teste em centavos cobre aportes, resgates, rendimentos pagos/reinvestidos, impostos, taxas e efeito líquido negativo; nenhum registro é modificado pelo seletor.
